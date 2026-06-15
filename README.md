@@ -142,6 +142,6 @@ to `config.toml` and reconciled to the OS on each launch.
 
 Built on [OpenSCQ30][openscq30] by Oppzippy — all device protocol support comes from there.
 
-[repo]: https://github.com/pamod/SoundCore-Desktop
+[repo]: https://github.com/pamod-madubashana/SoundCore-Desktop
 [soundcore]: https://www.soundcore.com
 [openscq30]: https://github.com/Oppzippy/OpenSCQ30
