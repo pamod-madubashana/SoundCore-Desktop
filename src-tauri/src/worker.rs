@@ -393,7 +393,7 @@ pub fn value_to_profile_string(value: &Value) -> String {
     }
 }
 
-fn parse_value(setting: &Setting, raw: &str) -> anyhow::Result<Value> {
+pub fn parse_value(setting: &Setting, raw: &str) -> anyhow::Result<Value> {
     match setting {
         Setting::Toggle { .. } => Ok(Value::from(bool::from_str(raw)?)),
         Setting::I32Range { setting, .. } => {
