@@ -1,0 +1,32 @@
+[package]
+name = "soundcore-auto-mode"
+version = "0.1.0"
+edition = "2024"
+description = "Automatically applies a Soundcore profile (gaming mode, ambient sound mode, EQ) the moment the device connects to this PC."
+
+[[bin]]
+name = "soundcore-auto-mode"
+path = "src/main.rs"
+
+[dependencies]
+openscq30-lib = { path = "../OpenSCQ30/lib" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
+macaddr = "1"
+strum = "0.28"
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+dirs = "6"
+eframe = { version = "0.31", default-features = false, features = ["glow", "default_fonts"] }
+egui = "0.31"
+tray-icon = "0.21"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.52"
+
+# Build with: cargo build --release
+# (a release-fast-like quick profile)
+[profile.release]
+opt-level = 2
