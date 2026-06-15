@@ -1,0 +1,24 @@
+# Soundcore Auto-Mode configuration
+#
+# One [[devices]] block per device. Each device's `profile` is pushed to it every time it
+# connects to this PC. You can edit all of this from the tray popup (left-click the tray
+# icon) instead — including picking settings with live controls while the device is
+# connected. Unknown setting ids are reported with a clear message when applied.
+
+# Start automatically at logon (toggle from the popup's "Run at startup" checkbox).
+autostart = true
+
+[[devices]]
+name = "R50i NC"
+mac_address = "34:09:C9:B9:EC:30"
+model = "SoundcoreA3959"
+poll_seconds = 5
+apply_delay_seconds = 2
+
+[[devices.profile]]
+id = "gamingMode"
+value = "true"
+
+[[devices.profile]]
+id = "ambientSoundMode"
+value = "Normal"
