@@ -1,9 +1,9 @@
 // Hide the console window in release builds (it's a tray app). Keep it in debug for logs.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-//! Soundcore Auto-Mode — lives in the system tray, applies a saved profile to each
+//! SoundCore-Desktop — lives in the system tray, applies a saved profile to each
 //! configured device the instant it connects. Left-click the tray icon for a small config
-//! popup; there is no main window. Supports any device OpenSCQ30 supports.
+//! popup; there is no main window. Supports any device OpenSCQ30 supports (Windows & Linux).
 
 mod autostart;
 mod config;
@@ -55,7 +55,7 @@ fn main() -> eframe::Result {
     };
 
     eframe::run_native(
-        "Soundcore Auto-Mode",
+        "SoundCore-Desktop",
         options,
         Box::new(move |cc| Ok(Box::new(App::new(cc, config, config_path, worker)))),
     )
@@ -96,9 +96,11 @@ impl App {
         menu.append(&quit_item).ok();
 
         let tray = TrayIconBuilder::new()
-            .with_tooltip("Soundcore Auto-Mode")
+            .with_tooltip("SoundCore-Desktop")
             .with_icon(build_icon())
             .with_menu(Box::new(menu))
+            // Left-click should open our popup, not the menu. The menu stays on right-click.
+            .with_menu_on_left_click(false)
             .build()
             .expect("failed to create tray icon");
 
@@ -246,7 +248,7 @@ impl eframe::App for App {
                         (egui::Color32::from_rgb(158, 158, 158), "○")
                     };
                     ui.colored_label(color, dot);
-                    ui.heading("Soundcore Auto-Mode");
+                    ui.heading("SoundCore-Desktop");
                 });
 
                 // ---- device picker ----

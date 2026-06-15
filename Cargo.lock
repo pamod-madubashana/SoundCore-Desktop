@@ -3261,7 +3261,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "soundcore-auto-mode"
+name = "soundcore-desktop"
 version = "0.1.0"
 dependencies = [
  "anyhow",

@@ -1,11 +1,11 @@
 [package]
-name = "soundcore-auto-mode"
+name = "soundcore-desktop"
 version = "0.1.0"
 edition = "2024"
-description = "Automatically applies a Soundcore profile (gaming mode, ambient sound mode, EQ) the moment the device connects to this PC."
+description = "Cross-platform desktop tray app that auto-applies Soundcore profiles (gaming mode, ANC, EQ) the moment a device connects. Windows & Linux."
 
 [[bin]]
-name = "soundcore-auto-mode"
+name = "soundcore-desktop"
 path = "src/main.rs"
 
 [dependencies]
