@@ -1,0 +1,25 @@
+{
+  "name": "auto-mode",
+  "version": "1.0.0",
+  "description": "This is the complete source code and the build instructions for **SoundCore-Desktop**, a tiny system-tray app that automatically applies your saved profile — gaming mode, ambient sound mode, equalizer, anything — to a [Soundcore][soundcore] device the moment it connects to your computer. No phone, no official app. Built on the [OpenSCQ30][openscq30] library and its reverse-engineered MTProto-style device protocol over Bluetooth RFCOMM.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pamod-madubashana/SoundCore-Desktop.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/pamod-madubashana/SoundCore-Desktop/issues"
+  },
+  "homepage": "https://github.com/pamod-madubashana/SoundCore-Desktop#readme",
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.2",
+    "sharp": "^0.35.1"
+  }
+}
