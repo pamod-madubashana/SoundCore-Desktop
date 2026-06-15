@@ -194,6 +194,16 @@ async fn device_loop(
         }
     };
 
+    // OpenSCQ30 only ships Bluetooth backends for Windows and Linux. On any other OS
+    // (e.g. macOS) connecting would panic, so degrade gracefully and park the task.
+    if openscq30_lib::default_backends().is_none() {
+        set_device_state(&state, mac, |s| {
+            s.message = "This OS has no Bluetooth backend (OpenSCQ30 supports Windows & Linux)".into();
+        });
+        while rx.recv().await.is_some() {}
+        return;
+    }
+
     // Idempotent mac<->model registration.
     let _ = session
         .pair(PairedDevice { mac_address: mac, model, is_demo: false })
