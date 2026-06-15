@@ -57,18 +57,36 @@ The binary is produced at `target\release\soundcore-auto-mode.exe`.
 
 ## Configure
 
-Edit [`config.toml`](config.toml). It's already filled in for the R50i NC
-(`34:09:C9:B9:EC:30`, model `SoundcoreA3959`). The `[[settings]]` entries are applied in
-order on every connect:
+Easiest: run the app, left-click the tray icon, and use the popup — add a device (＋),
+pick the model, **Scan** to fill the MAC from connected Bluetooth devices, then connect
+the device and flip the live controls. Tick the **★** next to any setting to re-apply it
+on every connect. **Save** writes `config.toml`.
 
-| setting id          | example                 | meaning                                   |
-| ------------------- | ----------------------- | ----------------------------------------- |
-| `gamingMode`        | `"true"` / `"false"`    | low-latency mode (needs recent firmware)  |
-| `ambientSoundMode`  | `"Normal"` / `"Transparency"` / `"NoiseCanceling"` |                    |
-| `volumeAdjustments` | `"0,0,0,0,0,0,0,0"`     | 8-band EQ, tenths of a dB (`-40` = -4.0)  |
+Or edit [`config.toml`](config.toml) directly. One `[[devices]]` block per device, each
+with its own `[[devices.profile]]` entries applied in order on connect:
 
-To discover every setting your firmware exposes, just run the program once with the buds
-connected — it logs each setting it applies, and rejects unknown ids with a clear message.
+```toml
+autostart = true            # run at logon (also toggled from the popup)
+
+[[devices]]
+name = "R50i NC"
+mac_address = "34:09:C9:B9:EC:30"
+model = "SoundcoreA3959"     # see OpenSCQ30 list-models for ids
+poll_seconds = 5
+apply_delay_seconds = 2
+
+[[devices.profile]]
+id = "gamingMode"            # "true" / "false" (low-latency; needs recent firmware)
+value = "true"
+
+[[devices.profile]]
+id = "ambientSoundMode"      # "Normal" / "Transparency" / "NoiseCanceling"
+value = "Normal"
+```
+
+Works for **any device OpenSCQ30 supports** — you don't need to memorize setting ids;
+connect the device and the real controls appear in the popup. Equalizer is
+`volumeAdjustments`, a comma-separated list of bands in tenths of a dB.
 
 ## Run
 
@@ -82,18 +100,12 @@ A tray icon appears (teal square). Left-click it for the config popup; right-cli
 Apply now / Quit. The release build has no console window; for logs run the debug build
 (`cargo run`) or set `RUST_LOG=debug`.
 
-### Start automatically at logon
+### Run at startup
 
-Register it as a hidden scheduled task (one line, no script files):
-
-```powershell
-$exe = "$PWD\target\release\soundcore-auto-mode.exe"
-$action  = New-ScheduledTaskAction -Execute $exe -WorkingDirectory (Split-Path $exe)
-$trigger = New-ScheduledTaskTrigger -AtLogOn
-Register-ScheduledTask -TaskName SoundcoreAutoMode -Action $action -Trigger $trigger -Force
-```
-
-Remove it with `Unregister-ScheduledTask -TaskName SoundcoreAutoMode -Confirm:$false`.
+On by default — the app registers itself under the per-user `Run` key
+(`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, no admin needed) so it starts at
+logon. Toggle it any time with the **"Run at startup"** checkbox in the popup; the choice
+is saved to `config.toml` and reconciled to the registry on each launch.
 
 ## Notes
 
