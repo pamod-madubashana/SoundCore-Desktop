@@ -1,4 +1,4 @@
-# Soundcore Auto-Mode configuration
+# SoundCore-Desktop configuration
 #
 # One [[devices]] block per device. Each device's `profile` is pushed to it every time it
 # connects to this PC. You can edit all of this from the tray popup (left-click the tray
