@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SoundCore-Desktop</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <span class="logo" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 14v-2a8 8 0 0 1 16 0v2" />
+              <rect x="3" y="13" width="4" height="7" rx="2" />
+              <rect x="17" y="13" width="4" height="7" rx="2" />
+            </svg>
+          </span>
+          <div class="titles">
+            <h1>SoundCore-Desktop</h1>
+            <p id="subtitle">auto profiles on connect</p>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <span id="status-pill" class="pill"><i class="dot"></i><span id="status-text">…</span></span>
+          <button id="close-btn" class="icon-btn" title="Hide">✕</button>
+        </div>
+      </header>
+
+      <nav id="device-tabs" class="tabs"></nav>
+
+      <main id="content" class="content">
+        <div id="empty" class="empty hidden">
+          <p>No devices yet.</p>
+          <button id="add-first" class="btn primary">+ Add a device</button>
+        </div>
+        <section id="device-panel" class="hidden"></section>
+      </main>
+
+      <footer class="footer">
+        <label class="switch-row">
+          <span class="switch">
+            <input type="checkbox" id="autostart" />
+            <span class="track"></span>
+          </span>
+          <span>Run at startup</span>
+        </label>
+        <div class="footer-actions">
+          <button id="apply-btn" class="btn">Apply now</button>
+          <button id="save-btn" class="btn primary">Save</button>
+        </div>
+      </footer>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+    <script src="main.js"></script>
+  </body>
+</html>
