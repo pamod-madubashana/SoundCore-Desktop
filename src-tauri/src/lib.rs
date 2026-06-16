@@ -162,6 +162,23 @@ fn set_setting(mac: String, id: String, raw: String, state: tauri::State<AppStat
     .ok_or("setting not currently available")?;
     let value = worker::parse_value(&setting, &raw).map_err(|e| e.to_string())?;
     let _ = state.worker.tx.send(Command::SetSetting { mac, id: setting_id, value });
+
+    // Persist so it re-applies on the next connect (no worker restart, no reconnect churn).
+    worker::upsert_profile_entry(&state.worker.state, mac, id.clone(), raw.clone());
+    {
+        let mut cfg = state.config.lock().unwrap();
+        if let Some(d) = cfg
+            .devices
+            .iter_mut()
+            .find(|d| MacAddr6::from_str(d.mac_address.trim()).ok() == Some(mac))
+        {
+            match d.profile.iter_mut().find(|e| e.id == id) {
+                Some(e) => e.value = raw.clone(),
+                None => d.profile.push(config::SettingEntry { id: id.clone(), value: raw.clone() }),
+            }
+            let _ = cfg.save(&state.config_path);
+        }
+    }
     Ok(())
 }
 
@@ -260,6 +277,52 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            // Auto-detect: periodically scan connected Bluetooth devices and add any
+            // recognized Soundcore device to the config (zero manual setup).
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                use strum::VariantArray;
+                let any_model = DeviceModel::VARIANTS[0];
+                loop {
+                    {
+                        let state = handle.state::<AppState>();
+                        let _ = state.worker.tx.send(Command::Scan { model: any_model });
+                    }
+                    tokio::time::sleep(std::time::Duration::from_millis(2500)).await;
+                    {
+                        let state = handle.state::<AppState>();
+                        let results = state.worker.state.scan_results.lock().unwrap().clone();
+                        let mut cfg = state.config.lock().unwrap().clone();
+                        let mut changed = false;
+                        for r in results {
+                            if let Some(model) = worker::infer_model(&r.name) {
+                                let known = cfg
+                                    .devices
+                                    .iter()
+                                    .any(|d| d.mac_address.eq_ignore_ascii_case(&r.mac_address));
+                                if !known {
+                                    cfg.devices.push(config::DeviceConfig {
+                                        name: r.name.clone(),
+                                        mac_address: r.mac_address.clone(),
+                                        model: model.to_string(),
+                                        poll_seconds: 5,
+                                        apply_delay_seconds: 2,
+                                        profile: Vec::new(),
+                                    });
+                                    changed = true;
+                                }
+                            }
+                        }
+                        if changed {
+                            let _ = cfg.save(&state.config_path);
+                            *state.config.lock().unwrap() = cfg.clone();
+                            let _ = state.worker.tx.send(Command::UpdateConfig(cfg));
+                        }
+                    }
+                    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                }
+            });
+
             let menu = Menu::with_items(
                 app,
                 &[
@@ -271,7 +334,7 @@ pub fn run() {
             )?;
 
             TrayIconBuilder::with_id("main")
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(tauri::include_image!("icons/128x128.png"))
                 .tooltip("SoundCore-Desktop")
                 .menu(&menu)
                 .show_menu_on_left_click(false)

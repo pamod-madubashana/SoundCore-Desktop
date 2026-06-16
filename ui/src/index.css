@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-popover: var(--popover);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-success: var(--success);
+  --color-destructive: var(--destructive);
+  --shadow-popup: 0 24px 60px -12px oklch(0 0 0 / 0.6), 0 0 0 1px oklch(1 0 0 / 0.04);
+  --shadow-glow: 0 0 32px -4px var(--brand-glow);
+}
+
+:root {
+  --radius: 0.875rem;
+  --background: oklch(0.18 0.015 250);
+  --foreground: oklch(0.97 0.005 250);
+  --popover: oklch(0.16 0.012 255);
+  --surface: oklch(0.21 0.014 255);
+  --surface-elevated: oklch(0.255 0.016 255);
+  --muted-foreground: oklch(0.66 0.018 255);
+  --brand: oklch(0.78 0.16 195);
+  --brand-foreground: oklch(0.16 0.012 255);
+  --brand-glow: oklch(0.78 0.16 195 / 0.35);
+  --success: oklch(0.78 0.16 160);
+  --destructive: oklch(0.65 0.22 25);
+}
+
+* { border-color: oklch(1 0 0 / 0.07); }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  color: var(--foreground);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+
+.popup-window {
+  background: linear-gradient(180deg, var(--popover) 0%, oklch(0.14 0.012 255) 100%);
+  box-shadow: var(--shadow-popup);
+  border: 1px solid oklch(1 0 0 / 0.06);
+}
+.brand-glow { box-shadow: var(--shadow-glow); }
+.eq-track {
+  background: linear-gradient(180deg, transparent 0%, oklch(1 0 0 / 0.04) 50%, transparent 100%);
+}
+
+::-webkit-scrollbar { width: 7px; }
+::-webkit-scrollbar-thumb { background: oklch(1 0 0 / 0.12); border-radius: 8px; }
