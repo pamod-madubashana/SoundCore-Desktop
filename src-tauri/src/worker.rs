@@ -43,6 +43,58 @@ pub struct SharedState {
     pub devices: Mutex<HashMap<MacAddr6, DeviceState>>,
     pub scan_results: Mutex<Vec<ScanResult>>,
     pub scanning: Mutex<bool>,
+    /// Per-device profile applied on connect. Read live so UI changes persist without
+    /// restarting the connection.
+    pub profiles: Mutex<HashMap<MacAddr6, Vec<SettingEntry>>>,
+}
+
+fn load_profiles(config: &Config) -> HashMap<MacAddr6, Vec<SettingEntry>> {
+    config
+        .devices
+        .iter()
+        .filter_map(|d| d.parse().ok().map(|(mac, _)| (mac, d.profile.clone())))
+        .collect()
+}
+
+fn current_profile(state: &SharedState, mac: MacAddr6) -> Vec<SettingEntry> {
+    state.profiles.lock().unwrap().get(&mac).cloned().unwrap_or_default()
+}
+
+/// Upsert one entry into a device's on-connect profile (used when the UI changes a setting).
+pub fn upsert_profile_entry(state: &SharedState, mac: MacAddr6, id: String, value: String) {
+    let mut map = state.profiles.lock().unwrap();
+    let list = map.entry(mac).or_default();
+    match list.iter_mut().find(|e| e.id == id) {
+        Some(e) => e.value = value,
+        None => list.push(SettingEntry { id, value }),
+    }
+}
+
+/// Best-effort Bluetooth-name -> model guess for zero-config auto-detect.
+/// ponytail: substring map for common devices; extend or derive from localized names later.
+pub fn infer_model(name: &str) -> Option<DeviceModel> {
+    let n = name.to_lowercase();
+    use DeviceModel::*;
+    let m = if n.contains("r50i nc") || n.contains("p30i") {
+        SoundcoreA3959
+    } else if n.contains("r50i") || n.contains("p20i") || n.contains("p25i") {
+        SoundcoreA3949
+    } else if n.contains("space one pro") {
+        SoundcoreA3062
+    } else if n.contains("space one") {
+        SoundcoreA3035
+    } else if n.contains("space q45") || n.contains("q45") {
+        SoundcoreA3040
+    } else if n.contains("liberty 4 nc") {
+        SoundcoreA3947
+    } else if n.contains("p40i") {
+        SoundcoreA3955
+    } else if n.contains("q30") {
+        SoundcoreA3028
+    } else {
+        return None;
+    };
+    Some(m)
 }
 
 #[derive(Debug, Clone)]
@@ -122,11 +174,13 @@ async fn run(
         }
     };
 
+    *state.profiles.lock().unwrap() = load_profiles(&config);
     let mut tasks = spawn_devices(&session, &state, &config);
 
     while let Some(cmd) = rx.recv().await {
         match cmd {
             Command::UpdateConfig(new_config) => {
+                *state.profiles.lock().unwrap() = load_profiles(&new_config);
                 std::mem::replace(&mut tasks, DeviceTasks { senders: HashMap::new(), handles: Vec::new() }).abort();
                 state.devices.lock().unwrap().clear();
                 tasks = spawn_devices(&session, &state, &new_config);
@@ -228,10 +282,10 @@ async fn device_loop(
                 if !apply_delay.is_zero() {
                     sleep(apply_delay).await;
                 }
-                apply_and_report(device.as_ref(), &dev.profile, &state, mac).await;
+                apply_and_report(device.as_ref(), &current_profile(&state, mac), &state, mac).await;
                 publish_snapshot(device.as_ref(), &state, mac);
 
-                if connected_session(device.as_ref(), &dev, &mut rx, &state, mac).await {
+                if connected_session(device.as_ref(), &mut rx, &state, mac).await {
                     return; // channel dropped -> task replaced
                 }
 
@@ -251,7 +305,6 @@ async fn device_loop(
 /// Returns true if the device command channel closed (task is being replaced).
 async fn connected_session(
     device: &(dyn OpenSCQ30Device + Send + Sync),
-    dev: &DeviceConfig,
     rx: &mut mpsc::UnboundedReceiver<DeviceCommand>,
     state: &SharedState,
     mac: MacAddr6,
@@ -262,7 +315,7 @@ async fn connected_session(
         tokio::select! {
             cmd = rx.recv() => match cmd {
                 Some(DeviceCommand::ApplyNow) => {
-                    apply_and_report(device, &dev.profile, state, mac).await;
+                    apply_and_report(device, &current_profile(state, mac), state, mac).await;
                     publish_snapshot(device, state, mac);
                 }
                 Some(DeviceCommand::SetSetting { id, value }) => {
@@ -351,46 +404,6 @@ async fn scan(session: &OpenSCQ30Session, state: &SharedState, model: DeviceMode
     };
     *state.scan_results.lock().unwrap() = results;
     *state.scanning.lock().unwrap() = false;
-}
-
-/// Converts a setting's current value into the string form stored in a profile.
-pub fn current_value_string(setting: &Setting) -> String {
-    match setting {
-        Setting::Toggle { value } => value.to_string(),
-        Setting::I32Range { value, .. } => value.to_string(),
-        Setting::Select { value, .. } => value.to_string(),
-        Setting::OptionalSelect { value, .. } | Setting::ModifiableSelect { value, .. } => {
-            value.clone().map(|v| v.to_string()).unwrap_or_default()
-        }
-        Setting::MultiSelect { values, .. } => values
-            .iter()
-            .map(|v| v.to_string())
-            .collect::<Vec<_>>()
-            .join(","),
-        Setting::Equalizer { value, .. } => value
-            .iter()
-            .map(|v| v.to_string())
-            .collect::<Vec<_>>()
-            .join(","),
-        Setting::Information { value, .. } => value.clone(),
-        Setting::ImportString { .. } | Setting::Action => String::new(),
-    }
-}
-
-/// Converts a `Value` (as produced by a UI widget) into the string form for a profile.
-pub fn value_to_profile_string(value: &Value) -> String {
-    match value {
-        Value::Bool(b) => b.to_string(),
-        Value::U16(n) => n.to_string(),
-        Value::I32(n) => n.to_string(),
-        Value::OptionalU16(o) => o.map(|x| x.to_string()).unwrap_or_default(),
-        Value::U16Vec(v) => v.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(","),
-        Value::I16Vec(v) => v.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(","),
-        Value::String(s) => s.to_string(),
-        Value::StringVec(v) => v.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(","),
-        Value::OptionalString(o) => o.clone().map(|s| s.to_string()).unwrap_or_default(),
-        Value::ModifiableSelectCommand(_) => String::new(),
-    }
 }
 
 pub fn parse_value(setting: &Setting, raw: &str) -> anyhow::Result<Value> {
