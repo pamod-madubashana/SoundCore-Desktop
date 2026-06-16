@@ -2,4 +2,4 @@
 /src-tauri/target
 /src-tauri/gen
 /src-tauri/config.toml
-/node_modules
+node_modules/
