@@ -9,7 +9,7 @@
   <a href="https://github.com/pamod-madubashana/SoundCore-Desktop"><img src="https://img.shields.io/badge/Windows-supported-46A75A?logo=windows&logoColor=white" alt="Windows"></a>
   <a href="https://github.com/pamod-madubashana/SoundCore-Desktop"><img src="https://img.shields.io/badge/Linux-supported-46A75A?logo=linux&logoColor=white" alt="Linux"></a>
   <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/Built%20with-Rust-DEA584?logo=rust&logoColor=white" alt="Built with Rust"></a>
-  <a href="https://github.com/pamod-madubashana/SoundCore-Desktop"><img src="https://img.shields.io/badge/Powered%20by-OpenSCQ30-46A75A" alt="Powered by OpenSCQ30"></a>
+  <a href="https://github.com/Oppzippy/OpenSCQ30"><img src="https://img.shields.io/badge/Powered%20by-OpenSCQ30-46A75A" alt="Powered by OpenSCQ30"></a>
 </p>
 </div>
 </div>
