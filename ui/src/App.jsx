@@ -124,8 +124,8 @@ function SoundMode({ s, send }) {
   const value = setting.value;
   const modes = [
     { kw: "noise", label: "Noise\nCancel", Icon: Ear },
-    { kw: "transparen", label: "Trans-\nparency", Icon: Waves },
     { kw: "normal", label: "Normal", Icon: Volume2 },
+    { kw: "transparen", label: "Trans-\nparency", Icon: Waves },
   ].map((m) => ({ ...m, opt: pickOption(opts, m.kw) })).filter((m) => m.opt);
 
   const manual = s.manualNoiseCanceling; // i32Range, optional
