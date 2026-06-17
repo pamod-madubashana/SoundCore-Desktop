@@ -9,19 +9,20 @@
   <a href="https://github.com/pamod-madubashana/SoundCore-Desktop"><img src="https://img.shields.io/badge/Windows-supported-46A75A?logo=windows&logoColor=white" alt="Windows"></a>
   <a href="https://github.com/pamod-madubashana/SoundCore-Desktop"><img src="https://img.shields.io/badge/Linux-supported-46A75A?logo=linux&logoColor=white" alt="Linux"></a>
   <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/Built%20with-Rust-DEA584?logo=rust&logoColor=white" alt="Built with Rust"></a>
-  <a href="https://github.com/pamod-madubashana/SoundCore-Desktop"><img src="https://img.shields.io/badge/Powered%20by-OpenSCQ30-46A75A" alt="Powered by OpenSCQ30"></a>
+  <a href="https://github.com/Oppzippy/OpenSCQ30"><img src="https://img.shields.io/badge/Powered%20by-OpenSCQ30-46A75A" alt="Powered by OpenSCQ30"></a>
 </p>
 </div>
 </div>
 <br>
 <div align="center">
 
+- Docs: [https://pamod.is-a.dev/SoundCore-Desktop](https://pamod.is-a.dev/SoundCore-Desktop)
+
 ## Downloads
 
 | Platform | Download Link |
 |----------|--------------|
 | Windows (Setup) | [SoundCore-Desktop-x64-setup.exe](https://github.com/pamod-madubashana/SoundCore-Desktop/releases/latest/download/SoundCore-Desktop-x64-setup.exe) |
-| Windows (MSI) | [SoundCore-Desktop-x64_en-US.msi](https://github.com/pamod-madubashana/SoundCore-Desktop/releases/latest/download/SoundCore-Desktop-x64_en-US.msi) |
 | Windows (Portable) | [SoundCore-Desktop.exe](https://github.com/pamod-madubashana/SoundCore-Desktop/releases/latest/download/SoundCore-Desktop.exe) |
 | Linux (DEB) | [SoundCore-Desktop-amd64.deb](https://github.com/pamod-madubashana/SoundCore-Desktop/releases/latest/download/SoundCore-Desktop-amd64.deb) |
 | Linux (RPM) | [SoundCore-Desktop-x86_64.rpm](https://github.com/pamod-madubashana/SoundCore-Desktop/releases/latest/download/SoundCore-Desktop-x86_64.rpm) |
@@ -44,23 +45,45 @@
 ## Project Structure
 
 ```
-ui/
-├── src/
-│   ├── App.jsx
-│   ├── main.jsx
-│   ├── index.css
-│   └── headphones.jpg
-src-tauri/
-├── src/
-│   ├── lib.rs
-│   └── main.rs
-├── Cargo.toml
-├── tauri.conf.json
-└── icons/
-    ├── icon.png
-    ├── icon.ico
-    ├── 32x32.png
-    └── ...
+.
+├── README.md
+├── package.json
+├── config.toml
+├── assets/
+│   └── ...
+├── soundcore-graphify/
+│   ├── GRAPH_REPORT.md
+│   ├── graph.html
+│   ├── graph.json
+│   ├── manifest.json
+│   └── cache/
+│       └── ...
+├── src-tauri/
+│   ├── Cargo.toml
+│   ├── config.toml
+│   ├── build.rs
+│   ├── tauri.conf.json
+│   ├── capabilities/
+│   │   └── default.json
+│   ├── gen/
+│   │   └── schemas/
+│   │       └── ...
+│   ├── icons/
+│   │   └── ...
+│   └── src/
+│       ├── autostart.rs
+│       ├── config.rs
+│       ├── lib.rs
+│       ├── main.rs
+│       └── worker.rs
+└── ui/
+    ├── index.html
+    ├── package.json
+    ├── vite.config.js
+    └── src/
+        ├── App.jsx
+        ├── index.css
+        └── main.jsx
 ```
 
 ## Key Features
@@ -115,3 +138,7 @@ npm run tauri build
 
 - **Left-click tray icon**: Show/hide control panel
 - **Right-click tray icon**: Open context menu (Show/Hide, Apply now, Quit)
+
+## Credits
+
+- This project uses and credits [OpenSCQ30](https://github.com/Oppzippy/OpenSCQ30) for the underlying Soundcore Bluetooth support and device handling.

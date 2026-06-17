@@ -1,0 +1,22 @@
+/* Custom Docusaurus CSS */
+
+:root {
+  --ifm-color-primary: #46a75a;
+  --ifm-color-primary-dark: #2f7f41;
+  --ifm-color-secondary: #a8d6a4;
+}
+
+body {
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.theme-dark {
+  --ifm-background-color: #0b1220;
+  --ifm-color: #e5e9f2;
+  --ifm-sidebar-background-color: #111827;
+}
+
+.theme-light {
+  --ifm-background-color: #0b1220;
+  --ifm-color: #e5e9f2;
+}
