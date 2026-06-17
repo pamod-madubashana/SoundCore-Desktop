@@ -40,6 +40,9 @@ pub struct DeviceConfig {
     /// Settings to push on every connect, in order.
     #[serde(default)]
     pub profile: Vec<SettingEntry>,
+    /// Optional product image URL shown in the popup (otherwise a generic illustration).
+    #[serde(default)]
+    pub image: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,6 +67,7 @@ impl Default for DeviceConfig {
             poll_seconds: 5,
             apply_delay_seconds: 2,
             profile: Vec::new(),
+            image: None,
         }
     }
 }
