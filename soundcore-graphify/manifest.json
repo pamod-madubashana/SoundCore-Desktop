@@ -1,0 +1,332 @@
+{
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\package.json": {
+    "mtime": 1781641374.8390732,
+    "ast_hash": "b6575267abd0fa82834f58f357e2bd25",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\build.rs": {
+    "mtime": 1781550628.7200928,
+    "ast_hash": "48af8f08e39b73562f866d3a50b2e88a",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\capabilities\\default.json": {
+    "mtime": 1781550930.0633974,
+    "ast_hash": "8e7bdaa61cc4af960da5ca8d147064b7",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\src\\autostart.rs": {
+    "mtime": 1781549743.8631606,
+    "ast_hash": "7157112f68eed616768522057e00a522",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\src\\config.rs": {
+    "mtime": 1781548939.1458838,
+    "ast_hash": "43148dcf3be3a7b20bf4b7c108cd21f0",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\src\\lib.rs": {
+    "mtime": 1781640991.7831068,
+    "ast_hash": "27a23ba10923482e06328b13b3554793",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\src\\main.rs": {
+    "mtime": 1781550700.8272562,
+    "ast_hash": "8ad04f27036c91aeac5e2b89ba276058",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\src\\worker.rs": {
+    "mtime": 1781640816.8374174,
+    "ast_hash": "ce35966fdf7250c63b2888cd92e6966c",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\tauri.conf.json": {
+    "mtime": 1781641733.3580515,
+    "ast_hash": "67ca3fbd6f591dc366fdeebc5b06000a",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\ui\\package.json": {
+    "mtime": 1781640613.0137517,
+    "ast_hash": "cfb46f67c62d8ef0220df389285a7481",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\ui\\src\\App.jsx": {
+    "mtime": 1781640758.9163377,
+    "ast_hash": "2a02fe5dab06020ef88925cdcd293721",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\ui\\src\\main.jsx": {
+    "mtime": 1781640652.5597289,
+    "ast_hash": "fbbddaf56bd3bb439ff6cda65810c774",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\ui\\vite.config.js": {
+    "mtime": 1781640621.7606802,
+    "ast_hash": "e50eedfd76f9f962975eff9b934898ad",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\README.md": {
+    "mtime": 1781551389.101995,
+    "ast_hash": "d7bb72cdff8e4f96f8d9385dedff4338",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\ui\\index.html": {
+    "mtime": 1781640630.495621,
+    "ast_hash": "cc971702b07ab1b54a9a04d3dc86520d",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\assets\\icon-1024.png": {
+    "mtime": 1781550475.335,
+    "ast_hash": "12e2369b2dd6722fa9ba2018af6641f0",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\assets\\icon.svg": {
+    "mtime": 1781550396.9322422,
+    "ast_hash": "e352f8f690de2c00f7dc8d9c76cb3fdc",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\128x128.png": {
+    "mtime": 1781550481.0156376,
+    "ast_hash": "cef42d7335307bfc7287e47ac70fb86d",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\128x128@2x.png": {
+    "mtime": 1781550481.0976787,
+    "ast_hash": "032171bf3ad654ae3816be0b7542ad11",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\32x32.png": {
+    "mtime": 1781550480.912269,
+    "ast_hash": "3eee91365df1c70105f21a21fb156881",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\64x64.png": {
+    "mtime": 1781550480.9658492,
+    "ast_hash": "549a0b95f65d35f99a26d50561b21622",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\Square107x107Logo.png": {
+    "mtime": 1781550479.2977798,
+    "ast_hash": "0f9341c3714882a84ee04fa5de269276",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\Square142x142Logo.png": {
+    "mtime": 1781550479.3693957,
+    "ast_hash": "5b87bccf96e12d136fb19f47b88075d2",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\Square150x150Logo.png": {
+    "mtime": 1781550479.4310982,
+    "ast_hash": "470ec75fddc10023b013168bb2e27d44",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\Square284x284Logo.png": {
+    "mtime": 1781550479.497653,
+    "ast_hash": "13dc03f48ebc22a880f4a30913335110",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\Square30x30Logo.png": {
+    "mtime": 1781550479.0977898,
+    "ast_hash": "217622f2816863b894e0867973af432f",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\Square310x310Logo.png": {
+    "mtime": 1781550479.5808256,
+    "ast_hash": "adfaf1952ac3058b9066c12fb40efa32",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\Square44x44Logo.png": {
+    "mtime": 1781550479.1456099,
+    "ast_hash": "901f5293754181aa8665c05ecd64c0a7",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\Square71x71Logo.png": {
+    "mtime": 1781550479.2029045,
+    "ast_hash": "5a03bca7c7e725971962abdc1bf5965c",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\Square89x89Logo.png": {
+    "mtime": 1781550479.2456567,
+    "ast_hash": "603046a55473da797edb834ebd6bbb73",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\StoreLogo.png": {
+    "mtime": 1781550479.0473125,
+    "ast_hash": "e4591528fcc5af46d1783c0826aaf1c2",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\android\\mipmap-hdpi\\ic_launcher.png": {
+    "mtime": 1781550482.8644488,
+    "ast_hash": "0b212a66d1de8c0a7fe753fd83c4a543",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\android\\mipmap-hdpi\\ic_launcher_foreground.png": {
+    "mtime": 1781550482.4312377,
+    "ast_hash": "06aee6f215cc817cc29c4a411b6a7892",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\android\\mipmap-hdpi\\ic_launcher_round.png": {
+    "mtime": 1781550482.8038533,
+    "ast_hash": "50676f5514faa2ae2612e7082dec8753",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\android\\mipmap-mdpi\\ic_launcher.png": {
+    "mtime": 1781550482.959777,
+    "ast_hash": "7f49fece7d7d7c43036c83af346d0a5e",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\android\\mipmap-mdpi\\ic_launcher_foreground.png": {
+    "mtime": 1781550482.4770558,
+    "ast_hash": "c574b01baa5c176b23731e10f5effd7f",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\android\\mipmap-mdpi\\ic_launcher_round.png": {
+    "mtime": 1781550482.9104786,
+    "ast_hash": "9781b256bff315ab02faab2b9d8c445d",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\android\\mipmap-xhdpi\\ic_launcher.png": {
+    "mtime": 1781550483.0607104,
+    "ast_hash": "a0ef2990791629d5782336d14276dde5",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\android\\mipmap-xhdpi\\ic_launcher_foreground.png": {
+    "mtime": 1781550482.5477827,
+    "ast_hash": "828bb8239a326bf5d06a6bfd2831c928",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\android\\mipmap-xhdpi\\ic_launcher_round.png": {
+    "mtime": 1781550483.0058837,
+    "ast_hash": "646e2d205d794c7ed2ec6d8a1d26ec75",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\android\\mipmap-xxhdpi\\ic_launcher.png": {
+    "mtime": 1781550483.1645925,
+    "ast_hash": "2353bd24581872907ef3bcabf1050c03",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\android\\mipmap-xxhdpi\\ic_launcher_foreground.png": {
+    "mtime": 1781550482.6291986,
+    "ast_hash": "752b099b53bd295e024762acbd908da2",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\android\\mipmap-xxhdpi\\ic_launcher_round.png": {
+    "mtime": 1781550483.112506,
+    "ast_hash": "118a5927a3b0126a7fb7adbdabb75f80",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\android\\mipmap-xxxhdpi\\ic_launcher.png": {
+    "mtime": 1781550483.2800481,
+    "ast_hash": "7c51eac46f83d3cfb1a1c7cb9772ce39",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\android\\mipmap-xxxhdpi\\ic_launcher_foreground.png": {
+    "mtime": 1781550482.747794,
+    "ast_hash": "fda5dbcc147b0bbfb72992b24c6c6d1b",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\android\\mipmap-xxxhdpi\\ic_launcher_round.png": {
+    "mtime": 1781550483.2145596,
+    "ast_hash": "b04d4a453ef73d03be93946b0018b7c2",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\icon.png": {
+    "mtime": 1781550481.2352047,
+    "ast_hash": "06aa16e703567eec6402f83a596f17f7",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\ios\\AppIcon-20x20@1x.png": {
+    "mtime": 1781550481.3478267,
+    "ast_hash": "2eb0860fe12fb7437c367294d5eb975c",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\ios\\AppIcon-20x20@2x-1.png": {
+    "mtime": 1781550481.2791367,
+    "ast_hash": "a611db04bfd87af3457f040b061e08f2",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\ios\\AppIcon-20x20@2x.png": {
+    "mtime": 1781550481.3978903,
+    "ast_hash": "a611db04bfd87af3457f040b061e08f2",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\ios\\AppIcon-20x20@3x.png": {
+    "mtime": 1781550481.4457061,
+    "ast_hash": "e6e72fdb9d264a4b7387157188d2b505",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\ios\\AppIcon-29x29@1x.png": {
+    "mtime": 1781550481.5624125,
+    "ast_hash": "2483c96f19e33e983405ff7825c224b5",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\ios\\AppIcon-29x29@2x-1.png": {
+    "mtime": 1781550481.4959745,
+    "ast_hash": "ffac154db11b48301146330b648993b3",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\ios\\AppIcon-29x29@2x.png": {
+    "mtime": 1781550481.6173112,
+    "ast_hash": "ffac154db11b48301146330b648993b3",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\ios\\AppIcon-29x29@3x.png": {
+    "mtime": 1781550481.6604638,
+    "ast_hash": "5cad3c3356b96cf49075dc356be79a7d",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\ios\\AppIcon-40x40@1x.png": {
+    "mtime": 1781550481.7586277,
+    "ast_hash": "a611db04bfd87af3457f040b061e08f2",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\ios\\AppIcon-40x40@2x-1.png": {
+    "mtime": 1781550481.713478,
+    "ast_hash": "427f781bc82a5e93d3703b78d4c34cdb",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\ios\\AppIcon-40x40@2x.png": {
+    "mtime": 1781550481.81035,
+    "ast_hash": "427f781bc82a5e93d3703b78d4c34cdb",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\ios\\AppIcon-40x40@3x.png": {
+    "mtime": 1781550481.8596787,
+    "ast_hash": "9fde8a1b9cc5eab8731578675353795a",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\ios\\AppIcon-512@2x.png": {
+    "mtime": 1781550482.3688214,
+    "ast_hash": "b6fe03038bbb4798e7b38bf1ce917c4d",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\ios\\AppIcon-60x60@2x.png": {
+    "mtime": 1781550481.9144983,
+    "ast_hash": "9fde8a1b9cc5eab8731578675353795a",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\ios\\AppIcon-60x60@3x.png": {
+    "mtime": 1781550481.9653895,
+    "ast_hash": "c94761f2bfb49b99b170dedb37430b89",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\ios\\AppIcon-76x76@1x.png": {
+    "mtime": 1781550482.0202832,
+    "ast_hash": "5cb82c30c958a7c49ba528b4cf2a71af",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\ios\\AppIcon-76x76@2x.png": {
+    "mtime": 1781550482.0791705,
+    "ast_hash": "c21fe05f1671379a30a79b387db4f368",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\src-tauri\\icons\\ios\\AppIcon-83.5x83.5@2x.png": {
+    "mtime": 1781550482.1353786,
+    "ast_hash": "82080dc8d841d4aafe9bb746ea14b083",
+    "semantic_hash": ""
+  },
+  "E:\\User\\Documents\\Repositories\\soundcore\\Auto-Mode\\ui\\src\\headphones.jpg": {
+    "mtime": 1781640597.9402897,
+    "ast_hash": "64501d2bd0a219d9636bd000205267ec",
+    "semantic_hash": ""
+  }
+}
