@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunksoundcore_desktop_docs=self.webpackChunksoundcore_desktop_docs||[]).push([[682],{9703(o){o.exports=JSON.parse('{"metadata":{"permalink":"/SoundCore-Desktop/blog","page":1,"postsPerPage":10,"totalPages":1,"totalCount":0,"blogDescription":"Blog","blogTitle":"Blog"}}')}}]);
