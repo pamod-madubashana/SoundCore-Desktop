@@ -38,6 +38,7 @@ struct DeviceStateDto {
     apply_delay_seconds: u64,
     connected: bool,
     message: String,
+    image: Option<String>,
     categories: Vec<CategoryDto>,
     profile_ids: Vec<String>,
 }
@@ -115,6 +116,7 @@ fn get_states(state: tauri::State<AppState>) -> Vec<DeviceStateDto> {
                 apply_delay_seconds: d.apply_delay_seconds,
                 connected,
                 message,
+                image: d.image.clone(),
                 categories,
                 profile_ids: d.profile.iter().map(|e| e.id.clone()).collect(),
             }
@@ -308,6 +310,7 @@ pub fn run() {
                                         poll_seconds: 5,
                                         apply_delay_seconds: 2,
                                         profile: Vec::new(),
+                                        image: None,
                                     });
                                     changed = true;
                                 }

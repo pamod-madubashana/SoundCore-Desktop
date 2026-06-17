@@ -4,3 +4,4 @@
 /src-tauri/config.toml
 node_modules/
 /soundcore-graphify
+/ui/dist
