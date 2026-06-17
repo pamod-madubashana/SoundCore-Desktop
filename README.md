@@ -8,7 +8,6 @@
   <a href="https://github.com/pamod-madubashana/SoundCore-Desktop"><img src="https://img.shields.io/badge/version-0.1.0-blue" alt="Version"></a>
   <a href="https://github.com/pamod-madubashana/SoundCore-Desktop"><img src="https://img.shields.io/badge/Windows-supported-46A75A?logo=windows&logoColor=white" alt="Windows"></a>
   <a href="https://github.com/pamod-madubashana/SoundCore-Desktop"><img src="https://img.shields.io/badge/Linux-supported-46A75A?logo=linux&logoColor=white" alt="Linux"></a>
-  <a href="https://github.com/pamod-madubashana/SoundCore-Desktop"><img src="https://img.shields.io/badge/macOS-unsupported-lightgrey?logo=apple&logoColor=white" alt="macOS"></a>
   <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/Built%20with-Rust-DEA584?logo=rust&logoColor=white" alt="Built with Rust"></a>
   <a href="https://github.com/pamod-madubashana/SoundCore-Desktop"><img src="https://img.shields.io/badge/Powered%20by-OpenSCQ30-46A75A" alt="Powered by OpenSCQ30"></a>
 </p>
@@ -24,10 +23,8 @@
 | Windows (Setup) | [SoundCore-Desktop-x64-setup.exe](https://github.com/pamod-madubashana/SoundCore-Desktop/releases/latest/download/SoundCore-Desktop-x64-setup.exe) |
 | Windows (MSI) | [SoundCore-Desktop-x64_en-US.msi](https://github.com/pamod-madubashana/SoundCore-Desktop/releases/latest/download/SoundCore-Desktop-x64_en-US.msi) |
 | Windows (Portable) | [SoundCore-Desktop.exe](https://github.com/pamod-madubashana/SoundCore-Desktop/releases/latest/download/SoundCore-Desktop.exe) |
-| Linux (AppImage) | [SoundCore-Desktop-amd64.AppImage](https://github.com/pamod-madubashana/SoundCore-Desktop/releases/latest/download/SoundCore-Desktop-amd64.AppImage) |
 | Linux (DEB) | [SoundCore-Desktop-amd64.deb](https://github.com/pamod-madubashana/SoundCore-Desktop/releases/latest/download/SoundCore-Desktop-amd64.deb) |
 | Linux (RPM) | [SoundCore-Desktop-x86_64.rpm](https://github.com/pamod-madubashana/SoundCore-Desktop/releases/latest/download/SoundCore-Desktop-x86_64.rpm) |
-| macOS (Apple Silicon) | [SoundCore-Desktop-aarch64.dmg](https://github.com/pamod-madubashana/SoundCore-Desktop/releases/latest/download/SoundCore-Desktop-aarch64.dmg) |
 
 </div>
 
@@ -71,7 +68,7 @@ src-tauri/
 - Runs in the system tray with a compact control panel
 - Automatically applies your saved Soundcore profile when a device connects
 - Supports quick toggles for gaming mode, ANC, and volume presets
-- Cross-platform build with Windows, Linux, and macOS packaging
+- Build targets for Windows and Linux
 - Minimal distraction and no phone app required once configured
 
 ## Getting Started
@@ -80,7 +77,7 @@ src-tauri/
 
 - Node.js 18+
 - Rust (latest stable)
-- Windows 10/11, Linux, or macOS
+- Windows 10/11 or Linux
 
 ### Installation
 

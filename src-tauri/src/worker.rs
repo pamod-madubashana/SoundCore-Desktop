@@ -16,7 +16,7 @@ use openscq30_lib::{
     DeviceModel, OpenSCQ30Session,
     connection::ConnectionStatus,
     device::OpenSCQ30Device,
-    settings::{CategoryId, ModifiableSelectCommand, Select, Setting, SettingId, Value},
+    settings::{CategoryId, ModifiableSelectCommand, MultiSelectWithRemoveCommand, Select, Setting, SettingId, Value},
     storage::PairedDevice,
 };
 use tokio::{
@@ -443,6 +443,16 @@ pub fn parse_value(setting: &Setting, raw: &str) -> anyhow::Result<Value> {
                 .map(|item| one_of(setting, item.trim()))
                 .collect::<anyhow::Result<Vec<_>>>()?;
             Ok(Value::from(selections))
+        }
+        Setting::MultiSelectWithRemove { setting, .. } => {
+            if let Some(rest) = raw.strip_prefix('-') {
+                Ok(Value::MultiSelectWithRemoveCommand(
+                    MultiSelectWithRemoveCommand::Remove(rest.to_owned().into()),
+                ))
+            } else {
+                let name = raw.strip_prefix("\\").unwrap_or(raw);
+                Ok(one_of(setting, name)?.into())
+            }
         }
         Setting::Equalizer { setting, .. } => {
             let values = raw
