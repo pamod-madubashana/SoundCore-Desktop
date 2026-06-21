@@ -1,10 +1,12 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version tag (e.g. v1.0.0). Defaults to package.json version.'
+        required: false
+        type: string
 
 jobs:
   build:
@@ -109,11 +111,22 @@ jobs:
         with:
           path: release-assets
 
+      - name: Resolve release tag
+        id: tag
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            tag="${{ inputs.version }}"
+          else
+            tag="v$(node -p "require('./package.json').version")"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
       - name: Create release and upload assets
         uses: ncipollo/release-action@v1
         with:
-          tag: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
+          tag: ${{ steps.tag.outputs.tag }}
+          name: Release ${{ steps.tag.outputs.tag }}
           artifacts: "release-assets/**/*"
           allowUpdates: true
           draft: false
