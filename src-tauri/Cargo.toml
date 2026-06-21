@@ -1,6 +1,6 @@
 [package]
 name = "soundcore-desktop"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2024"
 description = "Cross-platform desktop tray app that auto-applies Soundcore profiles (gaming mode, ANC, EQ) the moment a device connects. Windows & Linux."
 
