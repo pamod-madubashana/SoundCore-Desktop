@@ -337,7 +337,7 @@ pub fn run() {
             )?;
 
             TrayIconBuilder::with_id("main")
-                .icon(tauri::include_image!("icons/128x128.png"))
+                .icon(tauri::include_image!("../assets/tray-icon.png"))
                 .tooltip("SoundCore-Desktop")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
