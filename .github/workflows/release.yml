@@ -1,9 +1,6 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       version:
@@ -118,9 +115,7 @@ jobs:
         id: tag
         shell: bash
         run: |
-          if [ "${{ github.ref_type }}" = "tag" ]; then
-            tag="${{ github.ref_name }}"
-          elif [ -n "${{ inputs.version }}" ]; then
+          if [ -n "${{ inputs.version }}" ]; then
             tag="${{ inputs.version }}"
           else
             tag="v$(node -p "require('./package.json').version")"
