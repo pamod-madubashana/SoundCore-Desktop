@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version tag (e.g. v1.0.0). Defaults to package.json version.'
+        required: false
+        type: string
 
 jobs:
   build:
@@ -114,10 +119,13 @@ jobs:
         shell: bash
         run: |
           if [ "${{ github.ref_type }}" = "tag" ]; then
-            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            tag="${{ github.ref_name }}"
+          elif [ -n "${{ inputs.version }}" ]; then
+            tag="${{ inputs.version }}"
           else
-            echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+            tag="v$(node -p "require('./package.json').version")"
           fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: Create release and upload assets
         uses: ncipollo/release-action@v1
