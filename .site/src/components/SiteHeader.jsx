@@ -1,4 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
+import appIcon from "../assets/icon.svg";
 
 const GITHUB = "https://github.com/pamod-madubashana/SoundCore-Desktop";
 
@@ -16,9 +17,7 @@ export function SiteHeader() {
     <header className="sticky top-0 z-50 border-b border-border bg-background/85 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
         <Link to="/" className="flex items-center gap-2.5">
-          <span className="grid size-6 place-items-center rounded-[4px] border border-primary/40 bg-primary/10 font-mono text-[11px] leading-none text-primary">
-            SC
-          </span>
+          <img src={appIcon} alt="" className="size-6" />
           <span className="text-sm font-semibold tracking-tight">SoundCore-Desktop</span>
         </Link>
 
