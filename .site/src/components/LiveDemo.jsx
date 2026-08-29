@@ -1,12 +1,12 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 
 /* ── Mock device data ──────────────────────────────────────────────── */
 const MOCK_DEVICE = {
   name: "Space A40",
   model: "A3936",
   connected: true,
-  batteryL: 82,
-  batteryR: 78,
+  batteryL: 80,
+  batteryR: 80,
   soundMode: "noise_cancel",
   strength: 3,
   eq: [6, 4, 2, -1, 1, 3, 5, 2],
