@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  Settings, Power, Volume2, Waves, Ear, Sparkles, Loader2, X, Rocket,
+  Volume2, Waves, Ear, Sparkles, Loader2, X,
 } from "lucide-react";
 const invoke = window.__TAURI__?.core?.invoke ?? (async () => {});
 
@@ -128,6 +128,7 @@ export default function App() {
     <main className="h-screen w-screen flex items-stretch justify-stretch">
       <section className="popup-window w-full h-full rounded-2xl overflow-hidden flex flex-col">
         {active ? <Device d={active} /> : <Searching />}
+        <Footer />
       </section>
     </main>
   );
@@ -161,6 +162,18 @@ function Device({ d }) {
         <QuickToggles s={s} send={send} />
       </div>
     </>
+  );
+}
+
+const APP_VERSION = "1.2.0";
+
+function Footer() {
+  return (
+    <div className="px-3 py-2 flex items-center justify-between text-[10px] text-muted-foreground/60">
+      <span>v{APP_VERSION}</span>
+      <a href="https://github.com/pamod-madubashana/SoundCore-Desktop" target="_blank" rel="noopener noreferrer"
+        className="hover:text-muted-foreground transition">GitHub</a>
+    </div>
   );
 }
 
@@ -356,74 +369,5 @@ function ToggleRow({ t, send }) {
         <span className={"absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white shadow transition-all " + (on ? "left-[16px]" : "left-[2px]")} />
       </span>
     </button>
-  );
-}
-
-function Footer({ mac, view, setView }) {
-  const inSettings = view === "settings";
-  return (
-    <footer className="px-3 py-2.5 border-t border-white/[0.05] flex items-center justify-between bg-black/20">
-      <button onClick={() => invoke("apply_now", { mac })}
-        className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground hover:text-foreground transition px-2 py-1 rounded-md hover:bg-white/5">
-        <Rocket className="h-3.5 w-3.5" /> Re-apply
-      </button>
-      <button onClick={() => setView(inSettings ? "main" : "settings")}
-        className={"flex items-center gap-1.5 text-[11.5px] transition px-2 py-1 rounded-md hover:bg-white/5 " +
-          (inSettings ? "text-brand" : "text-muted-foreground hover:text-foreground")}>
-        <Settings className="h-3.5 w-3.5" /> {inSettings ? "Back" : "Settings"}
-      </button>
-      <button onClick={() => invoke("quit_app")}
-        className="flex items-center gap-1.5 text-[11.5px] text-destructive/90 hover:text-destructive transition px-2 py-1 rounded-md hover:bg-destructive/10">
-        <Power className="h-3.5 w-3.5" /> Quit
-      </button>
-    </footer>
-  );
-}
-
-function InfoRow({ k, v }) {
-  return (
-    <div className="flex justify-between gap-3">
-      <span className="text-muted-foreground">{k}</span>
-      <span className="text-foreground/90 truncate">{v}</span>
-    </div>
-  );
-}
-
-function SettingsPanel({ d }) {
-  const [autostart, setAutostart] = useState(null);
-  useEffect(() => { invoke("get_config").then((c) => setAutostart(!!c.autostart)).catch(() => {}); }, []);
-  const toggleAutostart = async () => {
-    try {
-      const c = await invoke("get_config");
-      c.autostart = !c.autostart;
-      await invoke("save_config", { newConfig: c });
-      setAutostart(c.autostart);
-    } catch { /* ignore */ }
-  };
-  return (
-    <div className="space-y-4">
-      <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Settings</h2>
-      <div className="rounded-xl bg-surface ring-1 ring-white/[0.04]">
-        <div className="flex items-center gap-3 px-3 py-2.5">
-          <div className="h-7 w-7 rounded-md bg-black/30 flex items-center justify-center">
-            <Rocket className="h-3.5 w-3.5 text-brand" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-[13px] font-medium">Run at startup</div>
-            <div className="text-[10.5px] text-muted-foreground">Launch automatically when you log in</div>
-          </div>
-          <button onClick={toggleAutostart} disabled={autostart === null}
-            className={"relative h-[18px] w-8 rounded-full transition-colors flex-shrink-0 " + (autostart ? "bg-brand" : "bg-white/10")}>
-            <span className={"absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white shadow transition-all " + (autostart ? "left-[16px]" : "left-[2px]")} />
-          </button>
-        </div>
-      </div>
-      <div className="rounded-xl bg-surface p-3 ring-1 ring-white/[0.04] text-[11.5px] space-y-1.5">
-        <InfoRow k="Device" v={d.name} />
-        <InfoRow k="Model" v={d.model} />
-        <InfoRow k="MAC" v={d.mac_address} />
-        <InfoRow k="Status" v={d.connected ? "Connected" : "Disconnected"} />
-      </div>
-    </div>
   );
 }
