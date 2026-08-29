@@ -163,6 +163,35 @@ fn download_and_cache(model: &str, color_code: &str) -> anyhow::Result<PathBuf> 
     }
 }
 
+/// Check if a bundled image exists in ui/public/devices/ and return its URL path.
+/// Returns `Some("/devices/{product}_{color_name}_com_device.png")` if the file exists.
+pub fn bundled_image_url(model: &str, color_code: &str) -> Option<String> {
+    let product = normalize_model(model);
+    let color_name = color_code_to_name(color_code);
+    let filename = format!("{product}_{color_name}_com_device.png");
+    let rel = format!("devices/{filename}");
+
+    // Try to find the project root by walking up from the exe directory
+    let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
+    let mut candidates = Vec::new();
+
+    // From exe dir: target/debug/ -> project root
+    if let Some(project_root) = exe_dir.parent().and_then(|p| p.parent()) {
+        candidates.push(project_root.join("ui/public").join(&rel));
+        candidates.push(project_root.join("ui/dist").join(&rel));
+    }
+    // Fallback: CWD-based (works when run from project root)
+    candidates.push(std::path::PathBuf::from("ui/public").join(&rel));
+    candidates.push(std::path::PathBuf::from("ui/dist").join(&rel));
+
+    for p in &candidates {
+        if p.exists() {
+            return Some(format!("/devices/{filename}"));
+        }
+    }
+    None
+}
+
 pub fn get_or_download(model: &str, color_code: &str) -> Option<PathBuf> {
     if let Some(path) = cached_image_path(model, color_code) {
         return Some(path);
