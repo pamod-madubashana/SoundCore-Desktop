@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { DocTitle, H2, P, UL } from "../components/Prose";
+import { DocTitle, H2, P, UL } from "../../components/Prose";
 
 const cards = [
   { to: "/docs/installation", title: "Installation", body: "Prerequisites, dependency setup, and running the app." },

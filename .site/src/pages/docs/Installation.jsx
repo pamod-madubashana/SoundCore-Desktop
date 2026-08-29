@@ -1,4 +1,4 @@
-import { DocTitle, H2, P, UL, Terminal } from "../components/Prose";
+import { DocTitle, H2, P, UL, Terminal } from "../../components/Prose";
 
 export default function Installation() {
   return (

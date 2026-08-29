@@ -1,4 +1,4 @@
-import { DocTitle, H2, H3, P, UL, OL, Terminal, Code } from "../components/Prose";
+import { DocTitle, H2, H3, P, UL, OL, Terminal, Code } from "../../components/Prose";
 
 export default function Development() {
   return (

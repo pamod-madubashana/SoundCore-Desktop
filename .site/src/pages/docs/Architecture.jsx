@@ -1,4 +1,4 @@
-import { DocTitle, H2, P, Code } from "../components/Prose";
+import { DocTitle, H2, P, Code } from "../../components/Prose";
 
 const folders = [
   ["ui/", "React + Vite frontend for the tray UI and user interaction."],
