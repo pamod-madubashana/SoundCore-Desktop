@@ -43,6 +43,10 @@ pub struct DeviceConfig {
     /// Optional product image URL shown in the popup (otherwise a generic illustration).
     #[serde(default)]
     pub image: Option<String>,
+    /// Device color as a hex string (e.g., "#1a1a1a") or a Soundcore color code ("1"-"y").
+    /// Used to tint the SVG device template.
+    #[serde(default)]
+    pub color: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -68,6 +72,7 @@ impl Default for DeviceConfig {
             apply_delay_seconds: 2,
             profile: Vec::new(),
             image: None,
+            color: None,
         }
     }
 }
