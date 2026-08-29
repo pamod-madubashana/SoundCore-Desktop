@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { SiteHeader } from "../components/SiteHeader";
 import { SiteFooter } from "../components/SiteFooter";
+import LiveDemo from "../components/LiveDemo";
 
 const GITHUB = "https://github.com/pamod-madubashana/SoundCore-Desktop";
 const RELEASE = `${GITHUB}/releases/latest/download`;
@@ -113,85 +114,9 @@ export default function Home() {
             </dl>
           </div>
 
-          {/* app preview mock — matches actual UI */}
+          {/* live interactive app preview */}
           <div className="relative">
-            <div className="pointer-events-none absolute -inset-4 rounded-2xl bg-primary/10 blur-3xl" />
-            <div className="relative rounded-xl border border-border bg-surface p-5 glow-panel">
-              {/* header */}
-              <div className="flex items-center justify-between border-b border-border pb-3">
-                <div className="flex items-center gap-3">
-                  <div className="grid size-10 place-items-center rounded-lg border border-border bg-background">
-                    <svg className="size-5 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <path d="M12 18.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
-                      <path d="M8 6a4 4 0 018 0v6a4 4 0 11-8 0V6z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-[13px] font-semibold">R50i NC</p>
-                    <div className="flex items-center gap-2 font-mono text-[10px] text-faint">
-                      <span className="flex items-center gap-1"><span className="size-1.5 rounded-full bg-primary" /> L 60%</span>
-                      <span className="flex items-center gap-1"><span className="size-1.5 rounded-full bg-primary" /> R 60%</span>
-                    </div>
-                  </div>
-                </div>
-                <span className="flex items-center gap-1.5 font-mono text-[11px] text-primary">
-                  <span className="size-1.5 rounded-full bg-primary" />
-                  connected
-                </span>
-              </div>
-
-              {/* sound mode */}
-              <div className="flex gap-2 py-3">
-                {["Noise Cancel", "Normal", "Transparency"].map((mode, i) => (
-                  <div key={mode} className={`flex-1 rounded-lg border px-2 py-2 text-center text-[11px] font-medium ${
-                    i === 2
-                      ? "border-primary/50 bg-primary/15 text-primary"
-                      : "border-border bg-background text-muted-foreground"
-                  }`}>
-                    {mode}
-                  </div>
-                ))}
-              </div>
-
-              {/* equalizer */}
-              <div className="border-t border-border pt-3">
-                <p className="font-mono text-[10px] uppercase tracking-wider text-faint mb-2">Equalizer</p>
-                <div className="flex items-end gap-1.5 h-10">
-                  {[45, 70, 58, 40, 52, 66, 48, 35].map((h, i) => (
-                    <span
-                      key={i}
-                      className="flex-1 rounded-[2px] bg-primary/70"
-                      style={{ height: `${h}%` }}
-                    />
-                  ))}
-                </div>
-                <div className="flex gap-1.5 mt-1">
-                  {["100", "200", "400", "800", "1.6k", "3.2k", "6.4k", "12.8k"].map((f) => (
-                    <span key={f} className="flex-1 text-center font-mono text-[8px] text-faint">{f}</span>
-                  ))}
-                </div>
-              </div>
-
-              {/* toggles */}
-              <div className="space-y-1 border-t border-border pt-3 mt-3">
-                {[
-                  ["Gaming Mode", false],
-                  ["Wind Noise Suppression", true],
-                  ["Normal Mode In Cycle", true],
-                ].map(([k, v]) => (
-                  <div key={k} className="flex items-center justify-between rounded-md px-1 py-1.5">
-                    <span className="font-mono text-[11px] text-muted-foreground">{k}</span>
-                    <span className={`relative h-4 w-7 rounded-full transition-colors ${v ? "bg-primary" : "bg-white/10"}`}>
-                      <span className={`absolute top-[2px] h-[12px] w-[12px] rounded-full bg-white shadow transition-all ${v ? "left-[16px]" : "left-[2px]"}`} />
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              <p className="mt-3 border-t border-border pt-3 font-mono text-[10px] text-faint">
-                <span className="text-primary">▸</span> profile reapplied on connect · 1s ago
-              </p>
-            </div>
+            <LiveDemo />
           </div>
         </div>
       </section>
