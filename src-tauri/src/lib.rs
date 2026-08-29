@@ -3,8 +3,11 @@
 
 mod autostart;
 mod config;
+mod device_colors;
+mod device_images;
 mod worker;
 
+use base64::Engine;
 use std::{path::PathBuf, str::FromStr, sync::Mutex};
 
 use config::Config;
@@ -39,6 +42,7 @@ struct DeviceStateDto {
     connected: bool,
     message: String,
     image: Option<String>,
+    color: Option<String>,
     categories: Vec<CategoryDto>,
     profile_ids: Vec<String>,
 }
@@ -116,7 +120,17 @@ fn get_states(state: tauri::State<AppState>) -> Vec<DeviceStateDto> {
                 apply_delay_seconds: d.apply_delay_seconds,
                 connected,
                 message,
-                image: d.image.clone(),
+                image: d.image.clone().or_else(|| {
+                    d.color.as_ref().and_then(|c| {
+                        device_images::get_or_download(&d.model, c)
+                            .and_then(|p| {
+                                let bytes = std::fs::read(&p).ok()?;
+                                let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+                                Some(format!("data:image/png;base64,{b64}"))
+                            })
+                    })
+                }),
+                color: d.color.clone(),
                 categories,
                 profile_ids: d.profile.iter().map(|e| e.id.clone()).collect(),
             }
@@ -311,6 +325,7 @@ pub fn run() {
                                         apply_delay_seconds: 2,
                                         profile: Vec::new(),
                                         image: None,
+                                        color: None,
                                     });
                                     changed = true;
                                 }
