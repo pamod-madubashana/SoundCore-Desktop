@@ -124,8 +124,8 @@ export default function LiveDemo() {
       <div className="relative">
         {/* ── Header ─────────────────────────────────────── */}
           <header className="flex items-center gap-4 border-b border-white/[0.06] p-4">
-          <div className="relative flex h-28 w-28 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/[0.03]">
-            <img src={spaceA40Img} alt="Space A40" className="h-full w-full object-contain p-1" />
+          <div className="relative flex h-28 w-28 flex-shrink-0 items-center justify-center overflow-hidden">
+            <img src={spaceA40Img} alt="Space A40" className="h-full w-full object-contain" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
