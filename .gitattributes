@@ -1,0 +1,5 @@
+# Exclude generated files from GitHub language stats
+soundcore-graphify/** linguist-generated=true
+site/dist/** linguist-generated=true
+ui/dist/** linguist-generated=true
+**/*.lock linguist-generated=true
