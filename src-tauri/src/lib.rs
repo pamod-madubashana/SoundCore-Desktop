@@ -121,19 +121,16 @@ fn get_states(state: tauri::State<AppState>) -> Vec<DeviceStateDto> {
                 connected,
                 message,
                 image: d.image.clone().or_else(|| {
-                    d.color.as_ref().and_then(|c| {
-                        // Try bundled image first (offline-capable)
-                        if let Some(url) = device_images::bundled_image_url(&d.model, c) {
-                            return Some(url);
-                        }
-                        // Fall back to CDN download + base64
-                        device_images::get_or_download(&d.model, c)
-                            .and_then(|p| {
-                                let bytes = std::fs::read(&p).ok()?;
-                                let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
-                                Some(format!("data:image/png;base64,{b64}"))
-                            })
-                    })
+                    let c = d.color.as_deref().unwrap_or("1");
+                    if let Some(url) = device_images::bundled_image_url(&d.model, c) {
+                        return Some(url);
+                    }
+                    device_images::get_or_download(&d.model, c)
+                        .and_then(|p| {
+                            let bytes = std::fs::read(&p).ok()?;
+                            let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+                            Some(format!("data:image/png;base64,{b64}"))
+                        })
                 }),
                 color: d.color.clone(),
                 categories,
