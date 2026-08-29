@@ -3,6 +3,8 @@ use std::io::Read;
 use std::path::PathBuf;
 use std::sync::LazyLock;
 
+use base64::Engine;
+
 const CDN_DOMAIN: &str = "https://d2htfo7ft368vg.cloudfront.net";
 
 /// Track failed downloads so we don't retry endlessly.
@@ -163,34 +165,21 @@ fn download_and_cache(model: &str, color_code: &str) -> anyhow::Result<PathBuf> 
     }
 }
 
-/// Check if a bundled image exists in ui/public/devices/ and return its URL path.
-/// Returns `Some("/devices/{product}_{color_name}_com_device.png")` if the file exists.
+/// Look up an embedded device image by model + color code.
+/// Returns a base64 data URL ready for use in an <img> tag.
+/// Images are compiled into the binary at build time — works in dev, built, and packaged apps.
 pub fn bundled_image_url(model: &str, color_code: &str) -> Option<String> {
     let product = normalize_model(model);
-    let color_name = color_code_to_name(color_code);
+    let effective_color = if color_code.is_empty() { "1" } else { color_code };
+    let color_name = color_code_to_name(effective_color);
     let filename = format!("{product}_{color_name}_com_device.png");
-    let rel = format!("devices/{filename}");
 
-    // Try to find the project root by walking up from the exe directory
-    let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
-    let mut candidates = Vec::new();
-
-    // From exe dir: target/debug/ -> project root
-    if let Some(project_root) = exe_dir.parent().and_then(|p| p.parent()) {
-        candidates.push(project_root.join("ui/public").join(&rel));
-        candidates.push(project_root.join("ui/dist").join(&rel));
-    }
-    // Fallback: CWD-based (works when run from project root)
-    candidates.push(std::path::PathBuf::from("ui/public").join(&rel));
-    candidates.push(std::path::PathBuf::from("ui/dist").join(&rel));
-
-    for p in &candidates {
-        if p.exists() {
-            return Some(format!("/devices/{filename}"));
-        }
-    }
-    None
+    let bytes = get_embedded_image(&filename)?;
+    let b64 = base64::engine::general_purpose::STANDARD.encode(bytes);
+    Some(format!("data:image/png;base64,{b64}"))
 }
+
+include!(concat!(env!("OUT_DIR"), "/embedded_devices.rs"));
 
 pub fn get_or_download(model: &str, color_code: &str) -> Option<PathBuf> {
     if let Some(path) = cached_image_path(model, color_code) {
