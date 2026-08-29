@@ -1,29 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  Volume2, Waves, Ear, Sparkles, Loader2, X,
+  Volume2, Waves, Ear, Loader2, X,
 } from "lucide-react";
 const invoke = window.__TAURI__?.core?.invoke ?? (async () => {});
-
-// Soundcore color code mapping
-const SOUNDCORE_COLORS = {
-  '1': '#555555', '2': '#f5f5f5', '3': '#5a8fc5', '4': '#c0c0c0',
-  '5': '#e8a0b4', '6': '#6aaa62', '7': '#d4a017', '8': '#ab8453',
-  '9': '#e45050', 'a': '#808080', 'b': '#c9a84c', 'c': '#f5f0e1',
-  'd': '#4a6a94', 'e': '#e8735a', 'f': '#87ceeb', 'g': '#e84057',
-  'h': '#c3b091', 'i': '#89cff0', 'k': '#d3d3d3', 'l': '#7fb5d5',
-  'm': '#c93756', 'n': '#add8e6', 'o': '#800080', 'p': '#4a5d23',
-  'q': '#fffdd0', 'r': '#4a4a4a', 's': '#f0f0f0', 't': '#9b59b6',
-  'u': '#4a4a4a', 'v': '#9acd32', 'w': '#2a2a2a', 'x': '#2d8b2d',
-  'y': '#3366cc',
-};
-
-function resolveColor(color) {
-  if (!color) return null;
-  const c = color.trim();
-  if (c.startsWith('#')) return c;
-  if (c.length === 1) return SOUNDCORE_COLORS[c.toLowerCase()] || null;
-  return SOUNDCORE_COLORS[c.toLowerCase()] || null;
-}
 
 // Device-type illustration picked from the name (no reliable per-model photo source exists).
 // Uses the device color to tint the SVG template.
@@ -36,7 +15,7 @@ function DeviceArt({ name = "", url, color }) {
       ? "overear"
       : "earbuds";
   
-  const fill = resolveColor(color) || "var(--brand)";
+  const fill = "var(--brand)";
   
   if (cat === "earbuds") {
     const lineColor = "#888888";
@@ -171,8 +150,8 @@ function Footer() {
   return (
     <div className="px-3 py-2 flex items-center justify-between text-[10px] text-muted-foreground/60">
       <span>v{APP_VERSION}</span>
-      <a href="https://github.com/pamod-madubashana/SoundCore-Desktop" target="_blank" rel="noopener noreferrer"
-        className="hover:text-muted-foreground transition">GitHub</a>
+      <button onClick={() => invoke("open_url", { url: "https://github.com/pamod-madubashana/SoundCore-Desktop" })}
+        className="hover:text-muted-foreground transition cursor-pointer">GitHub</button>
     </div>
   );
 }
@@ -357,13 +336,9 @@ function QuickToggles({ s, send }) {
 
 function ToggleRow({ t, send }) {
   const on = !!t.value;
-  const Icon = /gam/i.test(t.id) ? Sparkles : /wear|detect/i.test(t.id) ? Ear : Volume2;
   return (
     <button onClick={() => send(t.id, String(!on))}
       className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/[0.02] transition text-left">
-      <div className="h-7 w-7 rounded-md bg-black/30 flex items-center justify-center">
-        <Icon className="h-3.5 w-3.5 text-brand" />
-      </div>
       <div className="flex-1 min-w-0 text-[13px] font-medium">{pretty(t.id)}</div>
       <span className={"relative h-[18px] w-8 rounded-full transition-colors flex-shrink-0 " + (on ? "bg-brand" : "bg-white/10")}>
         <span className={"absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white shadow transition-all " + (on ? "left-[16px]" : "left-[2px]")} />
