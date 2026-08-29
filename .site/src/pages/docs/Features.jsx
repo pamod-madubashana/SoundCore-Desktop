@@ -1,4 +1,4 @@
-import { DocTitle, H2, P, UL } from "../components/Prose";
+import { DocTitle, H2, P, UL } from "../../components/Prose";
 
 export default function Features() {
   return (

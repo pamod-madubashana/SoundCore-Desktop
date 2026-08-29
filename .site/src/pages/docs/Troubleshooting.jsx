@@ -1,4 +1,4 @@
-import { DocTitle, H2, P, UL, Terminal } from "../components/Prose";
+import { DocTitle, H2, P, UL, Terminal } from "../../components/Prose";
 
 const GITHUB = "https://github.com/pamod-madubashana/SoundCore-Desktop";
 
