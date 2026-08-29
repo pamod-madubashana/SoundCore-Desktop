@@ -122,9 +122,9 @@ export default function LiveDemo() {
 
       <div className="relative">
         {/* ── Header ─────────────────────────────────────── */}
-        <header className="flex items-center gap-4 border-b border-white/[0.06] p-4">
-          <div className="relative flex h-28 w-28 flex-shrink-0 items-center justify-center overflow-hidden text-[var(--demo-brand)]">
-            <DeviceArt name={device.name} />
+          <header className="flex items-center gap-4 border-b border-white/[0.06] p-4">
+          <div className="relative flex h-28 w-28 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/[0.03]">
+            <img src="/devices/a3936_black_com_device.png" alt="Space A40" className="h-full w-full object-contain p-1" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
