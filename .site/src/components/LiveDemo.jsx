@@ -1,10 +1,11 @@
 import { useState } from "react";
-import spaceA40Img from "../assets/a3936_black_com_device.png";
+import appIcon from "../assets/icon.svg";
+import r50iNcImg from "../assets/a3959_black_com_device.png";
 
 /* ── Mock device data ──────────────────────────────────────────────── */
 const MOCK_DEVICE = {
-  name: "Space A40",
-  model: "A3936",
+  name: "R50i NC",
+  model: "A3933",
   connected: true,
   batteryL: 80,
   batteryR: 80,
@@ -125,7 +126,7 @@ export default function LiveDemo() {
         {/* ── Header ─────────────────────────────────────── */}
           <header className="flex items-center gap-4 border-b border-white/[0.06] p-4">
           <div className="relative flex h-28 w-28 flex-shrink-0 items-center justify-center overflow-hidden">
-            <img src={spaceA40Img} alt="Space A40" className="h-full w-full object-contain" />
+            <img src={r50iNcImg} alt="R50i NC" className="h-full w-full object-contain" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
