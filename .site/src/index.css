@@ -69,3 +69,84 @@
     background-color: oklch(0.82 0.15 178 / 0.3);
   }
 }
+
+/* ── LiveDemo: self-contained app preview styles ──────────────────── */
+:root {
+  --demo-brand: oklch(0.78 0.16 195);
+  --demo-brand-fg: oklch(0.16 0.012 255);
+  --demo-brand-glow: oklch(0.78 0.16 195 / 0.35);
+}
+
+.demo-shell {
+  max-width: 340px;
+}
+
+/* range slider — noise-cancel strength */
+.demo-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 9999px;
+  background: oklch(1 0 0 / 0.08);
+  outline: none;
+}
+.demo-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--demo-brand);
+  cursor: pointer;
+  box-shadow: 0 0 8px var(--demo-brand-glow);
+}
+.demo-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: var(--demo-brand);
+  cursor: pointer;
+}
+
+/* EQ vertical sliders */
+.demo-eq-track {
+  background: linear-gradient(180deg, transparent 0%, oklch(1 0 0 / 0.04) 50%, transparent 100%);
+}
+.demo-eq-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 14px;
+  height: 80px;
+  background: transparent;
+  outline: none;
+}
+.demo-eq-slider::-webkit-slider-runnable-track {
+  width: 4px;
+  border-radius: 9999px;
+  background: oklch(1 0 0 / 0.08);
+}
+.demo-eq-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--demo-brand);
+  cursor: pointer;
+  margin-left: -5px;
+  box-shadow: 0 0 6px var(--demo-brand-glow);
+}
+.demo-eq-slider::-moz-range-track {
+  width: 4px;
+  border-radius: 9999px;
+  background: oklch(1 0 0 / 0.08);
+}
+.demo-eq-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: var(--demo-brand);
+  cursor: pointer;
+}
