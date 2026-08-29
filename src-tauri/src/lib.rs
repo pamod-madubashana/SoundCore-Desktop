@@ -122,6 +122,11 @@ fn get_states(state: tauri::State<AppState>) -> Vec<DeviceStateDto> {
                 message,
                 image: d.image.clone().or_else(|| {
                     d.color.as_ref().and_then(|c| {
+                        // Try bundled image first (offline-capable)
+                        if let Some(url) = device_images::bundled_image_url(&d.model, c) {
+                            return Some(url);
+                        }
+                        // Fall back to CDN download + base64
                         device_images::get_or_download(&d.model, c)
                             .and_then(|p| {
                                 let bytes = std::fs::read(&p).ok()?;
@@ -221,6 +226,21 @@ fn get_scan(state: tauri::State<AppState>) -> ScanDto {
 }
 
 #[tauri::command]
+fn open_url(url: String) {
+    let _ = std::process::Command::new(match std::env::consts::OS {
+        "windows" => "cmd",
+        "macos" => "open",
+        _ => "xdg-open",
+    })
+    .args(if std::env::consts::OS == "windows" {
+        vec!["/c", "start", "", url.as_str()]
+    } else {
+        vec![url.as_str()]
+    })
+    .spawn();
+}
+
+#[tauri::command]
 fn hide_window(window: WebviewWindow) {
     let _ = window.hide();
 }
@@ -284,6 +304,7 @@ pub fn run() {
             scan,
             get_scan,
             hide_window,
+            open_url,
             quit_app
         ])
         .on_window_event(|window, event| {

@@ -71,7 +71,7 @@ pub fn upsert_profile_entry(state: &SharedState, mac: MacAddr6, id: String, valu
 }
 
 /// Best-effort Bluetooth-name -> model guess for zero-config auto-detect.
-/// ponytail: substring map for common devices; extend or derive from localized names later.
+/// Order matters: more specific patterns must come before less specific ones.
 pub fn infer_model(name: &str) -> Option<DeviceModel> {
     let n = name.to_lowercase();
     use DeviceModel::*;
@@ -79,18 +79,60 @@ pub fn infer_model(name: &str) -> Option<DeviceModel> {
         SoundcoreA3959
     } else if n.contains("r50i") || n.contains("p20i") || n.contains("p25i") {
         SoundcoreA3949
+    } else if n.contains("life tune pro") {
+        SoundcoreA3030
+    } else if n.contains("life tune") {
+        SoundcoreA3029
     } else if n.contains("space one pro") {
         SoundcoreA3062
     } else if n.contains("space one") {
         SoundcoreA3035
     } else if n.contains("space q45") || n.contains("q45") {
         SoundcoreA3040
+    } else if n.contains("space a40") || n.contains("a40") {
+        SoundcoreA3936
+    } else if n.contains("liberty air 2 pro") {
+        SoundcoreA3951
     } else if n.contains("liberty 4 nc") {
         SoundcoreA3947
+    } else if n.contains("liberty 3 pro") {
+        SoundcoreA3952
+    } else if n.contains("liberty 2 pro+") {
+        SoundcoreA3930
+    } else if n.contains("liberty 2 pro") {
+        SoundcoreA3909
+    } else if n.contains("liberty 5") {
+        SoundcoreA3957
+    } else if n.contains("life note 3s") {
+        SoundcoreA3945
+    } else if n.contains("life note 3") {
+        SoundcoreA3933
+    } else if n.contains("life dot 2 nc") {
+        SoundcoreA3931
+    } else if n.contains("life dot 2") {
+        SoundcoreA3926
+    } else if n.contains("life q35") || n.contains("q35") {
+        SoundcoreA3027
+    } else if n.contains("life q30") || n.contains("q30") {
+        SoundcoreA3028
+    } else if n.contains("life a2 nc") || n.contains("a2 nc") {
+        SoundcoreA3935
+    } else if n.contains("life 2 neo") || n.contains("life neo") {
+        SoundcoreA3033
+    } else if n.contains("life p3") {
+        SoundcoreA3939
+    } else if n.contains("motion+") {
+        SoundcoreA3116
+    } else if n.contains("sport x20") {
+        SoundcoreA3968
+    } else if n.contains("a20i") {
+        SoundcoreA3948
     } else if n.contains("p40i") {
         SoundcoreA3955
-    } else if n.contains("q30") {
-        SoundcoreA3028
+    } else if n.contains("q20i") || n.contains("q20") {
+        SoundcoreA3004
+    } else if n.contains("vortex") {
+        SoundcoreA3031
     } else {
         return None;
     };
@@ -472,6 +514,12 @@ pub fn parse_value(setting: &Setting, raw: &str) -> anyhow::Result<Value> {
         Setting::Information { .. } => bail!("information settings are read-only"),
         Setting::ImportString { .. } => Ok(Value::from(std::borrow::Cow::from(raw.to_owned()))),
         Setting::Action => Ok(Value::Bool(true)),
+        Setting::PresetEqualizerProfileSelect { .. } => {
+            Ok(Value::String(std::borrow::Cow::from(raw.to_owned())))
+        }
+        Setting::HueColorPicker { .. } => {
+            Ok(Value::String(std::borrow::Cow::from(raw.to_owned())))
+        }
     }
 }
 
