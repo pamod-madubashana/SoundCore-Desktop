@@ -5,7 +5,7 @@ use std::process::Command;
 use tauri::Emitter;
 
 const REPO: &str = "pamod-madubashana/SoundCore-Desktop";
-const ASSET_NAME: &str = "soundcore-desktop.exe";
+const ASSET_NAME: &str = "SoundCore-Desktop.exe";
 
 #[derive(Clone, serde::Serialize)]
 pub struct UpdateInfo {
