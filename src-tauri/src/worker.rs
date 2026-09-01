@@ -317,6 +317,8 @@ async fn device_loop(
 
         match timeout(Duration::from_secs(10), session.connect(mac)).await {
             Ok(Ok(device)) => {
+                // Publish snapshot first so battery data is available when frontend detects connect
+                publish_snapshot(device.as_ref(), &state, mac);
                 set_device_state(&state, mac, |s| {
                     s.connected = true;
                     s.message = "connected".into();
@@ -353,6 +355,8 @@ async fn connected_session(
 ) -> bool {
     let mut conn = device.connection_status();
     let mut changes = device.watch_for_changes();
+    let mut heartbeat = tokio::time::interval(Duration::from_secs(15));
+    heartbeat.tick().await; // consume the first immediate tick
     loop {
         tokio::select! {
             cmd = rx.recv() => match cmd {
@@ -377,6 +381,27 @@ async fn connected_session(
             conn_changed = conn.changed() => {
                 if conn_changed.is_err() || *conn.borrow_and_update() == ConnectionStatus::Disconnected {
                     return false;
+                }
+            }
+            _ = heartbeat.tick() => {
+                let probe = {
+                    let map = state.devices.lock().unwrap();
+                    map.get(&mac).and_then(|s| s.snapshot.as_ref()).and_then(|snap| {
+                        for (_, settings) in snap {
+                            for (id, setting) in settings {
+                                if let Setting::Toggle { value, .. } = setting {
+                                    return Some((*id, Value::Bool(*value)));
+                                }
+                            }
+                        }
+                        None
+                    })
+                };
+                if let Some((id, value)) = probe {
+                    if timeout(Duration::from_secs(3), device.set_setting_values(vec![(id, value)])).await.is_err() {
+                        warn!("heartbeat probe failed for {mac}, assuming disconnected");
+                        return false;
+                    }
                 }
             }
         }

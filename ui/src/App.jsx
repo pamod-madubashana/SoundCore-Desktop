@@ -83,20 +83,51 @@ const pretty = (id) => id.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUp
 
 export default function App() {
   const [devices, setDevices] = useState([]);
-  const interacting = useRef(false);
+  const prevConnected = useRef(null);
 
   useEffect(() => {
     const tick = async () => {
-      if (interacting.current) return;
-      try { setDevices(await invoke("get_states")); } catch { /* ignore */ }
+      try {
+        const next = await invoke("get_states");
+        setDevices(next);
+
+        const nowConnected = new Set(next.filter((d) => d.connected).map((d) => d.mac_address));
+
+        if (prevConnected.current === null) {
+          prevConnected.current = nowConnected;
+          return;
+        }
+
+        for (const d of next) {
+          const wasConnected = prevConnected.current.has(d.mac_address);
+          const isNowConnected = d.connected;
+
+          if (isNowConnected && !wasConnected) {
+            invoke("show_notification", {
+              name: d.name || d.model,
+              image: d.image || null,
+              status: "Connected",
+              batteryLeft: d.battery_left,
+              batteryRight: d.battery_right,
+              batteryCombined: d.battery_combined,
+            });
+          } else if (!isNowConnected && wasConnected) {
+            invoke("show_notification", {
+              name: d.name || d.model,
+              image: d.image || null,
+              status: "Disconnected",
+              batteryLeft: null,
+              batteryRight: null,
+              batteryCombined: null,
+            });
+          }
+        }
+        prevConnected.current = nowConnected;
+      } catch { /* ignore */ }
     };
     tick();
     const t = setInterval(tick, 900);
-    const down = () => (interacting.current = true);
-    const up = () => setTimeout(() => (interacting.current = false), 250);
-    window.addEventListener("pointerdown", down);
-    window.addEventListener("pointerup", up);
-    return () => { clearInterval(t); window.removeEventListener("pointerdown", down); window.removeEventListener("pointerup", up); };
+    return () => clearInterval(t);
   }, []);
 
   // Only surface a device once it's actually connected; otherwise keep searching for
@@ -158,11 +189,9 @@ function Footer() {
 
 function batteryPct(setting) {
   if (!setting) return null;
-  // Prefer translatedValue (e.g. "80%") from OpenSCQ30
   const tv = setting.translatedValue ?? "";
   const tm = String(tv).match(/(\d+)\s*%/);
   if (tm) return Math.min(100, Number(tm[1]));
-  // Fallback: parse raw value "4/5" or "8/10"
   const v = setting.value ?? "";
   const m = String(v).match(/(\d+)\s*\/\s*(\d+)/);
   if (m) {
