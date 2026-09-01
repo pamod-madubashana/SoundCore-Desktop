@@ -52,6 +52,10 @@ html, body, #root {
 .eq-track {
   background: linear-gradient(180deg, transparent 0%, oklch(1 0 0 / 0.04) 50%, transparent 100%);
 }
+.eq-track-readonly {
+  background: linear-gradient(180deg, transparent 0%, oklch(1 0 0 / 0.04) 50%, transparent 100%);
+  opacity: 0.6;
+}
 
 ::-webkit-scrollbar { width: 7px; }
 ::-webkit-scrollbar-thumb { background: oklch(1 0 0 / 0.12); border-radius: 8px; }
