@@ -8,7 +8,7 @@ mod device_images;
 mod worker;
 
 use base64::Engine;
-use std::{path::PathBuf, str::FromStr, sync::Mutex};
+use std::{path::PathBuf, str::FromStr, sync::Mutex, time::Duration};
 
 use config::Config;
 use macaddr::MacAddr6;
@@ -18,7 +18,8 @@ use openscq30_lib::{
 };
 use serde::Serialize;
 use tauri::{
-    AppHandle, Emitter, Manager, PhysicalPosition, WebviewWindow, WindowEvent,
+    AppHandle, Emitter, Manager, PhysicalPosition, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
+    WindowEvent,
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
@@ -28,6 +29,23 @@ struct AppState {
     worker: WorkerHandle,
     config: Mutex<Config>,
     config_path: PathBuf,
+    app_handle: Mutex<Option<AppHandle>>,
+    pending_notification: Mutex<Option<PendingNotification>>,
+}
+
+#[derive(Clone, Serialize)]
+struct PendingNotification {
+    name: String,
+    image: Option<String>,
+    status: String,
+    battery: Option<BatteryInfo>,
+}
+
+#[derive(Clone, Serialize)]
+struct BatteryInfo {
+    left: Option<i32>,
+    right: Option<i32>,
+    combined: Option<i32>,
 }
 
 // ---- DTOs sent to the web UI as JSON ----
@@ -45,6 +63,9 @@ struct DeviceStateDto {
     color: Option<String>,
     categories: Vec<CategoryDto>,
     profile_ids: Vec<String>,
+    battery_left: Option<i32>,
+    battery_right: Option<i32>,
+    battery_combined: Option<i32>,
 }
 
 #[derive(Serialize)]
@@ -90,6 +111,45 @@ fn build_categories(snapshot: &worker::Snapshot) -> Vec<CategoryDto> {
 
 // ---- commands ----
 
+fn battery_pct_from_setting(setting: &Setting) -> Option<i32> {
+    if let Setting::Information { translated_value, value, .. } = setting {
+        if let Some(stripped) = translated_value.trim().strip_suffix('%') {
+            if let Ok(n) = stripped.trim().parse::<i32>() {
+                return Some(n.min(100));
+            }
+        }
+        if let Some((num, den)) = value.split_once('/') {
+            let a: i32 = num.trim().parse().ok()?;
+            let b: i32 = den.trim().parse().ok()?;
+            if b <= 1 { return Some(100); }
+            return Some((a * 100 / b).min(100));
+        }
+        if let Ok(n) = value.trim().parse::<i32>() {
+            return Some(n.min(100));
+        }
+    }
+    None
+}
+
+fn extract_battery_from_snapshot(snapshot: &worker::Snapshot) -> (Option<i32>, Option<i32>, Option<i32>) {
+    let mut left = None;
+    let mut right = None;
+    let mut combined = None;
+    for (_cat, settings) in snapshot {
+        for (id, setting) in settings {
+            let id_str = id.to_string();
+            if id_str == "batteryLevelLeft" {
+                left = battery_pct_from_setting(setting);
+            } else if id_str == "batteryLevelRight" {
+                right = battery_pct_from_setting(setting);
+            } else if id_str == "batteryLevel" {
+                combined = battery_pct_from_setting(setting);
+            }
+        }
+    }
+    (left, right, combined)
+}
+
 #[tauri::command]
 fn get_models() -> Vec<String> {
     use strum::VariantArray;
@@ -104,13 +164,14 @@ fn get_states(state: tauri::State<AppState>) -> Vec<DeviceStateDto> {
         .iter()
         .map(|d| {
             let live = MacAddr6::from_str(d.mac_address.trim()).ok().and_then(|m| map.get(&m));
-            let (connected, message, categories) = match live {
-                Some(s) => (
-                    s.connected,
-                    s.message.clone(),
-                    s.snapshot.as_ref().map(build_categories).unwrap_or_default(),
-                ),
-                None => (false, String::new(), Vec::new()),
+            let (connected, message, categories, battery) = match live {
+                Some(s) => {
+                    let cats = s.snapshot.as_ref().map(build_categories).unwrap_or_default();
+                    let bat = s.snapshot.as_ref().map(extract_battery_from_snapshot)
+                        .unwrap_or((None, None, None));
+                    (s.connected, s.message.clone(), cats, bat)
+                }
+                None => (false, String::new(), Vec::new(), (None, None, None)),
             };
             DeviceStateDto {
                 name: d.name.clone(),
@@ -135,6 +196,9 @@ fn get_states(state: tauri::State<AppState>) -> Vec<DeviceStateDto> {
                 color: d.color.clone(),
                 categories,
                 profile_ids: d.profile.iter().map(|e| e.id.clone()).collect(),
+                battery_left: battery.0,
+                battery_right: battery.1,
+                battery_combined: battery.2,
             }
         })
         .collect()
@@ -243,6 +307,98 @@ fn hide_window(window: WebviewWindow) {
 }
 
 #[tauri::command]
+async fn show_notification(
+    name: String,
+    image: Option<String>,
+    status: String,
+    battery_left: Option<i32>,
+    battery_right: Option<i32>,
+    battery_combined: Option<i32>,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    let handle = {
+        let h = state.app_handle.lock().unwrap();
+        h.clone().ok_or("app handle ready")?
+    };
+
+    let label = "notification";
+
+    // Store data so the notification window can fetch it on load
+    {
+        let battery = if battery_left.is_some() || battery_right.is_some() || battery_combined.is_some() {
+            Some(BatteryInfo { left: battery_left, right: battery_right, combined: battery_combined })
+        } else {
+            None
+        };
+        let mut pending = state.pending_notification.lock().unwrap();
+        *pending = Some(PendingNotification { name, image, status, battery });
+    }
+
+    // Close existing notification window to force a clean reload with fresh data
+    if let Some(win) = handle.get_webview_window(label) {
+        let _ = win.close();
+        // Brief pause so Tauri cleans up the old window
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+
+    let monitor = handle.primary_monitor().ok().flatten();
+    let (scr_w, scr_h) = match &monitor {
+        Some(m) => (m.size().width, m.size().height),
+        None => (1920, 1080),
+    };
+    let scale = monitor.as_ref().map_or(1.0, |m| m.scale_factor());
+    let win_w = 360u32;
+    let win_h = 110u32;
+    let margin = (12.0 * scale) as u32;
+    let taskbar = (48.0 * scale) as u32;
+    let x = scr_w - win_w - margin;
+    let y = scr_h - win_h - margin - taskbar;
+
+    // Create window hidden, wait for HTML to load, then show with content
+    let _win = WebviewWindowBuilder::new(&handle, label, WebviewUrl::App("notification.html".into()))
+        .title("Notification")
+        .inner_size(win_w as f64, win_h as f64)
+        .position(x as f64, y as f64)
+        .resizable(false)
+        .decorations(false)
+        .transparent(true)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .focused(false)
+        .visible(false)
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    // When the HTML page loads, it calls get_notification (fetching stored data)
+    // and renders. After a short delay for rendering, we show the window.
+    let handle2 = handle.clone();
+    let label2 = label.to_string();
+    tokio::spawn(async move {
+        // Give the HTML time to load + render the content
+        tokio::time::sleep(Duration::from_millis(250)).await;
+        if let Some(w) = handle2.get_webview_window(&label2) {
+            let _ = w.show();
+        }
+    });
+
+    // Auto-hide after 3 seconds
+    let handle3 = handle.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_secs(3)).await;
+        if let Some(w) = handle3.get_webview_window(label) {
+            let _ = w.hide();
+        }
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
+fn get_notification(state: tauri::State<AppState>) -> Option<PendingNotification> {
+    state.pending_notification.lock().unwrap().clone()
+}
+
+#[tauri::command]
 fn quit_app(app: AppHandle) {
     if let Some(state) = app.try_state::<AppState>() {
         let _ = state.worker.tx.send(Command::Quit);
@@ -290,7 +446,13 @@ pub fn run() {
     let worker = worker::spawn(config.clone());
 
     tauri::Builder::default()
-        .manage(AppState { worker, config: Mutex::new(config), config_path })
+        .manage(AppState {
+            worker,
+            config: Mutex::new(config),
+            config_path,
+            app_handle: Mutex::new(None),
+            pending_notification: Mutex::new(None),
+        })
         .invoke_handler(tauri::generate_handler![
             get_models,
             get_states,
@@ -302,6 +464,8 @@ pub fn run() {
             get_scan,
             hide_window,
             open_url,
+            show_notification,
+            get_notification,
             quit_app
         ])
         .on_window_event(|window, event| {
@@ -311,6 +475,12 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            // Store app handle for notification window management
+            {
+                let state = app.handle().state::<AppState>();
+                *state.app_handle.lock().unwrap() = Some(app.handle().clone());
+            }
+
             // Auto-detect: periodically scan connected Bluetooth devices and add any
             // recognized Soundcore device to the config (zero manual setup).
             let handle = app.handle().clone();
