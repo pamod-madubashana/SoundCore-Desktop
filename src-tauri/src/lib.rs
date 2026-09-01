@@ -5,6 +5,7 @@ mod autostart;
 mod config;
 mod device_colors;
 mod device_images;
+mod updater;
 mod worker;
 
 use base64::Engine;
@@ -406,6 +407,33 @@ fn quit_app(app: AppHandle) {
     app.exit(0);
 }
 
+// ---- updater commands ----
+
+#[tauri::command]
+async fn check_update() -> Result<updater::UpdateInfo, String> {
+    updater::check_for_update().await
+}
+
+#[tauri::command]
+async fn start_update(app: AppHandle) -> Result<(), String> {
+    let info = updater::check_for_update().await?;
+    let download_path = updater::download_update(&info, &app).await?;
+    updater::install_update(&download_path, &app)?;
+    Ok(())
+}
+
+#[tauri::command]
+fn is_update_restart(app: AppHandle) -> bool {
+    let mut cfg = config::load(&app);
+    if cfg.update_restart {
+        cfg.update_restart = false;
+        let _ = config::save(&app, &cfg);
+        true
+    } else {
+        false
+    }
+}
+
 // ---- window helpers ----
 
 fn position_bottom_right(window: &WebviewWindow) {
@@ -466,7 +494,10 @@ pub fn run() {
             open_url,
             show_notification,
             get_notification,
-            quit_app
+            quit_app,
+            check_update,
+            start_update,
+            is_update_restart
         ])
         .on_window_event(|window, event| {
             // Auto-hide the popup when it loses focus, like a tray flyout.
@@ -480,6 +511,9 @@ pub fn run() {
                 let state = app.handle().state::<AppState>();
                 *state.app_handle.lock().unwrap() = Some(app.handle().clone());
             }
+
+            // Clean up leftover .old file from a previous update
+            updater::cleanup_old_exe();
 
             // Auto-detect: periodically scan connected Bluetooth devices and add any
             // recognized Soundcore device to the config (zero manual setup).

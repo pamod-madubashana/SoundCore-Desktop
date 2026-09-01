@@ -14,11 +14,14 @@ pub struct Config {
     pub autostart: bool,
     #[serde(default)]
     pub devices: Vec<DeviceConfig>,
+    /// Set to true when restarting after an update (cleared on next startup).
+    #[serde(default)]
+    pub update_restart: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Self { autostart: true, devices: Vec::new() }
+        Self { autostart: true, devices: Vec::new(), update_restart: false }
     }
 }
 
@@ -128,4 +131,16 @@ pub fn resolve_path(explicit: Option<String>) -> PathBuf {
         }
     }
     PathBuf::from("config.toml")
+}
+
+/// Load config using the path stored in the Tauri managed state.
+pub fn load(_app: &tauri::AppHandle) -> Config {
+    let path = resolve_path(None);
+    Config::load(&path).unwrap_or_default()
+}
+
+/// Save config using the path stored in the Tauri managed state.
+pub fn save(_app: &tauri::AppHandle, cfg: &Config) -> Result<(), String> {
+    let path = resolve_path(None);
+    cfg.save(&path).map_err(|e| e.to_string())
 }
