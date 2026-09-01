@@ -137,7 +137,7 @@ function Device({ d }) {
       <Header d={d} s={s} />
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {s.ambientSoundMode && <SoundMode s={s} send={send} />}
-        {s.volumeAdjustments && <Equalizer setting={s.volumeAdjustments} send={send} />}
+        {s.volumeAdjustments && <Equalizer setting={s.volumeAdjustments} send={send} readOnly={s.volumeAdjustments.readOnly} />}
         <QuickToggles s={s} send={send} />
       </div>
     </>
@@ -231,23 +231,35 @@ function pickOption(options, kw) {
 function SoundMode({ s, send }) {
   const setting = s.ambientSoundMode;
   const opts = setting.setting.options;
-  const value = setting.value;
   const modes = [
     { kw: "noise", label: "Noise Cancel", Icon: Ear },
     { kw: "normal", label: "Normal", Icon: Volume2 },
     { kw: "transparen", label: "Transparency", Icon: Waves },
   ].map((m) => ({ ...m, opt: pickOption(opts, m.kw) })).filter((m) => m.opt);
 
-  const manual = s.manualNoiseCanceling; // i32Range, optional
-  const showStrength = manual && /noise/i.test(value || "");
+  const [localValue, setLocalValue] = useState(setting.value);
+  const lastLocal = useRef(0);
+  useEffect(() => {
+    if (Date.now() - lastLocal.current < 500) return;
+    setLocalValue(setting.value);
+  }, [setting.value]);
+
+  const manual = s.manualNoiseCanceling;
+  const showStrength = manual && /noise/i.test(localValue || "");
+
+  const handleMode = (opt) => {
+    lastLocal.current = Date.now();
+    setLocalValue(opt);
+    send("ambientSoundMode", opt);
+  };
 
   return (
     <div className="rounded-xl bg-surface p-3 ring-1 ring-white/[0.04]">
       <div className="grid grid-cols-3 gap-1.5 p-1 rounded-lg bg-black/30">
         {modes.map(({ opt, label, Icon }) => {
-          const activeMode = opt === value;
+          const activeMode = opt === localValue;
           return (
-            <button key={opt} onClick={() => send("ambientSoundMode", opt)}
+            <button key={opt} onClick={() => handleMode(opt)}
               className={"relative flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-md text-[11px] font-medium leading-tight transition-all " +
                 (activeMode ? "bg-brand text-brand-foreground brand-glow" : "text-muted-foreground hover:text-foreground hover:bg-white/5")}>
               <Icon className="h-4 w-4" />
@@ -282,7 +294,7 @@ function Strength({ setting, send }) {
   );
 }
 
-function Equalizer({ setting, send }) {
+function Equalizer({ setting, send, readOnly }) {
   const { bandHz, fractionDigits, min, max } = setting.setting;
   const fd = fractionDigits || 0;
   const [bands, setBands] = useState(setting.value || []);
@@ -306,14 +318,15 @@ function Equalizer({ setting, send }) {
 
   return (
     <div className="rounded-xl bg-surface p-3 ring-1 ring-white/[0.04]">
-      <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-2.5">Equalizer</h2>
-      <div className="flex items-end justify-between gap-1 h-28 px-1 eq-track">
+      <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-2.5">Equalizer{readOnly && <span className="ml-2 text-[10px] font-normal normal-case tracking-normal">(Read-only)</span>}</h2>
+      <div className={"flex items-end justify-between gap-1 h-28 px-1 " + (readOnly ? "eq-track-readonly" : "eq-track")}>
         {bandHz.map((hz, i) => (
           <div key={hz} className="flex flex-col items-center gap-1 flex-1">
             <input type="range" min={min} max={max} step={1} value={bands[i] ?? 0}
+              disabled={readOnly}
               style={{ writingMode: "vertical-lr", direction: "rtl", width: 14, height: 80, accentColor: "var(--brand)" }}
-              onChange={(e) => setBand(i, Number(e.target.value))}
-              onPointerUp={commit} />
+              onChange={readOnly ? undefined : (e) => setBand(i, Number(e.target.value))}
+              onPointerUp={readOnly ? undefined : commit} />
             <span className="text-[8.5px] text-muted-foreground tabular-nums">{BAND_LABEL(hz)}</span>
             <span className="text-[8.5px] text-brand tabular-nums">{((bands[i] ?? 0) / 10 ** fd).toFixed(fd)}</span>
           </div>
@@ -335,13 +348,26 @@ function QuickToggles({ s, send }) {
 }
 
 function ToggleRow({ t, send }) {
-  const on = !!t.value;
+  const [localOn, setLocalOn] = useState(!!t.value);
+  const lastLocal = useRef(0);
+  useEffect(() => {
+    if (Date.now() - lastLocal.current < 500) return;
+    setLocalOn(!!t.value);
+  }, [t.value]);
+
+  const handleClick = () => {
+    const next = !localOn;
+    lastLocal.current = Date.now();
+    setLocalOn(next);
+    send(t.id, String(next));
+  };
+
   return (
-    <button onClick={() => send(t.id, String(!on))}
+    <button onClick={handleClick}
       className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/[0.02] transition text-left">
       <div className="flex-1 min-w-0 text-[13px] font-medium">{pretty(t.id)}</div>
-      <span className={"relative h-[18px] w-8 rounded-full transition-colors flex-shrink-0 " + (on ? "bg-brand" : "bg-white/10")}>
-        <span className={"absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white shadow transition-all " + (on ? "left-[16px]" : "left-[2px]")} />
+      <span className={"relative h-[18px] w-8 rounded-full transition-colors flex-shrink-0 " + (localOn ? "bg-brand" : "bg-white/10")}>
+        <span className={"absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white shadow transition-all " + (localOn ? "left-[16px]" : "left-[2px]")} />
       </span>
     </button>
   );
