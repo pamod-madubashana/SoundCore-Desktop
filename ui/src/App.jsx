@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  Volume2, Waves, Ear, Loader2, X,
+  Volume2, Waves, Ear, Loader2, X, Download,
 } from "lucide-react";
 const invoke = window.__TAURI__?.core?.invoke ?? (async () => {});
 
@@ -84,6 +84,40 @@ const pretty = (id) => id.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUp
 export default function App() {
   const [devices, setDevices] = useState([]);
   const prevConnected = useRef(null);
+  const [updateInfo, setUpdateInfo] = useState(null);
+  const [updateProgress, setUpdateProgress] = useState(null);
+  const [updateError, setUpdateError] = useState(null);
+
+  // Check for updates on mount
+  useEffect(() => {
+    invoke("check_update").then((info) => {
+      if (info) setUpdateInfo(info);
+    }).catch(() => {});
+  }, []);
+
+  // Listen for update progress events
+  useEffect(() => {
+    const unlisten = window.__TAURI__?.event?.listen?.("update_progress", (e) => {
+      setUpdateProgress(e.payload);
+    });
+    return () => { unlisten?.then?.((fn) => fn()); };
+  }, []);
+
+  const handleStartUpdate = async () => {
+    setUpdateError(null);
+    try {
+      await invoke("start_update");
+    } catch (e) {
+      setUpdateError(String(e).slice(0, 80));
+      setUpdateProgress(null);
+    }
+  };
+
+  const handleDismissUpdate = () => {
+    setUpdateInfo(null);
+    setUpdateProgress(null);
+    setUpdateError(null);
+  };
 
   useEffect(() => {
     const tick = async () => {
@@ -137,19 +171,48 @@ export default function App() {
   return (
     <main className="h-screen w-screen flex items-stretch justify-stretch">
       <section className="popup-window w-full h-full rounded-2xl overflow-hidden flex flex-col">
-        {active ? <Device d={active} /> : <Searching />}
+        {active
+          ? <Device d={active} updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={handleStartUpdate} onDismissUpdate={handleDismissUpdate} />
+          : <Searching updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={handleStartUpdate} onDismissUpdate={handleDismissUpdate} />}
         <Footer />
       </section>
     </main>
   );
 }
 
-function Searching() {
+function Searching({ updateInfo, updateProgress, updateError, onStartUpdate }) {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-3 text-muted-foreground">
+    <div className="flex-1 flex flex-col items-center justify-center gap-3 text-muted-foreground relative">
       <Loader2 className="h-7 w-7 animate-spin text-brand" />
       <p className="text-[13px]">Searching for a Soundcore device…</p>
       <p className="text-[11px] opacity-70">Connect it via Bluetooth and it'll appear here.</p>
+      {updateInfo && !updateProgress && (
+        <button onClick={onStartUpdate}
+          className="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand/10 text-brand text-[11px] font-medium hover:bg-brand/20 transition">
+          <Download className="h-3.5 w-3.5" />
+          Update to v{updateInfo.latest_version}
+        </button>
+      )}
+      {updateProgress && updateProgress.phase === "downloading" && (
+        <div className="mt-2 w-48">
+          <div className="flex items-center justify-between text-[10px] text-muted-foreground/60 mb-1">
+            <span>Downloading...</span>
+            <span>{Math.round(updateProgress.percent)}%</span>
+          </div>
+          <div className="h-1 rounded-full bg-white/10 overflow-hidden">
+            <div className="h-full rounded-full bg-brand transition-all duration-200" style={{ width: `${updateProgress.percent}%` }} />
+          </div>
+        </div>
+      )}
+      {updateProgress && updateProgress.phase !== "downloading" && (
+        <div className="mt-2 flex items-center gap-1.5 text-[10px] text-muted-foreground/60">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          <span>{updateProgress.message}</span>
+        </div>
+      )}
+      {updateError && (
+        <div className="mt-2 text-[10px] text-red-400/80 truncate" title={updateError}>{updateError}</div>
+      )}
     </div>
   );
 }
@@ -160,12 +223,12 @@ function settingsMap(d) {
   return m;
 }
 
-function Device({ d }) {
+function Device({ d, updateInfo, updateProgress, updateError, onStartUpdate, onDismissUpdate }) {
   const s = settingsMap(d);
   const send = (id, raw) => invoke("set_setting", { mac: d.mac_address, id, raw });
   return (
     <>
-      <Header d={d} s={s} />
+      <Header d={d} s={s} updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={onStartUpdate} onDismissUpdate={onDismissUpdate} />
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {s.ambientSoundMode && <SoundMode s={s} send={send} />}
         {s.volumeAdjustments && <Equalizer setting={s.volumeAdjustments} send={send} readOnly={s.volumeAdjustments.readOnly} />}
@@ -217,12 +280,14 @@ function BatteryIcon({ level }) {
   );
 }
 
-function Header({ d, s }) {
+function Header({ d, s, updateInfo, updateProgress, updateError, onStartUpdate, onDismissUpdate }) {
   const batteries = [
     ["L", batteryPct(s.batteryLevelLeft)],
     ["R", batteryPct(s.batteryLevelRight)],
     ["", batteryPct(s.batteryLevel)],
   ].filter(([, v]) => v != null);
+
+  const showUpdateBadge = updateInfo && !updateProgress;
 
   return (
     <header className="p-4 flex items-center gap-4 border-b border-white/[0.05]">
@@ -244,11 +309,40 @@ function Header({ d, s }) {
             ))}
           </div>
         )}
+        {updateProgress && updateProgress.phase === "downloading" && (
+          <div className="mt-2">
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground/60 mb-1">
+              <span>Downloading update...</span>
+              <span>{Math.round(updateProgress.percent)}%</span>
+            </div>
+            <div className="h-1 rounded-full bg-white/10 overflow-hidden">
+              <div className="h-full rounded-full bg-brand transition-all duration-200" style={{ width: `${updateProgress.percent}%` }} />
+            </div>
+          </div>
+        )}
+        {updateProgress && updateProgress.phase !== "downloading" && (
+          <div className="mt-2 flex items-center gap-1.5 text-[10px] text-muted-foreground/60">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            <span>{updateProgress.message}</span>
+          </div>
+        )}
+        {updateError && (
+          <div className="mt-2 text-[10px] text-red-400/80 truncate" title={updateError}>{updateError}</div>
+        )}
       </div>
-      <button onClick={() => invoke("hide_window")} title="Hide"
-        className="self-start -mt-1 -mr-1 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/5 transition">
-        <X className="h-4 w-4" />
-      </button>
+      <div className="flex items-center gap-0.5 self-start -mt-1 -mr-1">
+        {showUpdateBadge && (
+          <button onClick={onStartUpdate} title={`Update to v${updateInfo.latest_version}`}
+            className="p-1 rounded-md text-brand hover:bg-brand/10 transition relative">
+            <Download className="h-4 w-4" />
+            <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-brand animate-pulse" />
+          </button>
+        )}
+        <button onClick={() => invoke("hide_window")} title="Hide"
+          className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/5 transition">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
     </header>
   );
 }
