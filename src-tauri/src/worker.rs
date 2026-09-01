@@ -133,6 +133,18 @@ pub fn infer_model(name: &str) -> Option<DeviceModel> {
         SoundcoreA3004
     } else if n.contains("vortex") {
         SoundcoreA3031
+    } else if n.contains("r60i nc") {
+        SoundcoreD1202C
+    } else if n.contains("r60i") {
+        SoundcoreD1202
+    } else if n.contains("liberty 4 pro") {
+        SoundcoreA3954
+    } else if n.contains("v20i") {
+        SoundcoreA3876
+    } else if n.contains("c50i") {
+        SoundcoreD1101
+    } else if n.contains("sleep a30") {
+        SoundcoreD1301
     } else {
         return None;
     };
