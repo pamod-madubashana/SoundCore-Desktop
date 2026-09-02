@@ -4,6 +4,7 @@
 // and custom user presets (save/rename/delete).
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, RotateCcw, Save, Trash2, Pencil, Check, X, SlidersHorizontal } from "lucide-react";
 
 const invoke = window.__TAURI__?.core?.invoke ?? (async () => {});
@@ -288,6 +289,7 @@ function PresetPill({ name, active, isCustom, readOnly, onSelect, onRename, onDe
 function PresetDropdown({ allPresetNames, activePreset, customPresets, readOnly, isCustomBands, showSave, onSelect, onRename, onDelete, onSave, onReset }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
 
   // Close on outside click
   useEffect(() => {
@@ -297,6 +299,14 @@ function PresetDropdown({ allPresetNames, activePreset, customPresets, readOnly,
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  // Update position when opening
+  useEffect(() => {
+    if (open && ref.current) {
+      const r = ref.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, left: r.left, width: r.width });
+    }
   }, [open]);
 
   return (
@@ -311,9 +321,12 @@ function PresetDropdown({ allPresetNames, activePreset, customPresets, readOnly,
         <ChevronDown className={"h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform " + (open ? "rotate-180" : "")} />
       </button>
 
-      {/* Dropdown */}
-      {open && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-52 overflow-y-auto rounded-xl bg-surface-elevated ring-1 ring-white/[0.08] shadow-lg">
+      {/* Dropdown via portal to escape overflow-hidden parent */}
+      {open && createPortal(
+        <div
+          className="fixed z-[9999] max-h-72 overflow-y-auto rounded-xl bg-surface-elevated ring-1 ring-white/[0.08] shadow-lg"
+          style={{ top: pos.top, left: pos.left, width: pos.width }}
+        >
           {allPresetNames.map((name) => {
             const isCustom = customPresets.some((p) => p.name === name);
             const customId = customPresets.find((p) => p.name === name)?.id;
@@ -363,7 +376,8 @@ function PresetDropdown({ allPresetNames, activePreset, customPresets, readOnly,
           >
             <RotateCcw className="h-3.5 w-3.5" /> Reset to flat
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -532,7 +546,7 @@ export default function Equalizer({ setting, preset, send, model, defaultOpen = 
   };
 
   return (
-    <div className="overflow-hidden rounded-2xl bg-surface ring-1 ring-white/[0.04]">
+    <div className="mb-2 overflow-hidden rounded-2xl bg-surface ring-1 ring-white/[0.04]">
       {/* header / disclosure */}
       <button
         type="button"
