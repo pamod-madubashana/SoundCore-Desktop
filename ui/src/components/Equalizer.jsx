@@ -283,6 +283,92 @@ function PresetPill({ name, active, isCustom, readOnly, onSelect, onRename, onDe
   );
 }
 
+/* ── Preset dropdown ──────────────────────────────────────────────── */
+
+function PresetDropdown({ allPresetNames, activePreset, customPresets, readOnly, isCustomBands, showSave, onSelect, onRename, onDelete, onSave, onReset }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      {/* Trigger */}
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between gap-2 rounded-xl bg-surface-elevated px-3.5 py-2.5 text-[13px] font-medium text-foreground transition hover:bg-white/[0.06] ring-1 ring-white/[0.06]"
+      >
+        <span className="truncate">{activePreset || "Custom"}</span>
+        <ChevronDown className={"h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform " + (open ? "rotate-180" : "")} />
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-52 overflow-y-auto rounded-xl bg-surface-elevated ring-1 ring-white/[0.08] shadow-lg">
+          {allPresetNames.map((name) => {
+            const isCustom = customPresets.some((p) => p.name === name);
+            const customId = customPresets.find((p) => p.name === name)?.id;
+            const active = name === activePreset;
+            return (
+              <div
+                key={name}
+                className={"group flex items-center gap-2 px-3.5 py-2 text-[13px] cursor-pointer transition " +
+                  (active ? "bg-brand/15 text-brand" : "text-foreground hover:bg-white/[0.04]")}
+                onClick={() => { onSelect(name); setOpen(false); }}
+              >
+                <span className="flex-1 truncate">{name}</span>
+                {isCustom && !readOnly && (
+                  <span className="hidden group-hover:flex items-center gap-1">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onRename(customId, name); }}
+                      className="p-0.5 rounded hover:bg-white/10 text-muted-foreground hover:text-foreground"
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDelete(customId); }}
+                      className="p-0.5 rounded hover:bg-white/10 text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </span>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Save as preset */}
+          {!readOnly && isCustomBands && !showSave && (
+            <div
+              className="flex items-center gap-2 border-t border-white/[0.06] px-3.5 py-2 text-[13px] text-brand cursor-pointer hover:bg-white/[0.04]"
+              onClick={() => { onSave(); setOpen(false); }}
+            >
+              <Save className="h-3.5 w-3.5" /> Save as preset
+            </div>
+          )}
+
+          {/* Reset */}
+          <div
+            className={"flex items-center gap-2 border-t border-white/[0.06] px-3.5 py-2 text-[13px] cursor-pointer " + (readOnly ? "opacity-50 pointer-events-none" : "text-muted-foreground hover:text-brand hover:bg-white/[0.04]")}
+            onClick={() => { onReset(); setOpen(false); }}
+          >
+            <RotateCcw className="h-3.5 w-3.5" /> Reset to flat
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Main ─────────────────────────────────────────────────────────── */
 
 export default function Equalizer({ setting, preset, send, model, defaultOpen = false }) {
@@ -520,46 +606,20 @@ export default function Equalizer({ setting, preset, send, model, defaultOpen = 
               />
             )}
 
-            {/* Preset pills */}
-            <div className="grid grid-cols-2 gap-2">
-              {allPresetNames.map((name) => {
-                const isCustom = customPresets.some((p) => p.name === name);
-                const customId = customPresets.find((p) => p.name === name)?.id;
-                const active = name === activePreset;
-                return (
-                  <PresetPill
-                    key={name}
-                    name={name}
-                    active={active}
-                    isCustom={isCustom}
-                    readOnly={readOnly}
-                    onSelect={applyPreset}
-                    onRename={(newName) => customId && handleRenamePreset(customId, newName)}
-                    onDelete={() => customId && handleDeletePreset(customId)}
-                  />
-                );
-              })}
-
-              {/* Save button */}
-              {!readOnly && isCustomBands && !showSave && (
-                <button
-                  type="button"
-                  onClick={() => setShowSave(true)}
-                  className="flex items-center justify-center gap-1.5 rounded-full bg-brand/10 px-3 py-2 text-[12px] font-medium text-brand transition hover:bg-brand/20"
-                >
-                  <Save className="h-3.5 w-3.5" /> Save as preset
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={reset}
-                disabled={readOnly}
-                className="col-span-2 flex items-center justify-center gap-1.5 rounded-full bg-surface-elevated px-3 py-2 text-[12px] font-medium text-muted-foreground transition hover:text-brand disabled:opacity-50"
-              >
-                <RotateCcw className="h-3.5 w-3.5" /> Reset to flat
-              </button>
-            </div>
+            {/* Preset dropdown */}
+            <PresetDropdown
+              allPresetNames={allPresetNames}
+              activePreset={activePreset}
+              customPresets={customPresets}
+              readOnly={readOnly}
+              isCustomBands={isCustomBands}
+              showSave={showSave}
+              onSelect={applyPreset}
+              onRename={(id, newName) => handleRenamePreset(id, newName)}
+              onDelete={(id) => handleDeletePreset(id)}
+              onSave={() => setShowSave(true)}
+              onReset={reset}
+            />
 
             <p className="px-1 text-center text-[11px] text-muted-foreground">
               Tune the sound exactly the way you like it.
