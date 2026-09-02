@@ -524,34 +524,20 @@ async fn slide_window_y(window: &WebviewWindow, from_y: i32, to_y: i32, duration
 fn toggle_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         if window.is_visible().unwrap_or(false) {
-            // Animate slide-down then hide
-            let win = window.clone();
-            tauri::async_runtime::spawn(async move {
-                let start_y = win.outer_position().map(|p| p.y).unwrap_or(0);
-                // Get target Y (where it should be when fully shown)
-                let target_y = position_bottom_right(&win).map(|p| p.1).unwrap_or(start_y);
-                let slide_to = target_y + 60; // slide down 60px below target
-                slide_window_y(&win, start_y, slide_to, 150).await;
-                let _ = win.hide();
-                // Reset position to target so next open starts from correct spot
-                let _ = win.set_position(PhysicalPosition::new(
-                    win.outer_position().map(|p| p.x).unwrap_or(0),
-                    target_y,
-                ));
-            });
+            let _ = window.hide();
         } else {
-            // Start below screen, slide up to target
+            // Slide up from below
             let win = window.clone();
             tauri::async_runtime::spawn(async move {
                 let target_y = position_bottom_right(&win).map(|p| p.1).unwrap_or(0);
-                let start_y = target_y + 60; // start 60px below target
+                let start_y = target_y + 80;
                 let _ = win.set_position(PhysicalPosition::new(
                     win.outer_position().map(|p| p.x).unwrap_or(0),
                     start_y,
                 ));
                 let _ = win.show();
                 let _ = win.set_focus();
-                slide_window_y(&win, start_y, target_y, 180).await;
+                slide_window_y(&win, start_y, target_y, 200).await;
             });
         }
     }
