@@ -9,7 +9,7 @@ mod updater;
 mod worker;
 
 use base64::Engine;
-use std::{path::PathBuf, str::FromStr, sync::Mutex, time::Duration};
+use std::{path::PathBuf, str::FromStr, sync::{atomic::{AtomicBool, Ordering}, Mutex}, time::Duration};
 
 use config::Config;
 use macaddr::MacAddr6;
@@ -20,6 +20,7 @@ use openscq30_lib::{
 use serde::Serialize;
 use tauri::{
     AppHandle, Manager, PhysicalPosition, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
+    WindowEvent,
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
@@ -31,6 +32,7 @@ struct AppState {
     config_path: PathBuf,
     app_handle: Mutex<Option<AppHandle>>,
     pending_notification: Mutex<Option<PendingNotification>>,
+    tray_click_pending: AtomicBool,
 }
 
 #[derive(Clone, Serialize)]
@@ -561,6 +563,7 @@ pub fn run() {
             config_path,
             app_handle: Mutex::new(None),
             pending_notification: Mutex::new(None),
+            tray_click_pending: AtomicBool::new(false),
         })
         .invoke_handler(tauri::generate_handler![
             get_models,
@@ -584,8 +587,14 @@ pub fn run() {
             start_update,
             is_update_restart
         ])
-        .on_window_event(|_window, _event| {
-            // No-op: tray icon click handles show/hide toggle.
+        .on_window_event(|window, event| {
+            if let WindowEvent::Focused(false) = event {
+                let state = window.state::<AppState>();
+                if state.tray_click_pending.swap(false, Ordering::SeqCst) {
+                    return;
+                }
+                let _ = window.hide();
+            }
         })
         .setup(|app| {
             // Store app handle for notification window management
@@ -670,13 +679,21 @@ pub fn run() {
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click {
-                        button: MouseButton::Left,
-                        button_state: MouseButtonState::Up,
-                        ..
-                    } = event
-                    {
-                        toggle_window(tray.app_handle());
+                    let app = tray.app_handle();
+                    match event {
+                        TrayIconEvent::Enter { .. } => {
+                            if let Some(state) = app.try_state::<AppState>() {
+                                state.tray_click_pending.store(true, Ordering::SeqCst);
+                            }
+                        }
+                        TrayIconEvent::Click {
+                            button: MouseButton::Left,
+                            button_state: MouseButtonState::Up,
+                            ..
+                        } => {
+                            toggle_window(app);
+                        }
+                        _ => {}
                     }
                 })
                 .build(app)?;
