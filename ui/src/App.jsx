@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  Volume2, Waves, Ear, Loader2, X, Download,
+  Volume2, Waves, Ear, Loader2, X, Download, SlidersHorizontal,
 } from "lucide-react";
-import Equalizer from "./components/Equalizer";
+import SoundEffectsPopup from "./components/SoundEffectsPopup";
 const invoke = window.__TAURI__?.core?.invoke ?? (async () => {});
 
 // Device-type illustration picked from the name (no reliable per-model photo source exists).
@@ -228,14 +228,42 @@ function settingsMap(d) {
 function Device({ d, updateInfo, updateProgress, updateError, onStartUpdate, onDismissUpdate }) {
   const s = settingsMap(d);
   const send = (id, raw) => invoke("set_setting", { mac: d.mac_address, id, raw });
+  const [showSoundEffects, setShowSoundEffects] = useState(false);
+
+  const currentPreset = s.presetEqualizerProfile?.value || "Custom";
+
   return (
     <>
       <Header d={d} s={s} updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={onStartUpdate} onDismissUpdate={onDismissUpdate} />
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {s.ambientSoundMode && <SoundMode s={s} send={send} />}
-        {s.volumeAdjustments && <Equalizer setting={s.volumeAdjustments} preset={s.presetEqualizerProfile} send={send} />}
+
+        {/* Sound Effects nav item */}
+        {(s.volumeAdjustments || s.spatialAudio) && (
+          <button
+            type="button"
+            onClick={() => setShowSoundEffects(true)}
+            className="w-full rounded-2xl bg-surface ring-1 ring-white/[0.04] px-4 py-3 flex items-center justify-between transition hover:bg-white/[0.02]"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                <SlidersHorizontal className="h-5 w-5" />
+              </div>
+              <div className="text-left">
+                <span className="text-[14px] font-medium text-foreground">Sound Effects</span>
+                <span className="ml-2 text-[12px] text-muted-foreground">{currentPreset}</span>
+              </div>
+            </div>
+            <ChevronRightIcon className="h-4 w-4 text-muted-foreground" />
+          </button>
+        )}
+
         <QuickToggles s={s} send={send} />
       </div>
+
+      {showSoundEffects && (
+        <SoundEffectsPopup d={d} s={s} send={send} onClose={() => setShowSoundEffects(false)} />
+      )}
     </>
   );
 }
@@ -420,8 +448,18 @@ function Strength({ setting, send }) {
   );
 }
 
+function ChevronRightIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  );
+}
+
 function QuickToggles({ s, send }) {
-  const toggles = Object.values(s).filter((x) => x.type === "toggle")
+  const toggles = Object.values(s)
+    .filter((x) => x.type === "toggle")
+    .filter((x) => !["spatialAudio"].includes(x.id))
     .sort((a, b) => (/gam/i.test(a.id) ? -1 : /gam/i.test(b.id) ? 1 : 0));
   if (toggles.length === 0) return null;
   return (
