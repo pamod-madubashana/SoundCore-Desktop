@@ -32,6 +32,7 @@ struct AppState {
     config_path: PathBuf,
     app_handle: Mutex<Option<AppHandle>>,
     pending_notification: Mutex<Option<PendingNotification>>,
+    last_tray_click: Mutex<std::time::Instant>,
 }
 
 #[derive(Clone, Serialize)]
@@ -488,7 +489,7 @@ fn is_update_restart(app: AppHandle) -> bool {
 
 // ---- window helpers ----
 
-fn position_bottom_right(window: &WebviewWindow) {
+fn position_bottom_right(window: &WebviewWindow) -> Option<(i32, i32)> {
     if let Ok(Some(monitor)) = window.current_monitor() {
         let msize = monitor.size();
         let mpos = monitor.position();
@@ -498,18 +499,66 @@ fn position_bottom_right(window: &WebviewWindow) {
         let taskbar = (48.0 * scale) as i32;
         let x = mpos.x + msize.width as i32 - wsize.width as i32 - margin;
         let y = mpos.y + msize.height as i32 - wsize.height as i32 - margin - taskbar;
-        let _ = window.set_position(PhysicalPosition::new(x.max(0), y.max(0)));
+        let pos = (x.max(0), y.max(0));
+        let _ = window.set_position(PhysicalPosition::new(pos.0, pos.1));
+        return Some(pos);
+    }
+    None
+}
+
+/// Slide the window vertically from `from_y` to `to_y` over `duration_ms`.
+async fn slide_window_y(window: &WebviewWindow, from_y: i32, to_y: i32, duration_ms: u64) {
+    let steps = 12;
+    let step_delay = duration_ms / steps;
+    for i in 0..=steps {
+        let t = i as f64 / steps as f64;
+        // ease-out cubic
+        let t = 1.0 - (1.0 - t).powi(3);
+        let y = from_y as f64 + (to_y as f64 - from_y as f64) * t;
+        let _ = window.set_position(PhysicalPosition::new(
+            window.outer_position().map(|p| p.x).unwrap_or(0),
+            y as i32,
+        ));
+        tokio::time::sleep(Duration::from_millis(step_delay)).await;
     }
 }
 
 fn toggle_window(app: &AppHandle) {
+    // Record tray click time to debounce focus-loss hide
+    if let Some(state) = app.try_state::<AppState>() {
+        *state.last_tray_click.lock().unwrap() = std::time::Instant::now();
+    }
     if let Some(window) = app.get_webview_window("main") {
         if window.is_visible().unwrap_or(false) {
-            let _ = window.hide();
+            // Animate slide-down then hide
+            let win = window.clone();
+            tauri::async_runtime::spawn(async move {
+                let start_y = win.outer_position().map(|p| p.y).unwrap_or(0);
+                // Get target Y (where it should be when fully shown)
+                let target_y = position_bottom_right(&win).map(|p| p.1).unwrap_or(start_y);
+                let slide_to = target_y + 60; // slide down 60px below target
+                slide_window_y(&win, start_y, slide_to, 150).await;
+                let _ = win.hide();
+                // Reset position to target so next open starts from correct spot
+                let _ = win.set_position(PhysicalPosition::new(
+                    win.outer_position().map(|p| p.x).unwrap_or(0),
+                    target_y,
+                ));
+            });
         } else {
-            position_bottom_right(&window);
-            let _ = window.show();
-            let _ = window.set_focus();
+            // Start below screen, slide up to target
+            let win = window.clone();
+            tauri::async_runtime::spawn(async move {
+                let target_y = position_bottom_right(&win).map(|p| p.1).unwrap_or(0);
+                let start_y = target_y + 60; // start 60px below target
+                let _ = win.set_position(PhysicalPosition::new(
+                    win.outer_position().map(|p| p.x).unwrap_or(0),
+                    start_y,
+                ));
+                let _ = win.show();
+                let _ = win.set_focus();
+                slide_window_y(&win, start_y, target_y, 180).await;
+            });
         }
     }
 }
@@ -532,6 +581,7 @@ pub fn run() {
             config_path,
             app_handle: Mutex::new(None),
             pending_notification: Mutex::new(None),
+            last_tray_click: Mutex::new(std::time::Instant::now()),
         })
         .invoke_handler(tauri::generate_handler![
             get_models,
@@ -556,9 +606,14 @@ pub fn run() {
             is_update_restart
         ])
         .on_window_event(|window, event| {
-            // Auto-hide the popup when it loses focus, like a tray flyout.
+            // Hide on focus loss (clicking outside), but not right after a tray click
             if let WindowEvent::Focused(false) = event {
-                let _ = window.hide();
+                let now = std::time::Instant::now();
+                let state = window.state::<AppState>();
+                let last = *state.last_tray_click.lock().unwrap();
+                if now.duration_since(last).as_millis() > 300 {
+                    let _ = window.hide();
+                }
             }
         })
         .setup(|app| {

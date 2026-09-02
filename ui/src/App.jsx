@@ -179,7 +179,7 @@ export default function App() {
 
   return (
     <main className="h-screen w-screen flex items-stretch justify-stretch">
-      <section className="popup-window w-full h-full rounded-2xl overflow-hidden flex flex-col">
+      <section className="popup-window animate-fade-in w-full h-full rounded-2xl overflow-hidden flex flex-col">
         {active
           ? <Device d={active} updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={handleStartUpdate} onDismissUpdate={handleDismissUpdate} />
           : <Searching updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={handleStartUpdate} onDismissUpdate={handleDismissUpdate} />}
