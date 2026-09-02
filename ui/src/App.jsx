@@ -88,6 +88,13 @@ export default function App() {
   const [updateProgress, setUpdateProgress] = useState(null);
   const [updateError, setUpdateError] = useState(null);
 
+  // Disable right-click context menu across the entire app
+  useEffect(() => {
+    const handler = (e) => e.preventDefault();
+    document.addEventListener("contextmenu", handler);
+    return () => document.removeEventListener("contextmenu", handler);
+  }, []);
+
   // Check for updates on mount
   useEffect(() => {
     invoke("check_update").then((info) => {
@@ -297,16 +304,28 @@ function batteryPct(setting) {
   return Number.isFinite(n) ? Math.min(100, n) : null;
 }
 
-function BatteryIcon({ level }) {
-  // level: 0-100
+function BatteryIcon({ level, label }) {
+  // level: 0-100, label: "L", "R", or "Case"
   const pct = Math.max(0, Math.min(100, level ?? 0));
   const color = pct > 50 ? "text-success" : pct > 20 ? "text-yellow-500" : "text-red-500";
   return (
-    <svg width="18" height="11" viewBox="0 0 18 11" fill="none" className={color}>
-      <rect x="0.5" y="0.5" width="15" height="10" rx="2" stroke="currentColor" strokeWidth="1" opacity="0.4" />
-      <rect x="16" y="3" width="2" height="5" rx="0.5" fill="currentColor" opacity="0.4" />
-      <rect x="1.5" y="1.5" width={Math.max(0, 13 * pct / 100)} height="8" rx="1" fill="currentColor" />
-    </svg>
+    <span className="inline-flex items-center gap-1">
+      {label && (
+        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/10 text-[8px] font-bold text-foreground/70">
+          {label === "Case" ? (
+            <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="2" y="7" width="20" height="14" rx="2" />
+              <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+            </svg>
+          ) : label}
+        </span>
+      )}
+      <svg width="18" height="11" viewBox="0 0 18 11" fill="none" className={color}>
+        <rect x="0.5" y="0.5" width="15" height="10" rx="2" stroke="currentColor" strokeWidth="1" opacity="0.4" />
+        <rect x="16" y="3" width="2" height="5" rx="0.5" fill="currentColor" opacity="0.4" />
+        <rect x="1.5" y="1.5" width={Math.max(0, 13 * pct / 100)} height="8" rx="1" fill="currentColor" />
+      </svg>
+    </span>
   );
 }
 
@@ -334,7 +353,7 @@ function Header({ d, s, updateInfo, updateProgress, updateError, onStartUpdate, 
           <div className="flex items-center gap-3 mt-2">
             {batteries.map(([label, v]) => (
               <div key={label || "b"} className="flex items-center gap-1.5 text-[13px]">
-                <BatteryIcon level={v} />
+                <BatteryIcon level={v} label={label || null} />
                 <span className="text-foreground font-medium">{v}%</span>
               </div>
             ))}
