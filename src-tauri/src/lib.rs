@@ -9,7 +9,7 @@ mod updater;
 mod worker;
 
 use base64::Engine;
-use std::{path::PathBuf, str::FromStr, sync::Mutex, time::Duration};
+use std::{path::PathBuf, str::FromStr, sync::{atomic::{AtomicBool, Ordering}, Mutex}, time::Duration};
 
 use config::Config;
 use macaddr::MacAddr6;
@@ -32,7 +32,7 @@ struct AppState {
     config_path: PathBuf,
     app_handle: Mutex<Option<AppHandle>>,
     pending_notification: Mutex<Option<PendingNotification>>,
-    last_tray_click: Mutex<std::time::Instant>,
+    tray_click_pending: AtomicBool,
 }
 
 #[derive(Clone, Serialize)]
@@ -524,10 +524,6 @@ async fn slide_window_y(window: &WebviewWindow, from_y: i32, to_y: i32, duration
 }
 
 fn toggle_window(app: &AppHandle) {
-    // Record tray click time to debounce focus-loss hide
-    if let Some(state) = app.try_state::<AppState>() {
-        *state.last_tray_click.lock().unwrap() = std::time::Instant::now();
-    }
     if let Some(window) = app.get_webview_window("main") {
         if window.is_visible().unwrap_or(false) {
             // Animate slide-down then hide
@@ -581,7 +577,7 @@ pub fn run() {
             config_path,
             app_handle: Mutex::new(None),
             pending_notification: Mutex::new(None),
-            last_tray_click: Mutex::new(std::time::Instant::now()),
+            tray_click_pending: AtomicBool::new(false),
         })
         .invoke_handler(tauri::generate_handler![
             get_models,
@@ -606,14 +602,13 @@ pub fn run() {
             is_update_restart
         ])
         .on_window_event(|window, event| {
-            // Hide on focus loss (clicking outside), but not right after a tray click
             if let WindowEvent::Focused(false) = event {
-                let now = std::time::Instant::now();
                 let state = window.state::<AppState>();
-                let last = *state.last_tray_click.lock().unwrap();
-                if now.duration_since(last).as_millis() > 300 {
-                    let _ = window.hide();
+                // Skip hide if a tray click is being processed (flag set synchronously in tray handler)
+                if state.tray_click_pending.swap(false, Ordering::SeqCst) {
+                    return;
                 }
+                let _ = window.hide();
             }
         })
         .setup(|app| {
@@ -703,13 +698,28 @@ pub fn run() {
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click {
-                        button: MouseButton::Left,
-                        button_state: MouseButtonState::Up,
-                        ..
-                    } = event
-                    {
-                        toggle_window(tray.app_handle());
+                    let app = tray.app_handle();
+                    match event {
+                        // Set flag when mouse enters tray icon area (before click fires)
+                        TrayIconEvent::Enter { .. } => {
+                            if let Some(state) = app.try_state::<AppState>() {
+                                state.tray_click_pending.store(true, Ordering::SeqCst);
+                            }
+                        }
+                        // Clear flag when mouse leaves tray icon
+                        TrayIconEvent::Leave { .. } => {
+                            if let Some(state) = app.try_state::<AppState>() {
+                                state.tray_click_pending.store(false, Ordering::SeqCst);
+                            }
+                        }
+                        TrayIconEvent::Click {
+                            button: MouseButton::Left,
+                            button_state: MouseButtonState::Up,
+                            ..
+                        } => {
+                            toggle_window(app);
+                        }
+                        _ => {}
                     }
                 })
                 .build(app)?;
