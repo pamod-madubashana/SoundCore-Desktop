@@ -1,33 +1,17 @@
 // ui/src/components/Equalizer.jsx
 //
-// Drop-in replacement for the inline <Equalizer /> in ui/src/App.jsx.
-// Self-contained: only depends on react + lucide-react + the existing CSS
-// tokens (--brand, bg-surface, bg-surface-elevated, text-muted-foreground).
-//
-// Usage in App.jsx:
-//   import Equalizer from "./components/Equalizer";
-//   ...
-//   {s.volumeAdjustments && (
-//     <Equalizer
-//       setting={s.volumeAdjustments}
-//       preset={s.presetEqualizerProfile}   // optional, may be undefined
-//       send={send}
-//     />
-//   )}
-//
-// Everything user-facing lives in the small tables at the top of this file:
-// tweak PRESETS / labels there instead of editing JSX.
+// Self-contained equalizer with Samsung-style sliders, device presets,
+// and custom user presets (save/rename/delete).
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, RotateCcw, SlidersHorizontal } from "lucide-react";
+import { ChevronDown, RotateCcw, Save, Trash2, Pencil, Check, X } from "lucide-react";
+
+const invoke = window.__TAURI__?.core?.invoke ?? (async () => {});
 
 /* ------------------------------------------------------------------ config */
 
-const SYNC_GRACE_MS = 2500; // ignore device polls right after a local edit
+const SYNC_GRACE_MS = 2500;
 
-// Fallback presets, used when the device exposes no presetEqualizerProfile
-// setting. Values are "gain shapes" resampled to however many bands the
-// device reports, so this works for 5-band and 8-band hardware alike.
 const PRESETS = {
   Flat: [0, 0, 0, 0, 0],
   "Bass Boost": [6, 4, 1, 0, 0],
@@ -43,7 +27,6 @@ const hzLabel = (hz) => (hz >= 1000 ? `${hz / 1000}k` : String(hz));
 
 /* ------------------------------------------------------------------ helpers */
 
-// Resample a 5-point curve onto n bands with linear interpolation.
 function resample(shape, n) {
   if (n === shape.length) return [...shape];
   return Array.from({ length: n }, (_, i) => {
@@ -58,9 +41,26 @@ function resample(shape, n) {
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 
+/* ── API helpers ──────────────────────────────────────────────────── */
+
+function loadPresets(model) {
+  return invoke("list_eq_presets", { model }).catch(() => []);
+}
+
+function savePreset(name, bands, model) {
+  return invoke("save_eq_preset", { name, bands, model });
+}
+
+function renamePreset(id, name) {
+  return invoke("rename_eq_preset", { id, name });
+}
+
+function deletePreset(id) {
+  return invoke("delete_eq_preset", { id });
+}
+
 /* ------------------------------------------------------------- band slider */
 
-/** Samsung-style vertical band: light rail above the handle, accent stem below. */
 function BandSlider({ hz, value, min, max, fd, disabled, onChange, onCommit }) {
   const ref = useRef(null);
   const dragging = useRef(false);
@@ -126,17 +126,14 @@ function BandSlider({ hz, value, min, max, fd, disabled, onChange, onCommit }) {
             : "cursor-ns-resize focus-visible:ring-1 focus-visible:ring-brand/60 focus-visible:ring-offset-0")
         }
       >
-        {/* upper rail */}
         <span
           className="absolute left-1/2 top-0 w-[2px] -translate-x-1/2 rounded-full bg-white/45"
           style={{ height: `${100 - pct}%` }}
         />
-        {/* accent stem */}
         <span
           className="absolute bottom-0 left-1/2 w-[2px] -translate-x-1/2 rounded-full bg-brand"
           style={{ height: `${pct}%` }}
         />
-        {/* handle */}
         <span
           className="absolute left-1/2 h-[13px] w-[13px] -translate-x-1/2 rounded-full border-2 border-brand bg-surface"
           style={{ bottom: `calc(${pct}% - 6.5px)` }}
@@ -149,7 +146,6 @@ function BandSlider({ hz, value, min, max, fd, disabled, onChange, onCommit }) {
 
 /* ------------------------------------------------------------ curve preview */
 
-/** Tiny sparkline of the current curve, shown in the collapsed header. */
 function CurvePreview({ bands, min, max }) {
   const w = 56;
   const h = 16;
@@ -175,9 +171,115 @@ function CurvePreview({ bands, min, max }) {
   );
 }
 
-/* ------------------------------------------------------------------- main */
+/* ── Save dialog ──────────────────────────────────────────────────── */
 
-export default function Equalizer({ setting, preset, send, defaultOpen = false }) {
+function SaveDialog({ bands, model, onSaved, onCancel }) {
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!name.trim() || saving) return;
+    setSaving(true);
+    try {
+      await savePreset(name.trim(), bands.join(","), model);
+      onSaved();
+    } catch {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2 rounded-xl bg-surface-elevated p-3 ring-1 ring-white/[0.06]">
+      <input
+        type="text"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && handleSave()}
+        placeholder="Preset name..."
+        autoFocus
+        className="flex-1 bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground outline-none"
+      />
+      <button
+        type="button"
+        onClick={handleSave}
+        disabled={!name.trim() || saving}
+        className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand text-brand-foreground transition disabled:opacity-50"
+      >
+        <Check className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={onCancel}
+        className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 text-muted-foreground transition hover:text-foreground"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
+/* ── Editable preset pill ─────────────────────────────────────────── */
+
+function PresetPill({ name, active, isCustom, readOnly, onSelect, onRename, onDelete }) {
+  const [editing, setEditing] = useState(false);
+  const [newName, setNewName] = useState(name);
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1 rounded-full bg-surface-elevated ring-1 ring-brand/30 px-2 py-1">
+        <input
+          type="text"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && newName.trim()) { onRename(newName.trim()); setEditing(false); }
+            if (e.key === "Escape") setEditing(false);
+          }}
+          autoFocus
+          className="w-full bg-transparent text-[12px] font-medium text-foreground outline-none"
+        />
+        <button onClick={() => { if (newName.trim()) { onRename(newName.trim()); setEditing(false); } }}
+          className="text-brand"><Check className="h-3 w-3" /></button>
+        <button onClick={() => setEditing(false)}
+          className="text-muted-foreground"><X className="h-3 w-3" /></button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="group relative">
+      <button
+        type="button"
+        disabled={readOnly}
+        onClick={() => onSelect(name)}
+        className={
+          "w-full truncate rounded-full px-3 py-2 text-[12px] font-medium transition disabled:opacity-50 " +
+          (active
+            ? "bg-brand text-brand-foreground"
+            : "bg-surface-elevated text-foreground/80 hover:bg-white/[0.08]")
+        }
+      >
+        {name}
+      </button>
+      {isCustom && !readOnly && (
+        <div className="absolute -top-1 -right-1 hidden group-hover:flex items-center gap-0.5">
+          <button onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+            className="flex h-5 w-5 items-center justify-center rounded-full bg-surface-elevated text-muted-foreground ring-1 ring-white/10 hover:text-brand">
+            <Pencil className="h-2.5 w-2.5" />
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="flex h-5 w-5 items-center justify-center rounded-full bg-surface-elevated text-muted-foreground ring-1 ring-white/10 hover:text-red-400">
+            <Trash2 className="h-2.5 w-2.5" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Main ─────────────────────────────────────────────────────────── */
+
+export default function Equalizer({ setting, preset, send, model, defaultOpen = false }) {
   const { bandHz, fractionDigits, min, max } = setting.setting;
   const readOnly = !!setting.readOnly;
   const fd = fractionDigits || 0;
@@ -186,8 +288,16 @@ export default function Equalizer({ setting, preset, send, defaultOpen = false }
   const [bands, setBands] = useState(setting.value || []);
   const lastEdit = useRef(0);
 
-  // Sync from the device only when the content actually changed and we didn't
-  // just edit, so a poll tick can't clobber the band being dragged.
+  // Custom presets
+  const [customPresets, setCustomPresets] = useState([]);
+  const [showSave, setShowSave] = useState(false);
+
+  // Load custom presets on mount and when model changes
+  useEffect(() => {
+    loadPresets(model || "").then(setCustomPresets);
+  }, [model]);
+
+  // Sync from device
   const incoming = (setting.value || []).join(",");
   useEffect(() => {
     if (Date.now() - lastEdit.current < SYNC_GRACE_MS) return;
@@ -214,23 +324,53 @@ export default function Equalizer({ setting, preset, send, defaultOpen = false }
     });
   };
 
-  // Prefer the device's own preset list; fall back to local shapes.
+  // Device presets
   const deviceOptions = preset?.setting?.options ?? null;
-  const presetNames = useMemo(
-    () => deviceOptions ?? Object.keys(PRESETS),
-    [deviceOptions],
-  );
+
+  // All preset names: device presets + custom presets
+  const allPresetNames = useMemo(() => {
+    const device = deviceOptions ?? Object.keys(PRESETS);
+    const custom = customPresets.map((p) => p.name);
+    return [...device, ...custom];
+  }, [deviceOptions, customPresets]);
+
+  // Which custom preset matches current bands (by value)
+  const activeCustomId = useMemo(() => {
+    const bandStr = bands.join(",");
+    const match = customPresets.find((p) => p.bands === bandStr);
+    return match?.id ?? null;
+  }, [bands, customPresets]);
+
   const activePreset = deviceOptions
-    ? (preset?.value ?? "")
+    ? (preset?.value ?? (activeCustomId ? customPresets.find((p) => p.id === activeCustomId)?.name : "") ?? "Custom")
     : (Object.keys(PRESETS).find(
         (name) =>
           resample(PRESETS[name] ?? [], bandHz.length)
             .map((v) => clamp(v * 10 ** fd, min, max))
             .join(",") === bands.join(","),
-      ) ?? "Custom");
+      ) ?? customPresets.find((p) => p.bands === bands.join(","))?.name ?? "Custom");
+
+  // Check if bands differ from ALL presets (for save button)
+  const isCustomBands = useMemo(() => {
+    const bandStr = bands.join(",");
+    if (customPresets.some((p) => p.bands === bandStr)) return false;
+    if (deviceOptions) return true; // always show save for device presets
+    return !Object.keys(PRESETS).some(
+      (name) =>
+        resample(PRESETS[name] ?? [], bandHz.length)
+          .map((v) => clamp(v * 10 ** fd, min, max))
+          .join(",") === bandStr,
+    );
+  }, [bands, customPresets, deviceOptions, bandHz.length, fd, min, max]);
 
   const applyPreset = (name) => {
     if (readOnly || !name) return;
+    // Check custom presets first
+    const custom = customPresets.find((p) => p.name === name);
+    if (custom) {
+      commit(custom.bands.split(",").map(Number));
+      return;
+    }
     if (deviceOptions && preset) {
       touch();
       send(preset.id, name);
@@ -242,7 +382,24 @@ export default function Equalizer({ setting, preset, send, defaultOpen = false }
       ),
     );
   };
+
   const reset = () => !readOnly && commit(bandHz.map(() => 0));
+
+  const handleDeletePreset = async (id) => {
+    await deletePreset(id);
+    setCustomPresets((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  const handleRenamePreset = async (id, newName) => {
+    await renamePreset(id, newName);
+    setCustomPresets((prev) => prev.map((p) => p.id === id ? { ...p, name: newName } : p));
+  };
+
+  const handleSaved = async () => {
+    setShowSave(false);
+    const updated = await loadPresets(model || "");
+    setCustomPresets(updated);
+  };
 
   return (
     <div className="overflow-hidden rounded-2xl bg-surface ring-1 ring-white/[0.04]">
@@ -279,7 +436,6 @@ export default function Equalizer({ setting, preset, send, defaultOpen = false }
           <div className="space-y-4 px-3 pb-4 pt-1">
             {/* plot card */}
             <div className="relative rounded-2xl bg-surface-elevated px-2.5 pb-2 pt-3">
-              {/* horizontal grid lines behind the bands */}
               <div
                 className="pointer-events-none absolute inset-x-3 top-[30px] bottom-[30px]"
                 aria-hidden
@@ -310,27 +466,47 @@ export default function Equalizer({ setting, preset, send, defaultOpen = false }
               </div>
             </div>
 
-            {/* preset pills */}
+            {/* Save dialog */}
+            {showSave && (
+              <SaveDialog
+                bands={bands}
+                model={model || ""}
+                onSaved={handleSaved}
+                onCancel={() => setShowSave(false)}
+              />
+            )}
+
+            {/* Preset pills */}
             <div className="grid grid-cols-2 gap-2">
-              {presetNames.map((name) => {
+              {allPresetNames.map((name) => {
+                const isCustom = customPresets.some((p) => p.name === name);
+                const customId = customPresets.find((p) => p.name === name)?.id;
                 const active = name === activePreset;
                 return (
-                  <button
+                  <PresetPill
                     key={name}
-                    type="button"
-                    disabled={readOnly}
-                    onClick={() => applyPreset(name)}
-                    className={
-                      "truncate rounded-full px-3 py-2 text-[12px] font-medium transition disabled:opacity-50 " +
-                      (active
-                        ? "bg-brand text-brand-foreground"
-                        : "bg-surface-elevated text-foreground/80 hover:bg-white/[0.08]")
-                    }
-                  >
-                    {name}
-                  </button>
+                    name={name}
+                    active={active}
+                    isCustom={isCustom}
+                    readOnly={readOnly}
+                    onSelect={applyPreset}
+                    onRename={(newName) => customId && handleRenamePreset(customId, newName)}
+                    onDelete={() => customId && handleDeletePreset(customId)}
+                  />
                 );
               })}
+
+              {/* Save button */}
+              {!readOnly && isCustomBands && !showSave && (
+                <button
+                  type="button"
+                  onClick={() => setShowSave(true)}
+                  className="flex items-center justify-center gap-1.5 rounded-full bg-brand/10 px-3 py-2 text-[12px] font-medium text-brand transition hover:bg-brand/20"
+                >
+                  <Save className="h-3.5 w-3.5" /> Save as preset
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={reset}

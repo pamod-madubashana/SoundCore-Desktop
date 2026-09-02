@@ -235,7 +235,7 @@ export default function SoundEffectsPopup({ d, s, send, onClose }) {
           <h2 className="text-[15px] font-semibold text-foreground">Custom EQ</h2>
         </header>
         <div className="flex-1 overflow-y-auto p-4">
-          <Equalizer setting={s.volumeAdjustments} preset={s.presetEqualizerProfile} send={send} defaultOpen />
+          <Equalizer setting={s.volumeAdjustments} preset={s.presetEqualizerProfile} send={send} model={d.model} defaultOpen />
         </div>
       </div>
     );
