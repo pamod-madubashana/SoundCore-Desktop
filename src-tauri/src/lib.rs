@@ -271,6 +271,51 @@ fn set_setting(mac: String, id: String, raw: String, state: tauri::State<AppStat
     Ok(())
 }
 
+// ---- EQ preset commands ----
+
+#[derive(Clone, Serialize)]
+struct EqPresetDto {
+    id: i64,
+    name: String,
+    bands: String,
+    model: String,
+}
+
+#[tauri::command]
+fn list_eq_presets(model: String, state: tauri::State<AppState>) -> Vec<EqPresetDto> {
+    let cfg = state.config.lock().unwrap();
+    cfg.eq_presets
+        .iter()
+        .filter(|p| p.model.is_empty() || p.model == model)
+        .map(|p| EqPresetDto { id: p.id, name: p.name.clone(), bands: p.bands.clone(), model: p.model.clone() })
+        .collect()
+}
+
+#[tauri::command]
+fn save_eq_preset(name: String, bands: String, model: String, state: tauri::State<AppState>) -> Result<EqPresetDto, String> {
+    let mut cfg = state.config.lock().unwrap();
+    let next_id = cfg.eq_presets.iter().map(|p| p.id).max().unwrap_or(0) + 1;
+    let entry = config::EqPresetEntry { id: next_id, name: name.clone(), bands: bands.clone(), model: model.clone() };
+    cfg.eq_presets.push(entry);
+    cfg.save(&state.config_path).map_err(|e| e.to_string())?;
+    Ok(EqPresetDto { id: next_id, name, bands, model })
+}
+
+#[tauri::command]
+fn rename_eq_preset(id: i64, name: String, state: tauri::State<AppState>) -> Result<(), String> {
+    let mut cfg = state.config.lock().unwrap();
+    let entry = cfg.eq_presets.iter_mut().find(|p| p.id == id).ok_or("preset not found")?;
+    entry.name = name;
+    cfg.save(&state.config_path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn delete_eq_preset(id: i64, state: tauri::State<AppState>) -> Result<(), String> {
+    let mut cfg = state.config.lock().unwrap();
+    cfg.eq_presets.retain(|p| p.id != id);
+    cfg.save(&state.config_path).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn scan(model: String, state: tauri::State<AppState>) -> Result<(), String> {
     let model = DeviceModel::from_str(model.trim()).map_err(|_| format!("invalid model '{model}'"))?;
@@ -495,6 +540,10 @@ pub fn run() {
             save_config,
             apply_now,
             set_setting,
+            list_eq_presets,
+            save_eq_preset,
+            rename_eq_preset,
+            delete_eq_preset,
             scan,
             get_scan,
             hide_window,

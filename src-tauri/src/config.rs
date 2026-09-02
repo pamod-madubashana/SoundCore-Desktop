@@ -17,11 +17,14 @@ pub struct Config {
     /// Set to true when restarting after an update (cleared on next startup).
     #[serde(default)]
     pub update_restart: bool,
+    /// Custom equalizer presets (global + per-device).
+    #[serde(default)]
+    pub eq_presets: Vec<EqPresetEntry>,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Self { autostart: true, devices: Vec::new(), update_restart: false }
+        Self { autostart: true, devices: Vec::new(), update_restart: false, eq_presets: Vec::new() }
     }
 }
 
@@ -56,6 +59,19 @@ pub struct DeviceConfig {
 pub struct SettingEntry {
     pub id: String,
     pub value: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EqPresetEntry {
+    /// Auto-incrementing ID.
+    pub id: i64,
+    /// User-facing name.
+    pub name: String,
+    /// Comma-separated band values (e.g. "6,4,1,0,0").
+    pub bands: String,
+    /// Device model this preset is for, or empty/null for global presets.
+    #[serde(default)]
+    pub model: String,
 }
 
 fn default_poll_seconds() -> u64 {
