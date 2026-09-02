@@ -32,6 +32,7 @@ struct AppState {
     config_path: PathBuf,
     app_handle: Mutex<Option<AppHandle>>,
     pending_notification: Mutex<Option<PendingNotification>>,
+    last_tray_click: Mutex<std::time::Instant>,
 }
 
 #[derive(Clone, Serialize)]
@@ -47,6 +48,7 @@ struct BatteryInfo {
     left: Option<i32>,
     right: Option<i32>,
     combined: Option<i32>,
+    case: Option<i32>,
 }
 
 // ---- DTOs sent to the web UI as JSON ----
@@ -67,6 +69,7 @@ struct DeviceStateDto {
     battery_left: Option<i32>,
     battery_right: Option<i32>,
     battery_combined: Option<i32>,
+    battery_case: Option<i32>,
 }
 
 #[derive(Serialize)]
@@ -132,10 +135,11 @@ fn battery_pct_from_setting(setting: &Setting) -> Option<i32> {
     None
 }
 
-fn extract_battery_from_snapshot(snapshot: &worker::Snapshot) -> (Option<i32>, Option<i32>, Option<i32>) {
+fn extract_battery_from_snapshot(snapshot: &worker::Snapshot) -> (Option<i32>, Option<i32>, Option<i32>, Option<i32>) {
     let mut left = None;
     let mut right = None;
     let mut combined = None;
+    let mut case = None;
     for (_cat, settings) in snapshot {
         for (id, setting) in settings {
             let id_str = id.to_string();
@@ -145,10 +149,12 @@ fn extract_battery_from_snapshot(snapshot: &worker::Snapshot) -> (Option<i32>, O
                 right = battery_pct_from_setting(setting);
             } else if id_str == "batteryLevel" {
                 combined = battery_pct_from_setting(setting);
+            } else if id_str == "caseBatteryLevel" {
+                case = battery_pct_from_setting(setting);
             }
         }
     }
-    (left, right, combined)
+    (left, right, combined, case)
 }
 
 #[tauri::command]
@@ -169,10 +175,10 @@ fn get_states(state: tauri::State<AppState>) -> Vec<DeviceStateDto> {
                 Some(s) => {
                     let cats = s.snapshot.as_ref().map(build_categories).unwrap_or_default();
                     let bat = s.snapshot.as_ref().map(extract_battery_from_snapshot)
-                        .unwrap_or((None, None, None));
+                        .unwrap_or((None, None, None, None));
                     (s.connected, s.message.clone(), cats, bat)
                 }
-                None => (false, String::new(), Vec::new(), (None, None, None)),
+                None => (false, String::new(), Vec::new(), (None, None, None, None)),
             };
             DeviceStateDto {
                 name: d.name.clone(),
@@ -200,6 +206,7 @@ fn get_states(state: tauri::State<AppState>) -> Vec<DeviceStateDto> {
                 battery_left: battery.0,
                 battery_right: battery.1,
                 battery_combined: battery.2,
+                battery_case: battery.3,
             }
         })
         .collect()
@@ -265,6 +272,51 @@ fn set_setting(mac: String, id: String, raw: String, state: tauri::State<AppStat
     Ok(())
 }
 
+// ---- EQ preset commands ----
+
+#[derive(Clone, Serialize)]
+struct EqPresetDto {
+    id: i64,
+    name: String,
+    bands: String,
+    model: String,
+}
+
+#[tauri::command]
+fn list_eq_presets(model: String, state: tauri::State<AppState>) -> Vec<EqPresetDto> {
+    let cfg = state.config.lock().unwrap();
+    cfg.eq_presets
+        .iter()
+        .filter(|p| p.model.is_empty() || p.model == model)
+        .map(|p| EqPresetDto { id: p.id, name: p.name.clone(), bands: p.bands.clone(), model: p.model.clone() })
+        .collect()
+}
+
+#[tauri::command]
+fn save_eq_preset(name: String, bands: String, model: String, state: tauri::State<AppState>) -> Result<EqPresetDto, String> {
+    let mut cfg = state.config.lock().unwrap();
+    let next_id = cfg.eq_presets.iter().map(|p| p.id).max().unwrap_or(0) + 1;
+    let entry = config::EqPresetEntry { id: next_id, name: name.clone(), bands: bands.clone(), model: model.clone() };
+    cfg.eq_presets.push(entry);
+    cfg.save(&state.config_path).map_err(|e| e.to_string())?;
+    Ok(EqPresetDto { id: next_id, name, bands, model })
+}
+
+#[tauri::command]
+fn rename_eq_preset(id: i64, name: String, state: tauri::State<AppState>) -> Result<(), String> {
+    let mut cfg = state.config.lock().unwrap();
+    let entry = cfg.eq_presets.iter_mut().find(|p| p.id == id).ok_or("preset not found")?;
+    entry.name = name;
+    cfg.save(&state.config_path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn delete_eq_preset(id: i64, state: tauri::State<AppState>) -> Result<(), String> {
+    let mut cfg = state.config.lock().unwrap();
+    cfg.eq_presets.retain(|p| p.id != id);
+    cfg.save(&state.config_path).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn scan(model: String, state: tauri::State<AppState>) -> Result<(), String> {
     let model = DeviceModel::from_str(model.trim()).map_err(|_| format!("invalid model '{model}'"))?;
@@ -315,6 +367,7 @@ async fn show_notification(
     battery_left: Option<i32>,
     battery_right: Option<i32>,
     battery_combined: Option<i32>,
+    battery_case: Option<i32>,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
     let handle = {
@@ -326,8 +379,8 @@ async fn show_notification(
 
     // Store data so the notification window can fetch it on load
     {
-        let battery = if battery_left.is_some() || battery_right.is_some() || battery_combined.is_some() {
-            Some(BatteryInfo { left: battery_left, right: battery_right, combined: battery_combined })
+        let battery = if battery_left.is_some() || battery_right.is_some() || battery_combined.is_some() || battery_case.is_some() {
+            Some(BatteryInfo { left: battery_left, right: battery_right, combined: battery_combined, case: battery_case })
         } else {
             None
         };
@@ -436,7 +489,7 @@ fn is_update_restart(app: AppHandle) -> bool {
 
 // ---- window helpers ----
 
-fn position_bottom_right(window: &WebviewWindow) {
+fn position_bottom_right(window: &WebviewWindow) -> Option<(i32, i32)> {
     if let Ok(Some(monitor)) = window.current_monitor() {
         let msize = monitor.size();
         let mpos = monitor.position();
@@ -446,18 +499,66 @@ fn position_bottom_right(window: &WebviewWindow) {
         let taskbar = (48.0 * scale) as i32;
         let x = mpos.x + msize.width as i32 - wsize.width as i32 - margin;
         let y = mpos.y + msize.height as i32 - wsize.height as i32 - margin - taskbar;
-        let _ = window.set_position(PhysicalPosition::new(x.max(0), y.max(0)));
+        let pos = (x.max(0), y.max(0));
+        let _ = window.set_position(PhysicalPosition::new(pos.0, pos.1));
+        return Some(pos);
+    }
+    None
+}
+
+/// Slide the window vertically from `from_y` to `to_y` over `duration_ms`.
+async fn slide_window_y(window: &WebviewWindow, from_y: i32, to_y: i32, duration_ms: u64) {
+    let steps = 12;
+    let step_delay = duration_ms / steps;
+    for i in 0..=steps {
+        let t = i as f64 / steps as f64;
+        // ease-out cubic
+        let t = 1.0 - (1.0 - t).powi(3);
+        let y = from_y as f64 + (to_y as f64 - from_y as f64) * t;
+        let _ = window.set_position(PhysicalPosition::new(
+            window.outer_position().map(|p| p.x).unwrap_or(0),
+            y as i32,
+        ));
+        tokio::time::sleep(Duration::from_millis(step_delay)).await;
     }
 }
 
 fn toggle_window(app: &AppHandle) {
+    // Record tray click time to debounce focus-loss hide
+    if let Some(state) = app.try_state::<AppState>() {
+        *state.last_tray_click.lock().unwrap() = std::time::Instant::now();
+    }
     if let Some(window) = app.get_webview_window("main") {
         if window.is_visible().unwrap_or(false) {
-            let _ = window.hide();
+            // Animate slide-down then hide
+            let win = window.clone();
+            tauri::async_runtime::spawn(async move {
+                let start_y = win.outer_position().map(|p| p.y).unwrap_or(0);
+                // Get target Y (where it should be when fully shown)
+                let target_y = position_bottom_right(&win).map(|p| p.1).unwrap_or(start_y);
+                let slide_to = target_y + 60; // slide down 60px below target
+                slide_window_y(&win, start_y, slide_to, 150).await;
+                let _ = win.hide();
+                // Reset position to target so next open starts from correct spot
+                let _ = win.set_position(PhysicalPosition::new(
+                    win.outer_position().map(|p| p.x).unwrap_or(0),
+                    target_y,
+                ));
+            });
         } else {
-            position_bottom_right(&window);
-            let _ = window.show();
-            let _ = window.set_focus();
+            // Start below screen, slide up to target
+            let win = window.clone();
+            tauri::async_runtime::spawn(async move {
+                let target_y = position_bottom_right(&win).map(|p| p.1).unwrap_or(0);
+                let start_y = target_y + 60; // start 60px below target
+                let _ = win.set_position(PhysicalPosition::new(
+                    win.outer_position().map(|p| p.x).unwrap_or(0),
+                    start_y,
+                ));
+                let _ = win.show();
+                let _ = win.set_focus();
+                slide_window_y(&win, start_y, target_y, 180).await;
+            });
         }
     }
 }
@@ -480,6 +581,7 @@ pub fn run() {
             config_path,
             app_handle: Mutex::new(None),
             pending_notification: Mutex::new(None),
+            last_tray_click: Mutex::new(std::time::Instant::now()),
         })
         .invoke_handler(tauri::generate_handler![
             get_models,
@@ -488,6 +590,10 @@ pub fn run() {
             save_config,
             apply_now,
             set_setting,
+            list_eq_presets,
+            save_eq_preset,
+            rename_eq_preset,
+            delete_eq_preset,
             scan,
             get_scan,
             hide_window,
@@ -500,9 +606,14 @@ pub fn run() {
             is_update_restart
         ])
         .on_window_event(|window, event| {
-            // Auto-hide the popup when it loses focus, like a tray flyout.
+            // Hide on focus loss (clicking outside), but not right after a tray click
             if let WindowEvent::Focused(false) = event {
-                let _ = window.hide();
+                let now = std::time::Instant::now();
+                let state = window.state::<AppState>();
+                let last = *state.last_tray_click.lock().unwrap();
+                if now.duration_since(last).as_millis() > 300 {
+                    let _ = window.hide();
+                }
             }
         })
         .setup(|app| {

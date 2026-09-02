@@ -40,7 +40,9 @@ html, body, #root {
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
+  -webkit-user-select: none;
   user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .popup-window {
@@ -59,3 +61,15 @@ html, body, #root {
 
 ::-webkit-scrollbar { width: 7px; }
 ::-webkit-scrollbar-thumb { background: oklch(1 0 0 / 0.12); border-radius: 8px; }
+
+@keyframes slide-up {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.animate-slide-up { animation: slide-up 0.25s ease-out; }
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fade-in { animation: fade-in 0.18s ease-out; }

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  Volume2, Waves, Ear, Loader2, X, Download,
+  Volume2, Waves, Ear, Loader2, X, Download, SlidersHorizontal,
 } from "lucide-react";
+import SoundEffectsPopup from "./components/SoundEffectsPopup";
 const invoke = window.__TAURI__?.core?.invoke ?? (async () => {});
 
 // Device-type illustration picked from the name (no reliable per-model photo source exists).
@@ -78,7 +79,6 @@ function DeviceArt({ name = "", url, color }) {
   );
 }
 
-const BAND_LABEL = (hz) => (hz >= 1000 ? hz / 1000 + "k" : String(hz));
 const pretty = (id) => id.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()).trim();
 
 export default function App() {
@@ -87,6 +87,13 @@ export default function App() {
   const [updateInfo, setUpdateInfo] = useState(null);
   const [updateProgress, setUpdateProgress] = useState(null);
   const [updateError, setUpdateError] = useState(null);
+
+  // Disable right-click context menu across the entire app
+  useEffect(() => {
+    const handler = (e) => e.preventDefault();
+    document.addEventListener("contextmenu", handler);
+    return () => document.removeEventListener("contextmenu", handler);
+  }, []);
 
   // Check for updates on mount
   useEffect(() => {
@@ -144,6 +151,7 @@ export default function App() {
               batteryLeft: d.battery_left,
               batteryRight: d.battery_right,
               batteryCombined: d.battery_combined,
+              batteryCase: d.battery_case,
             });
           } else if (!isNowConnected && wasConnected) {
             invoke("show_notification", {
@@ -153,6 +161,7 @@ export default function App() {
               batteryLeft: null,
               batteryRight: null,
               batteryCombined: null,
+              batteryCase: null,
             });
           }
         }
@@ -170,7 +179,7 @@ export default function App() {
 
   return (
     <main className="h-screen w-screen flex items-stretch justify-stretch">
-      <section className="popup-window w-full h-full rounded-2xl overflow-hidden flex flex-col">
+      <section className="popup-window animate-fade-in w-full h-full rounded-2xl overflow-hidden flex flex-col">
         {active
           ? <Device d={active} updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={handleStartUpdate} onDismissUpdate={handleDismissUpdate} />
           : <Searching updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={handleStartUpdate} onDismissUpdate={handleDismissUpdate} />}
@@ -226,14 +235,42 @@ function settingsMap(d) {
 function Device({ d, updateInfo, updateProgress, updateError, onStartUpdate, onDismissUpdate }) {
   const s = settingsMap(d);
   const send = (id, raw) => invoke("set_setting", { mac: d.mac_address, id, raw });
+  const [showSoundEffects, setShowSoundEffects] = useState(false);
+
+  const currentPreset = s.presetEqualizerProfile?.value || "Custom";
+
   return (
     <>
       <Header d={d} s={s} updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={onStartUpdate} onDismissUpdate={onDismissUpdate} />
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {s.ambientSoundMode && <SoundMode s={s} send={send} />}
-        {s.volumeAdjustments && <Equalizer setting={s.volumeAdjustments} send={send} readOnly={s.volumeAdjustments.readOnly} />}
+
+        {/* Sound Effects nav item */}
+        {(s.volumeAdjustments || s.spatialAudio) && (
+          <button
+            type="button"
+            onClick={() => setShowSoundEffects(true)}
+            className="w-full rounded-2xl bg-surface ring-1 ring-white/[0.04] px-4 py-3 flex items-center justify-between transition hover:bg-white/[0.02]"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                <SlidersHorizontal className="h-5 w-5" />
+              </div>
+              <div className="text-left">
+                <span className="text-[14px] font-medium text-foreground">Sound Effects</span>
+                <span className="ml-2 text-[12px] text-muted-foreground">{currentPreset}</span>
+              </div>
+            </div>
+            <ChevronRightIcon className="h-4 w-4 text-muted-foreground" />
+          </button>
+        )}
+
         <QuickToggles s={s} send={send} />
       </div>
+
+      {showSoundEffects && (
+        <SoundEffectsPopup d={d} s={s} send={send} onClose={() => setShowSoundEffects(false)} />
+      )}
     </>
   );
 }
@@ -267,16 +304,28 @@ function batteryPct(setting) {
   return Number.isFinite(n) ? Math.min(100, n) : null;
 }
 
-function BatteryIcon({ level }) {
-  // level: 0-100
+function BatteryIcon({ level, label }) {
+  // level: 0-100, label: "L", "R", or "Case"
   const pct = Math.max(0, Math.min(100, level ?? 0));
   const color = pct > 50 ? "text-success" : pct > 20 ? "text-yellow-500" : "text-red-500";
   return (
-    <svg width="18" height="11" viewBox="0 0 18 11" fill="none" className={color}>
-      <rect x="0.5" y="0.5" width="15" height="10" rx="2" stroke="currentColor" strokeWidth="1" opacity="0.4" />
-      <rect x="16" y="3" width="2" height="5" rx="0.5" fill="currentColor" opacity="0.4" />
-      <rect x="1.5" y="1.5" width={Math.max(0, 13 * pct / 100)} height="8" rx="1" fill="currentColor" />
-    </svg>
+    <span className="inline-flex items-center gap-1">
+      {label && (
+        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/10 text-[8px] font-bold text-foreground/70">
+          {label === "Case" ? (
+            <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="2" y="7" width="20" height="14" rx="2" />
+              <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+            </svg>
+          ) : label}
+        </span>
+      )}
+      <svg width="18" height="11" viewBox="0 0 18 11" fill="none" className={color}>
+        <rect x="0.5" y="0.5" width="15" height="10" rx="2" stroke="currentColor" strokeWidth="1" opacity="0.4" />
+        <rect x="16" y="3" width="2" height="5" rx="0.5" fill="currentColor" opacity="0.4" />
+        <rect x="1.5" y="1.5" width={Math.max(0, 13 * pct / 100)} height="8" rx="1" fill="currentColor" />
+      </svg>
+    </span>
   );
 }
 
@@ -285,6 +334,7 @@ function Header({ d, s, updateInfo, updateProgress, updateError, onStartUpdate, 
     ["L", batteryPct(s.batteryLevelLeft)],
     ["R", batteryPct(s.batteryLevelRight)],
     ["", batteryPct(s.batteryLevel)],
+    ["Case", batteryPct(s.caseBatteryLevel)],
   ].filter(([, v]) => v != null);
 
   const showUpdateBadge = updateInfo && !updateProgress;
@@ -303,7 +353,7 @@ function Header({ d, s, updateInfo, updateProgress, updateError, onStartUpdate, 
           <div className="flex items-center gap-3 mt-2">
             {batteries.map(([label, v]) => (
               <div key={label || "b"} className="flex items-center gap-1.5 text-[13px]">
-                <BatteryIcon level={v} />
+                <BatteryIcon level={v} label={label || null} />
                 <span className="text-foreground font-medium">{v}%</span>
               </div>
             ))}
@@ -417,50 +467,18 @@ function Strength({ setting, send }) {
   );
 }
 
-function Equalizer({ setting, send, readOnly }) {
-  const { bandHz, fractionDigits, min, max } = setting.setting;
-  const fd = fractionDigits || 0;
-  const [bands, setBands] = useState(setting.value || []);
-  const lastEdit = useRef(0);
-  // Sync from the device only when the *content* changes AND we didn't just edit, so a
-  // poll tick can't clobber the band you're dragging.
-  const incoming = (setting.value || []).join(",");
-  useEffect(() => {
-    if (Date.now() - lastEdit.current < 2500) return;
-    setBands(setting.value || []);
-  }, [incoming]);
-
-  const setBand = (i, v) => {
-    lastEdit.current = Date.now();
-    setBands((b) => b.map((x, idx) => (idx === i ? v : x)));
-  };
-  const commit = () => {
-    lastEdit.current = Date.now();
-    setBands((b) => { send("volumeAdjustments", b.join(",")); return b; });
-  };
-
+function ChevronRightIcon(props) {
   return (
-    <div className="rounded-xl bg-surface p-3 ring-1 ring-white/[0.04]">
-      <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-2.5">Equalizer{readOnly && <span className="ml-2 text-[10px] font-normal normal-case tracking-normal">(Read-only)</span>}</h2>
-      <div className={"flex items-end justify-between gap-1 h-28 px-1 " + (readOnly ? "eq-track-readonly" : "eq-track")}>
-        {bandHz.map((hz, i) => (
-          <div key={hz} className="flex flex-col items-center gap-1 flex-1">
-            <input type="range" min={min} max={max} step={1} value={bands[i] ?? 0}
-              disabled={readOnly}
-              style={{ writingMode: "vertical-lr", direction: "rtl", width: 14, height: 80, accentColor: "var(--brand)" }}
-              onChange={readOnly ? undefined : (e) => setBand(i, Number(e.target.value))}
-              onPointerUp={readOnly ? undefined : commit} />
-            <span className="text-[8.5px] text-muted-foreground tabular-nums">{BAND_LABEL(hz)}</span>
-            <span className="text-[8.5px] text-brand tabular-nums">{((bands[i] ?? 0) / 10 ** fd).toFixed(fd)}</span>
-          </div>
-        ))}
-      </div>
-    </div>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
   );
 }
 
 function QuickToggles({ s, send }) {
-  const toggles = Object.values(s).filter((x) => x.type === "toggle")
+  const toggles = Object.values(s)
+    .filter((x) => x.type === "toggle")
+    .filter((x) => !["spatialAudio"].includes(x.id))
     .sort((a, b) => (/gam/i.test(a.id) ? -1 : /gam/i.test(b.id) ? 1 : 0));
   if (toggles.length === 0) return null;
   return (
