@@ -49,6 +49,7 @@ html, body, #root {
   background: linear-gradient(180deg, var(--popover) 0%, oklch(0.14 0.012 255) 100%);
   box-shadow: var(--shadow-popup);
   border: 1px solid oklch(1 0 0 / 0.06);
+  border-radius: var(--radius);
 }
 .brand-glow { box-shadow: var(--shadow-glow); }
 .eq-track {
