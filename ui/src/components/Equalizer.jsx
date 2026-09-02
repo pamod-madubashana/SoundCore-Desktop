@@ -4,7 +4,7 @@
 // and custom user presets (save/rename/delete).
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, RotateCcw, Save, Trash2, Pencil, Check, X } from "lucide-react";
+import { ChevronDown, RotateCcw, Save, Trash2, Pencil, Check, X, SlidersHorizontal } from "lucide-react";
 
 const invoke = window.__TAURI__?.core?.invoke ?? (async () => {});
 
