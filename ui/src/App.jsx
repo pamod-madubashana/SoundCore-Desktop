@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   Volume2, Waves, Ear, Loader2, X, Download,
 } from "lucide-react";
+import Equalizer from "./components/Equalizer";
 const invoke = window.__TAURI__?.core?.invoke ?? (async () => {});
 
 // Device-type illustration picked from the name (no reliable per-model photo source exists).
@@ -78,7 +79,6 @@ function DeviceArt({ name = "", url, color }) {
   );
 }
 
-const BAND_LABEL = (hz) => (hz >= 1000 ? hz / 1000 + "k" : String(hz));
 const pretty = (id) => id.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()).trim();
 
 export default function App() {
@@ -144,6 +144,7 @@ export default function App() {
               batteryLeft: d.battery_left,
               batteryRight: d.battery_right,
               batteryCombined: d.battery_combined,
+              batteryCase: d.battery_case,
             });
           } else if (!isNowConnected && wasConnected) {
             invoke("show_notification", {
@@ -153,6 +154,7 @@ export default function App() {
               batteryLeft: null,
               batteryRight: null,
               batteryCombined: null,
+              batteryCase: null,
             });
           }
         }
@@ -231,7 +233,7 @@ function Device({ d, updateInfo, updateProgress, updateError, onStartUpdate, onD
       <Header d={d} s={s} updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={onStartUpdate} onDismissUpdate={onDismissUpdate} />
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {s.ambientSoundMode && <SoundMode s={s} send={send} />}
-        {s.volumeAdjustments && <Equalizer setting={s.volumeAdjustments} send={send} readOnly={s.volumeAdjustments.readOnly} />}
+        {s.volumeAdjustments && <Equalizer setting={s.volumeAdjustments} preset={s.presetEqualizerProfile} send={send} />}
         <QuickToggles s={s} send={send} />
       </div>
     </>
@@ -285,6 +287,7 @@ function Header({ d, s, updateInfo, updateProgress, updateError, onStartUpdate, 
     ["L", batteryPct(s.batteryLevelLeft)],
     ["R", batteryPct(s.batteryLevelRight)],
     ["", batteryPct(s.batteryLevel)],
+    ["Case", batteryPct(s.caseBatteryLevel)],
   ].filter(([, v]) => v != null);
 
   const showUpdateBadge = updateInfo && !updateProgress;
@@ -413,48 +416,6 @@ function Strength({ setting, send }) {
       <input type="range" min={start} max={end} value={v} className="w-full accent-brand h-1"
         onChange={(e) => { lastEdit.current = Date.now(); setV(Number(e.target.value)); }}
         onPointerUp={() => { lastEdit.current = Date.now(); send("manualNoiseCanceling", String(v)); }} />
-    </div>
-  );
-}
-
-function Equalizer({ setting, send, readOnly }) {
-  const { bandHz, fractionDigits, min, max } = setting.setting;
-  const fd = fractionDigits || 0;
-  const [bands, setBands] = useState(setting.value || []);
-  const lastEdit = useRef(0);
-  // Sync from the device only when the *content* changes AND we didn't just edit, so a
-  // poll tick can't clobber the band you're dragging.
-  const incoming = (setting.value || []).join(",");
-  useEffect(() => {
-    if (Date.now() - lastEdit.current < 2500) return;
-    setBands(setting.value || []);
-  }, [incoming]);
-
-  const setBand = (i, v) => {
-    lastEdit.current = Date.now();
-    setBands((b) => b.map((x, idx) => (idx === i ? v : x)));
-  };
-  const commit = () => {
-    lastEdit.current = Date.now();
-    setBands((b) => { send("volumeAdjustments", b.join(",")); return b; });
-  };
-
-  return (
-    <div className="rounded-xl bg-surface p-3 ring-1 ring-white/[0.04]">
-      <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-2.5">Equalizer{readOnly && <span className="ml-2 text-[10px] font-normal normal-case tracking-normal">(Read-only)</span>}</h2>
-      <div className={"flex items-end justify-between gap-1 h-28 px-1 " + (readOnly ? "eq-track-readonly" : "eq-track")}>
-        {bandHz.map((hz, i) => (
-          <div key={hz} className="flex flex-col items-center gap-1 flex-1">
-            <input type="range" min={min} max={max} step={1} value={bands[i] ?? 0}
-              disabled={readOnly}
-              style={{ writingMode: "vertical-lr", direction: "rtl", width: 14, height: 80, accentColor: "var(--brand)" }}
-              onChange={readOnly ? undefined : (e) => setBand(i, Number(e.target.value))}
-              onPointerUp={readOnly ? undefined : commit} />
-            <span className="text-[8.5px] text-muted-foreground tabular-nums">{BAND_LABEL(hz)}</span>
-            <span className="text-[8.5px] text-brand tabular-nums">{((bands[i] ?? 0) / 10 ** fd).toFixed(fd)}</span>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

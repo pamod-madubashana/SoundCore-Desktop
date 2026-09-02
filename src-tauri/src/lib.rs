@@ -47,6 +47,7 @@ struct BatteryInfo {
     left: Option<i32>,
     right: Option<i32>,
     combined: Option<i32>,
+    case: Option<i32>,
 }
 
 // ---- DTOs sent to the web UI as JSON ----
@@ -67,6 +68,7 @@ struct DeviceStateDto {
     battery_left: Option<i32>,
     battery_right: Option<i32>,
     battery_combined: Option<i32>,
+    battery_case: Option<i32>,
 }
 
 #[derive(Serialize)]
@@ -132,10 +134,11 @@ fn battery_pct_from_setting(setting: &Setting) -> Option<i32> {
     None
 }
 
-fn extract_battery_from_snapshot(snapshot: &worker::Snapshot) -> (Option<i32>, Option<i32>, Option<i32>) {
+fn extract_battery_from_snapshot(snapshot: &worker::Snapshot) -> (Option<i32>, Option<i32>, Option<i32>, Option<i32>) {
     let mut left = None;
     let mut right = None;
     let mut combined = None;
+    let mut case = None;
     for (_cat, settings) in snapshot {
         for (id, setting) in settings {
             let id_str = id.to_string();
@@ -145,10 +148,12 @@ fn extract_battery_from_snapshot(snapshot: &worker::Snapshot) -> (Option<i32>, O
                 right = battery_pct_from_setting(setting);
             } else if id_str == "batteryLevel" {
                 combined = battery_pct_from_setting(setting);
+            } else if id_str == "caseBatteryLevel" {
+                case = battery_pct_from_setting(setting);
             }
         }
     }
-    (left, right, combined)
+    (left, right, combined, case)
 }
 
 #[tauri::command]
@@ -169,10 +174,10 @@ fn get_states(state: tauri::State<AppState>) -> Vec<DeviceStateDto> {
                 Some(s) => {
                     let cats = s.snapshot.as_ref().map(build_categories).unwrap_or_default();
                     let bat = s.snapshot.as_ref().map(extract_battery_from_snapshot)
-                        .unwrap_or((None, None, None));
+                        .unwrap_or((None, None, None, None));
                     (s.connected, s.message.clone(), cats, bat)
                 }
-                None => (false, String::new(), Vec::new(), (None, None, None)),
+                None => (false, String::new(), Vec::new(), (None, None, None, None)),
             };
             DeviceStateDto {
                 name: d.name.clone(),
@@ -200,6 +205,7 @@ fn get_states(state: tauri::State<AppState>) -> Vec<DeviceStateDto> {
                 battery_left: battery.0,
                 battery_right: battery.1,
                 battery_combined: battery.2,
+                battery_case: battery.3,
             }
         })
         .collect()
@@ -315,6 +321,7 @@ async fn show_notification(
     battery_left: Option<i32>,
     battery_right: Option<i32>,
     battery_combined: Option<i32>,
+    battery_case: Option<i32>,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
     let handle = {
@@ -326,8 +333,8 @@ async fn show_notification(
 
     // Store data so the notification window can fetch it on load
     {
-        let battery = if battery_left.is_some() || battery_right.is_some() || battery_combined.is_some() {
-            Some(BatteryInfo { left: battery_left, right: battery_right, combined: battery_combined })
+        let battery = if battery_left.is_some() || battery_right.is_some() || battery_combined.is_some() || battery_case.is_some() {
+            Some(BatteryInfo { left: battery_left, right: battery_right, combined: battery_combined, case: battery_case })
         } else {
             None
         };

@@ -71,6 +71,7 @@
       if (battery.left != null) items.push(["L", battery.left]);
       if (battery.right != null) items.push(["R", battery.right]);
       if (items.length === 0 && battery.combined != null) items.push(["", battery.combined]);
+      if (battery.case != null) items.push(["Case", battery.case]);
       if (items.length === 0) { el.innerHTML = ""; return; }
       el.innerHTML = items.map(([label, pct]) =>
         '<div class="bat">' +
