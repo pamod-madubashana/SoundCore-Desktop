@@ -32,7 +32,7 @@ struct AppState {
     config_path: PathBuf,
     app_handle: Mutex<Option<AppHandle>>,
     pending_notification: Mutex<Option<PendingNotification>>,
-    tray_click_pending: AtomicBool,
+    hide_cancel: AtomicBool,
 }
 
 #[derive(Clone, Serialize)]
@@ -524,6 +524,10 @@ async fn slide_window_y(window: &WebviewWindow, from_y: i32, to_y: i32, duration
 }
 
 fn toggle_window(app: &AppHandle) {
+    // Cancel any pending focus-loss hide
+    if let Some(state) = app.try_state::<AppState>() {
+        state.hide_cancel.store(true, Ordering::SeqCst);
+    }
     if let Some(window) = app.get_webview_window("main") {
         if window.is_visible().unwrap_or(false) {
             let _ = window.hide();
@@ -563,7 +567,7 @@ pub fn run() {
             config_path,
             app_handle: Mutex::new(None),
             pending_notification: Mutex::new(None),
-            tray_click_pending: AtomicBool::new(false),
+            hide_cancel: AtomicBool::new(false),
         })
         .invoke_handler(tauri::generate_handler![
             get_models,
@@ -589,11 +593,19 @@ pub fn run() {
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::Focused(false) = event {
-                let state = window.state::<AppState>();
-                if state.tray_click_pending.swap(false, Ordering::SeqCst) {
-                    return;
+                let handle = window.app_handle().clone();
+                let win = window.clone();
+                if let Some(state) = handle.try_state::<AppState>() {
+                    state.hide_cancel.store(false, Ordering::SeqCst);
                 }
-                let _ = window.hide();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    if let Some(state) = handle.try_state::<AppState>() {
+                        if !state.hide_cancel.load(Ordering::SeqCst) {
+                            let _ = win.hide();
+                        }
+                    }
+                });
             }
         })
         .setup(|app| {
@@ -679,21 +691,13 @@ pub fn run() {
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
-                    let app = tray.app_handle();
-                    match event {
-                        TrayIconEvent::Enter { .. } => {
-                            if let Some(state) = app.try_state::<AppState>() {
-                                state.tray_click_pending.store(true, Ordering::SeqCst);
-                            }
-                        }
-                        TrayIconEvent::Click {
-                            button: MouseButton::Left,
-                            button_state: MouseButtonState::Up,
-                            ..
-                        } => {
-                            toggle_window(app);
-                        }
-                        _ => {}
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        toggle_window(tray.app_handle());
                     }
                 })
                 .build(app)?;
