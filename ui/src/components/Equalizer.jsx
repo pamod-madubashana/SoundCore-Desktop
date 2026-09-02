@@ -115,9 +115,15 @@ function BandSlider({ hz, value, min, max, fd, disabled, onChange, onCommit }) {
         onPointerMove={move}
         onPointerUp={end}
         onPointerCancel={end}
+        onWheel={(e) => {
+          if (disabled) return;
+          e.preventDefault();
+          e.stopPropagation();
+          step(e.deltaY < 0 ? 1 : -1);
+        }}
         onKeyDown={(e) => {
-          if (e.key === "ArrowUp") step(1);
-          else if (e.key === "ArrowDown") step(-1);
+          if (e.key === "ArrowUp") { e.preventDefault(); step(1); }
+          else if (e.key === "ArrowDown") { e.preventDefault(); step(-1); }
         }}
         className={
           "relative h-40 w-full touch-none outline-none " +
@@ -303,6 +309,44 @@ export default function Equalizer({ setting, preset, send, model, defaultOpen = 
     if (Date.now() - lastEdit.current < SYNC_GRACE_MS) return;
     setBands(setting.value || []);
   }, [incoming]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Lock scroll when any EQ slider is focused
+  useEffect(() => {
+    const lock = (e) => {
+      const target = e.target;
+      if (target?.getAttribute?.("role") === "slider") {
+        let el = target.parentElement;
+        while (el && el !== document.body) {
+          const style = getComputedStyle(el);
+          if (style.overflow === "auto" || style.overflow === "scroll" ||
+              style.overflowY === "auto" || style.overflowY === "scroll") {
+            el.dataset.scrollLocked = el.style.overflow;
+            el.style.overflow = "hidden";
+          }
+          el = el.parentElement;
+        }
+      }
+    };
+    const unlock = (e) => {
+      const target = e.target;
+      if (target?.getAttribute?.("role") === "slider") {
+        let el = target.parentElement;
+        while (el && el !== document.body) {
+          if (el.dataset.scrollLocked !== undefined) {
+            el.style.overflow = el.dataset.scrollLocked;
+            delete el.dataset.scrollLocked;
+          }
+          el = el.parentElement;
+        }
+      }
+    };
+    document.addEventListener("focusin", lock);
+    document.addEventListener("focusout", unlock);
+    return () => {
+      document.removeEventListener("focusin", lock);
+      document.removeEventListener("focusout", unlock);
+    };
+  }, []);
 
   const touch = () => (lastEdit.current = Date.now());
 
