@@ -262,10 +262,7 @@ fn set_setting(mac: String, id: String, raw: String, state: tauri::State<AppStat
             .iter_mut()
             .find(|d| MacAddr6::from_str(d.mac_address.trim()).ok() == Some(mac))
         {
-            match d.profile.iter_mut().find(|e| e.id == id) {
-                Some(e) => e.value = raw.clone(),
-                None => d.profile.push(config::SettingEntry { id: id.clone(), value: raw.clone() }),
-            }
+            config::upsert_entry(&mut d.profile, id.clone(), raw.clone());
             let _ = cfg.save(&state.config_path);
         }
     }

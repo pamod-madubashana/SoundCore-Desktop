@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Volume2, Waves, Ear, Loader2, X, Download, SlidersHorizontal,
 } from "lucide-react";
 import SoundEffectsPopup from "./components/SoundEffectsPopup";
+import { matchCustomPreset, soundEffectLabel } from "./lib/soundEffects";
 const invoke = window.__TAURI__?.core?.invoke ?? (async () => {});
 
 // Device-type illustration picked from the name (no reliable per-model photo source exists).
@@ -179,7 +180,7 @@ export default function App() {
 
   return (
     <main className="h-screen w-screen flex items-stretch justify-stretch">
-      <section className="popup-window animate-fade-in w-full h-full rounded-2xl overflow-hidden flex flex-col">
+      <section className="popup-window animate-fade-in w-full h-full rounded-2xl flex flex-col">
         {active
           ? <Device d={active} updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={handleStartUpdate} onDismissUpdate={handleDismissUpdate} />
           : <Searching updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={handleStartUpdate} onDismissUpdate={handleDismissUpdate} />}
@@ -237,7 +238,18 @@ function Device({ d, updateInfo, updateProgress, updateError, onStartUpdate, onD
   const send = (id, raw) => invoke("set_setting", { mac: d.mac_address, id, raw });
   const [showSoundEffects, setShowSoundEffects] = useState(false);
 
-  const currentPreset = s.presetEqualizerProfile?.value || "Custom";
+  // The user's saved EQ curves live here so the Sound Effects row, the Custom EQ
+  // card and the equalizer itself all name the active preset identically.
+  const [eqPresets, setEqPresets] = useState([]);
+  const reloadEqPresets = useCallback(() => {
+    invoke("list_eq_presets", { model: d.model })
+      .then((list) => setEqPresets(list || []))
+      .catch(() => setEqPresets([]));
+  }, [d.model]);
+  useEffect(() => { reloadEqPresets(); }, [reloadEqPresets]);
+
+  const currentPreset = soundEffectLabel(s, eqPresets);
+  const customPresetName = matchCustomPreset(s.volumeAdjustments?.value, eqPresets) ?? "Custom";
 
   return (
     <>
@@ -258,7 +270,9 @@ function Device({ d, updateInfo, updateProgress, updateError, onStartUpdate, onD
               </div>
               <div className="text-left">
                 <span className="text-[14px] font-medium text-foreground">Sound Effects</span>
-                <span className="ml-2 text-[12px] text-muted-foreground">{currentPreset}</span>
+                {currentPreset && (
+                  <span className="ml-2 text-[12px] text-muted-foreground">{currentPreset}</span>
+                )}
               </div>
             </div>
             <ChevronRightIcon className="h-4 w-4 text-muted-foreground" />
@@ -269,7 +283,15 @@ function Device({ d, updateInfo, updateProgress, updateError, onStartUpdate, onD
       </div>
 
       {showSoundEffects && (
-        <SoundEffectsPopup d={d} s={s} send={send} onClose={() => setShowSoundEffects(false)} />
+        <SoundEffectsPopup
+          d={d}
+          s={s}
+          send={send}
+          onClose={() => setShowSoundEffects(false)}
+          eqPresets={eqPresets}
+          onEqPresetsChanged={reloadEqPresets}
+          customPresetName={customPresetName}
+        />
       )}
     </>
   );
