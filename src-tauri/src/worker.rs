@@ -61,13 +61,10 @@ fn current_profile(state: &SharedState, mac: MacAddr6) -> Vec<SettingEntry> {
 }
 
 /// Upsert one entry into a device's on-connect profile (used when the UI changes a setting).
+/// Contradictory sound-effect entries are dropped so the profile stays replayable.
 pub fn upsert_profile_entry(state: &SharedState, mac: MacAddr6, id: String, value: String) {
     let mut map = state.profiles.lock().unwrap();
-    let list = map.entry(mac).or_default();
-    match list.iter_mut().find(|e| e.id == id) {
-        Some(e) => e.value = value,
-        None => list.push(SettingEntry { id, value }),
-    }
+    crate::config::upsert_entry(map.entry(mac).or_default(), id, value);
 }
 
 /// Best-effort Bluetooth-name -> model guess for zero-config auto-detect.
@@ -379,6 +376,9 @@ async fn connected_session(
                 Some(DeviceCommand::SetSetting { id, value }) => {
                     if let Err(err) = device.set_setting_values(vec![(id, value)]).await {
                         warn!("set failed: {err}");
+                        if matches!(err, openscq30_lib::device::Error::ConnectionError { .. }) {
+                            return false;
+                        }
                         set_device_state(state, mac, |s| s.message = format!("set failed: {err}"));
                     }
                     publish_snapshot(device, state, mac);

@@ -61,6 +61,78 @@ pub struct SettingEntry {
     pub value: String,
 }
 
+/// Settings that each select the *source* of the equalizer curve. Only one can be
+/// in effect at a time.
+const EQ_SOURCE_IDS: [&str; 3] = [
+    "volumeAdjustments",
+    "presetEqualizerProfile",
+    "customEqualizerProfile",
+];
+
+fn is_eq_source(id: &str) -> bool {
+    EQ_SOURCE_IDS.contains(&id)
+}
+
+fn is_enabling_spatial(id: &str, value: &str) -> bool {
+    id == "spatialAudio" && value.trim().eq_ignore_ascii_case("true")
+}
+
+/// Drops entries that cannot coexist with `id`.
+///
+/// The whole profile is replayed in a single `set_setting_values` call on connect,
+/// and the device folds it into one target state before sending anything. Writing
+/// any equalizer value clears spatial audio device-side, and two equalizer sources
+/// simply overwrite each other — so a profile holding e.g. both `volumeAdjustments`
+/// and `spatialAudio = true` silently loses spatial audio on every reconnect.
+/// Keeping the profile internally consistent is what makes the mode stick.
+fn prune_conflicts(list: &mut Vec<SettingEntry>, id: &str, value: &str) {
+    let eq_source = is_eq_source(id);
+    if !eq_source && !is_enabling_spatial(id, value) {
+        return;
+    }
+    list.retain(|e| {
+        if e.id == id {
+            return true;
+        }
+        // At most one equalizer source survives, and enabling spatial audio
+        // removes all of them.
+        if is_eq_source(&e.id) {
+            return false;
+        }
+        // Picking an equalizer source turns spatial audio off. `spatialAudioMode`
+        // is kept so the choice is remembered for next time.
+        if e.id == "spatialAudio" && eq_source {
+            return false;
+        }
+        true
+    });
+}
+
+/// Upserts one entry into a profile, dropping anything it contradicts.
+pub fn upsert_entry(list: &mut Vec<SettingEntry>, id: String, value: String) {
+    prune_conflicts(list, &id, &value);
+    match list.iter_mut().find(|e| e.id == id) {
+        Some(e) => e.value = value,
+        None => list.push(SettingEntry { id, value }),
+    }
+}
+
+/// Resolves contradictions in a profile that was written before the rules above
+/// existed. The last conflicting entry wins, matching "most recently changed".
+/// Returns true if anything was removed.
+pub fn prune_profile(list: &mut Vec<SettingEntry>) -> bool {
+    let winner = list
+        .iter()
+        .rposition(|e| is_eq_source(&e.id) || is_enabling_spatial(&e.id, &e.value))
+        .map(|i| (list[i].id.clone(), list[i].value.clone()));
+    let Some((id, value)) = winner else {
+        return false;
+    };
+    let before = list.len();
+    prune_conflicts(list, &id, &value);
+    list.len() != before
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EqPresetEntry {
     /// Auto-incrementing ID.
@@ -124,7 +196,16 @@ impl Config {
     pub fn load(path: &PathBuf) -> anyhow::Result<Self> {
         let text = std::fs::read_to_string(path)
             .with_context(|| format!("failed to read {}", path.display()))?;
-        toml::from_str(&text).map_err(Into::into)
+        let mut config: Self = toml::from_str(&text)?;
+        for dev in &mut config.devices {
+            if prune_profile(&mut dev.profile) {
+                tracing::info!(
+                    "dropped conflicting sound-effect entries from '{}' profile",
+                    dev.label()
+                );
+            }
+        }
+        Ok(config)
     }
 
     pub fn save(&self, path: &PathBuf) -> anyhow::Result<()> {
