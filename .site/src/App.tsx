@@ -1,3 +1,4 @@
+import React from "react";
 import { Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import DocsLayout from "./pages/DocsLayout";
@@ -12,7 +13,7 @@ import Troubleshooting from "./pages/docs/Troubleshooting";
 import Downloads from "./pages/Downloads";
 import NotFound from "./pages/NotFound";
 
-export default function App() {
+export default function App(): React.JSX.Element {
   return (
     <Routes>
       <Route path="/" element={<Home />} />
