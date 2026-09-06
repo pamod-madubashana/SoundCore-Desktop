@@ -12,11 +12,10 @@ interface DeviceArtProps { name?: string; url?: string | null; color?: string }
 function DeviceArt({ name = "", url, color }: DeviceArtProps) {
   if (url) return <img src={url} alt="" className="h-full w-full object-cover" />;
   const n = name.toLowerCase();
-  const cat = /motion|boom|flare|select|rave/.test(n)
-    ? "speaker"
-    : /space|vortex|life tune|life q|(^|\s)q\d/.test(n)
-      ? "overear"
-      : "earbuds";
+  const isSpeaker = /motion|boom|flare|select|rave/.test(n);
+  const isNeckband = /q11i/.test(n);
+  const isOverear = /space|vortex|life tune|life q|(^|\s)q\d/.test(n);
+  const cat = isSpeaker ? "speaker" : isNeckband ? "earbuds" : isOverear ? "overear" : "earbuds";
   
   const fill = "var(--brand)";
   
