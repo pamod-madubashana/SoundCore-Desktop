@@ -4,18 +4,18 @@ import {
 } from "lucide-react";
 import SoundEffectsPopup from "./components/SoundEffectsPopup";
 import { matchCustomPreset, soundEffectLabel } from "./lib/soundEffects";
-const invoke = window.__TAURI__?.core?.invoke ?? (async () => {});
+const invoke = (window as any).__TAURI__?.core?.invoke ?? (async () => {});
 
 // Device-type illustration picked from the name (no reliable per-model photo source exists).
 // Uses the device color to tint the SVG template.
-function DeviceArt({ name = "", url, color }) {
+interface DeviceArtProps { name?: string; url?: string | null; color?: string }
+function DeviceArt({ name = "", url, color }: DeviceArtProps) {
   if (url) return <img src={url} alt="" className="h-full w-full object-cover" />;
   const n = name.toLowerCase();
-  const cat = /motion|boom|flare|select|rave/.test(n)
-    ? "speaker"
-    : /space|vortex|life tune|life q|(^|\s)q\d/.test(n)
-      ? "overear"
-      : "earbuds";
+  const isSpeaker = /motion|boom|flare|select|rave/.test(n);
+  const isNeckband = /q11i/.test(n);
+  const isOverear = /space|vortex|life tune|life q|(^|\s)q\d/.test(n);
+  const cat = isSpeaker ? "speaker" : isNeckband ? "earbuds" : isOverear ? "overear" : "earbuds";
   
   const fill = "var(--brand)";
   
@@ -80,35 +80,35 @@ function DeviceArt({ name = "", url, color }) {
   );
 }
 
-const pretty = (id) => id.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()).trim();
+const pretty = (id: string): string => id.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase()).trim();
 
 export default function App() {
-  const [devices, setDevices] = useState([]);
-  const prevConnected = useRef(null);
-  const [updateInfo, setUpdateInfo] = useState(null);
-  const [updateProgress, setUpdateProgress] = useState(null);
-  const [updateError, setUpdateError] = useState(null);
+  const [devices, setDevices] = useState<any[]>([]);
+  const prevConnected = useRef<Set<string> | null>(null);
+  const [updateInfo, setUpdateInfo] = useState<any>(null);
+  const [updateProgress, setUpdateProgress] = useState<any>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   // Disable right-click context menu across the entire app
   useEffect(() => {
-    const handler = (e) => e.preventDefault();
+    const handler = (e: MouseEvent) => e.preventDefault();
     document.addEventListener("contextmenu", handler);
     return () => document.removeEventListener("contextmenu", handler);
   }, []);
 
   // Check for updates on mount
   useEffect(() => {
-    invoke("check_update").then((info) => {
+    invoke("check_update").then((info: any) => {
       if (info) setUpdateInfo(info);
     }).catch(() => {});
   }, []);
 
   // Listen for update progress events
   useEffect(() => {
-    const unlisten = window.__TAURI__?.event?.listen?.("update_progress", (e) => {
+    const unlisten = (window as any).__TAURI__?.event?.listen?.("update_progress", (e: any) => {
       setUpdateProgress(e.payload);
     });
-    return () => { unlisten?.then?.((fn) => fn()); };
+    return () => { unlisten?.then?.((fn: any) => fn()); };
   }, []);
 
   const handleStartUpdate = async () => {
@@ -133,7 +133,7 @@ export default function App() {
         const next = await invoke("get_states");
         setDevices(next);
 
-        const nowConnected = new Set(next.filter((d) => d.connected).map((d) => d.mac_address));
+        const nowConnected = new Set<string>(next.filter((d: any) => d.connected).map((d: any) => d.mac_address as string));
 
         if (prevConnected.current === null) {
           prevConnected.current = nowConnected;
@@ -176,7 +176,7 @@ export default function App() {
 
   // Only surface a device once it's actually connected; otherwise keep searching for
   // ANY supported Soundcore device rather than pinning to a remembered (offline) one.
-  const active = devices.find((d) => d.connected) || null;
+  const active = devices.find((d: any) => d.connected) || null;
 
   return (
     <main className="h-screen w-screen flex items-stretch justify-stretch">
@@ -189,7 +189,8 @@ export default function App() {
   );
 }
 
-function Searching({ updateInfo, updateProgress, updateError, onStartUpdate }) {
+interface SearchingProps { updateInfo: any; updateProgress: any; updateError: string | null; onStartUpdate: () => void; onDismissUpdate?: () => void }
+function Searching({ updateInfo, updateProgress, updateError, onStartUpdate }: SearchingProps) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-3 text-muted-foreground relative">
       <Loader2 className="h-7 w-7 animate-spin text-brand" />
@@ -226,15 +227,16 @@ function Searching({ updateInfo, updateProgress, updateError, onStartUpdate }) {
   );
 }
 
-function settingsMap(d) {
-  const m = {};
-  (d.categories || []).forEach((c) => c.settings.forEach((s) => (m[s.id] = s)));
+function settingsMap(d: any): Record<string, any> {
+  const m: Record<string, any> = {};
+  (d.categories || []).forEach((c: any) => c.settings.forEach((s: any) => (m[s.id] = s)));
   return m;
 }
 
-function Device({ d, updateInfo, updateProgress, updateError, onStartUpdate, onDismissUpdate }) {
+interface DeviceProps { d: any; updateInfo: any; updateProgress: any; updateError: string | null; onStartUpdate: () => void; onDismissUpdate: () => void }
+function Device({ d, updateInfo, updateProgress, updateError, onStartUpdate, onDismissUpdate }: DeviceProps) {
   const s = settingsMap(d);
-  const send = (id, raw) => invoke("set_setting", { mac: d.mac_address, id, raw });
+  const send = (id: string, raw: string) => invoke("set_setting", { mac: d.mac_address, id, raw });
   const [showSoundEffects, setShowSoundEffects] = useState(false);
 
   // The user's saved EQ curves live here so the Sound Effects row, the Custom EQ
@@ -242,7 +244,7 @@ function Device({ d, updateInfo, updateProgress, updateError, onStartUpdate, onD
   const [eqPresets, setEqPresets] = useState([]);
   const reloadEqPresets = useCallback(() => {
     invoke("list_eq_presets", { model: d.model })
-      .then((list) => setEqPresets(list || []))
+      .then((list: any) => setEqPresets(list || []))
       .catch(() => setEqPresets([]));
   }, [d.model]);
   useEffect(() => { reloadEqPresets(); }, [reloadEqPresets]);
@@ -315,7 +317,7 @@ function Footer() {
   );
 }
 
-function batteryPct(setting) {
+function batteryPct(setting: any): number | null {
   if (!setting) return null;
   const tv = setting.translatedValue ?? "";
   const tm = String(tv).match(/(\d+)\s*%/);
@@ -332,7 +334,8 @@ function batteryPct(setting) {
   return Number.isFinite(n) ? Math.min(100, n) : null;
 }
 
-function BatteryIcon({ level, label }) {
+interface BatteryIconProps { level: number | null; label: string | null }
+function BatteryIcon({ level, label }: BatteryIconProps) {
   // level: 0-100, label: "L", "R", or "Case"
   const pct = Math.max(0, Math.min(100, level ?? 0));
   const color = pct > 50 ? "text-success" : pct > 20 ? "text-yellow-500" : "text-red-500";
@@ -357,13 +360,14 @@ function BatteryIcon({ level, label }) {
   );
 }
 
-function Header({ d, s, updateInfo, updateProgress, updateError, onStartUpdate, onDismissUpdate }) {
-  const batteries = [
+interface HeaderProps { d: any; s: Record<string, any>; updateInfo: any; updateProgress: any; updateError: string | null; onStartUpdate: () => void; onDismissUpdate: () => void }
+function Header({ d, s, updateInfo, updateProgress, updateError, onStartUpdate, onDismissUpdate }: HeaderProps) {
+  const batteries: Array<[string, number | null]> = [
     ["L", batteryPct(s.batteryLevelLeft)],
     ["R", batteryPct(s.batteryLevelRight)],
     ["", batteryPct(s.batteryLevel)],
     ["Case", batteryPct(s.caseBatteryLevel)],
-  ].filter(([, v]) => v != null);
+  ].filter(([, v]) => v != null) as Array<[string, number | null]>;
 
   const showUpdateBadge = updateInfo && !updateProgress;
 
@@ -425,11 +429,12 @@ function Header({ d, s, updateInfo, updateProgress, updateError, onStartUpdate, 
   );
 }
 
-function pickOption(options, kw) {
+function pickOption(options: string[], kw: string): string | undefined {
   return options.find((o) => o.toLowerCase().includes(kw));
 }
 
-function SoundMode({ s, send }) {
+interface SoundModeProps { s: Record<string, any>; send: (id: string, raw: string) => void }
+function SoundMode({ s, send }: SoundModeProps) {
   const setting = s.ambientSoundMode;
   const opts = setting.setting.options;
   const modes = [
@@ -439,7 +444,7 @@ function SoundMode({ s, send }) {
   ].map((m) => ({ ...m, opt: pickOption(opts, m.kw) })).filter((m) => m.opt);
 
   const [localValue, setLocalValue] = useState(setting.value);
-  const lastLocal = useRef(0);
+  const lastLocal = useRef<number>(0);
   useEffect(() => {
     if (Date.now() - lastLocal.current < 500) return;
     setLocalValue(setting.value);
@@ -448,7 +453,7 @@ function SoundMode({ s, send }) {
   const manual = s.manualNoiseCanceling;
   const showStrength = manual && /noise/i.test(localValue || "");
 
-  const handleMode = (opt) => {
+  const handleMode = (opt: string) => {
     lastLocal.current = Date.now();
     setLocalValue(opt);
     send("ambientSoundMode", opt);
@@ -460,7 +465,7 @@ function SoundMode({ s, send }) {
         {modes.map(({ opt, label, Icon }) => {
           const activeMode = opt === localValue;
           return (
-            <button key={opt} onClick={() => handleMode(opt)}
+            <button key={opt} onClick={() => handleMode(opt!)}
               className={"relative flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-md text-[11px] font-medium leading-tight transition-all " +
                 (activeMode ? "bg-brand text-brand-foreground brand-glow" : "text-muted-foreground hover:text-foreground hover:bg-[var(--hover-medium)]")}>
               <Icon className="h-4 w-4" />
@@ -474,10 +479,11 @@ function SoundMode({ s, send }) {
   );
 }
 
-function Strength({ setting, send }) {
+interface StrengthProps { setting: any; send: (id: string, raw: string) => void }
+function Strength({ setting, send }: StrengthProps) {
   const { start, end } = setting.setting;
   const [v, setV] = useState(setting.value);
-  const lastEdit = useRef(0);
+  const lastEdit = useRef<number>(0);
   useEffect(() => {
     if (Date.now() - lastEdit.current < 2500) return; // keep a fresh local edit
     setV(setting.value);
@@ -495,7 +501,7 @@ function Strength({ setting, send }) {
   );
 }
 
-function ChevronRightIcon(props) {
+function ChevronRightIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <polyline points="9 18 15 12 9 6" />
@@ -503,22 +509,24 @@ function ChevronRightIcon(props) {
   );
 }
 
-function QuickToggles({ s, send }) {
+interface QuickTogglesProps { s: Record<string, any>; send: (id: string, raw: string) => void }
+function QuickToggles({ s, send }: QuickTogglesProps) {
   const toggles = Object.values(s)
-    .filter((x) => x.type === "toggle")
-    .filter((x) => !["spatialAudio"].includes(x.id))
-    .sort((a, b) => (/gam/i.test(a.id) ? -1 : /gam/i.test(b.id) ? 1 : 0));
+    .filter((x: any) => x.type === "toggle")
+    .filter((x: any) => !["spatialAudio"].includes(x.id))
+    .sort((a: any, b: any) => (/gam/i.test(a.id) ? -1 : /gam/i.test(b.id) ? 1 : 0));
   if (toggles.length === 0) return null;
   return (
     <div className="rounded-xl bg-surface ring-1 ring-[var(--border-subtle)] divide-y divide-[var(--border-subtle)]">
-      {toggles.map((t) => <ToggleRow key={t.id} t={t} send={send} />)}
+      {toggles.map((t: any) => <ToggleRow key={t.id} t={t} send={send} />)}
     </div>
   );
 }
 
-function ToggleRow({ t, send }) {
+interface ToggleRowProps { t: any; send: (id: string, raw: string) => void }
+function ToggleRow({ t, send }: ToggleRowProps) {
   const [localOn, setLocalOn] = useState(!!t.value);
-  const lastLocal = useRef(0);
+  const lastLocal = useRef<number>(0);
   useEffect(() => {
     if (Date.now() - lastLocal.current < 500) return;
     setLocalOn(!!t.value);

@@ -1,4 +1,4 @@
-// ui/src/components/Equalizer.jsx
+// ui/src/components/Equalizer.tsx
 //
 // Self-contained equalizer with Samsung-style sliders, device presets,
 // and custom user presets (save/rename/delete).
@@ -8,7 +8,7 @@ import { createPortal } from "react-dom";
 import { ChevronDown, RotateCcw, Save, Trash2, Pencil, Check, X, SlidersHorizontal } from "lucide-react";
 import { presetEntries } from "../lib/soundEffects";
 
-const invoke = window.__TAURI__?.core?.invoke ?? (async () => {});
+const invoke = (window as any).__TAURI__?.core?.invoke ?? (async () => {});
 
 /* ------------------------------------------------------------------ config */
 
@@ -17,7 +17,7 @@ const SYNC_GRACE_MS = 2500;
 // Generic fallback curves, used only for devices that expose no presets of
 // their own. Real Soundcore devices ship their own list via
 // presetEqualizerProfile.select, which always takes priority.
-const PRESETS = {
+const PRESETS: Record<string, number[]> = {
   Flat: [0, 0, 0, 0, 0],
   "Bass Boost": [6, 4, 1, 0, 0],
   "Bass Reducer": [-6, -4, -1, 0, 0],
@@ -28,11 +28,11 @@ const PRESETS = {
   Podcast: [-3, 1, 4, 2, -1],
 };
 
-const hzLabel = (hz) => (hz >= 1000 ? `${hz / 1000}k` : String(hz));
+const hzLabel = (hz: number): string => (hz >= 1000 ? `${hz / 1000}k` : String(hz));
 
 /* ------------------------------------------------------------------ helpers */
 
-function resample(shape, n) {
+function resample(shape: number[], n: number): number[] {
   if (n === shape.length) return [...shape];
   return Array.from({ length: n }, (_, i) => {
     const t = (i / Math.max(1, n - 1)) * (shape.length - 1);
@@ -44,29 +44,30 @@ function resample(shape, n) {
   });
 }
 
-const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+const clamp = (v: number, min: number, max: number): number => Math.min(max, Math.max(min, v));
 
 /* ── API helpers ──────────────────────────────────────────────────── */
 
-function savePreset(name, bands, model) {
+function savePreset(name: string, bands: string, model: string) {
   return invoke("save_eq_preset", { name, bands, model });
 }
 
-function renamePreset(id, name) {
+function renamePreset(id: number, name: string) {
   return invoke("rename_eq_preset", { id, name });
 }
 
-function deletePreset(id) {
+function deletePreset(id: number) {
   return invoke("delete_eq_preset", { id });
 }
 
 /* ------------------------------------------------------------- band slider */
 
-function BandSlider({ hz, value, min, max, fd, disabled, onChange, onCommit }) {
-  const ref = useRef(null);
+interface BandSliderProps { hz: number; value: number; min: number; max: number; fd: number; disabled: boolean; onChange: (v: number) => void; onCommit: () => void }
+function BandSlider({ hz, value, min, max, fd, disabled, onChange, onCommit }: BandSliderProps) {
+  const ref = useRef<HTMLDivElement | null>(null);
   const dragging = useRef(false);
 
-  const valueFromEvent = (e) => {
+  const valueFromEvent = (e: React.PointerEvent<HTMLDivElement>): number => {
     const el = ref.current;
     if (!el) return value;
     const { top, height } = el.getBoundingClientRect();
@@ -76,13 +77,13 @@ function BandSlider({ hz, value, min, max, fd, disabled, onChange, onCommit }) {
 
   const pct = ((value - min) / (max - min)) * 100;
 
-  const start = (e) => {
+  const start = (e: React.PointerEvent<HTMLDivElement>) => {
     if (disabled) return;
     dragging.current = true;
-    e.currentTarget.setPointerCapture?.(e.pointerId);
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
     onChange(valueFromEvent(e));
   };
-  const move = (e) => {
+  const move = (e: React.PointerEvent<HTMLDivElement>) => {
     if (dragging.current) onChange(valueFromEvent(e));
   };
   const end = () => {
@@ -90,7 +91,7 @@ function BandSlider({ hz, value, min, max, fd, disabled, onChange, onCommit }) {
     dragging.current = false;
     onCommit();
   };
-  const step = (delta) => {
+  const step = (delta: number) => {
     if (disabled) return;
     onChange(clamp(value + delta, min, max));
     onCommit();
@@ -116,13 +117,13 @@ function BandSlider({ hz, value, min, max, fd, disabled, onChange, onCommit }) {
         onPointerMove={move}
         onPointerUp={end}
         onPointerCancel={end}
-        onWheel={(e) => {
+        onWheel={(e: React.WheelEvent) => {
           if (disabled) return;
           e.preventDefault();
           e.stopPropagation();
           step(e.deltaY < 0 ? 1 : -1);
         }}
-        onKeyDown={(e) => {
+        onKeyDown={(e: React.KeyboardEvent) => {
           if (e.key === "ArrowUp") { e.preventDefault(); step(1); }
           else if (e.key === "ArrowDown") { e.preventDefault(); step(-1); }
         }}
@@ -153,7 +154,8 @@ function BandSlider({ hz, value, min, max, fd, disabled, onChange, onCommit }) {
 
 /* ------------------------------------------------------------ curve preview */
 
-function CurvePreview({ bands, min, max }) {
+interface CurvePreviewProps { bands: number[]; min: number; max: number }
+function CurvePreview({ bands, min, max }: CurvePreviewProps) {
   const w = 56;
   const h = 16;
   const points = bands
@@ -180,7 +182,8 @@ function CurvePreview({ bands, min, max }) {
 
 /* ── Save dialog ──────────────────────────────────────────────────── */
 
-function SaveDialog({ bands, model, onSaved, onCancel }) {
+interface SaveDialogProps { bands: number[]; model: string; onSaved: () => void; onCancel: () => void }
+function SaveDialog({ bands, model, onSaved, onCancel }: SaveDialogProps) {
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -227,7 +230,8 @@ function SaveDialog({ bands, model, onSaved, onCancel }) {
 
 /* ── Preset dropdown ──────────────────────────────────────────────── */
 
-function PresetRow({ entry, active, readOnly, onSelect, onRename, onDelete }) {
+interface PresetRowProps { entry: { id: string; label: string; customId?: number }; active: boolean; readOnly: boolean; onSelect: (id: string) => void; onRename: (id: number, name: string) => void; onDelete: (id: number) => void }
+function PresetRow({ entry, active, readOnly, onSelect, onRename, onDelete }: PresetRowProps) {
   const { id, label, customId } = entry;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(label);
@@ -235,7 +239,7 @@ function PresetRow({ entry, active, readOnly, onSelect, onRename, onDelete }) {
   const commitRename = () => {
     const name = draft.trim();
     setEditing(false);
-    if (name && name !== label) onRename(customId, name);
+    if (name && name !== label) onRename(customId!, name);
   };
 
   if (editing) {
@@ -245,7 +249,7 @@ function PresetRow({ entry, active, readOnly, onSelect, onRename, onDelete }) {
           type="text"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
+          onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
             if (e.key === "Enter") commitRename();
             if (e.key === "Escape") { setDraft(label); setEditing(false); }
           }}
@@ -289,7 +293,8 @@ function PresetRow({ entry, active, readOnly, onSelect, onRename, onDelete }) {
   );
 }
 
-function PresetPopup({ entries, activeId, readOnly, onSelect, onRename, onDelete }) {
+interface PresetPopupProps { entries: Array<{ id: string; label: string; customId?: number }>; activeId: string | null; readOnly: boolean; onSelect: (id: string) => void; onRename: (id: number, name: string) => void; onDelete: (id: number) => void }
+function PresetPopup({ entries, activeId, readOnly, onSelect, onRename, onDelete }: PresetPopupProps) {
   const [open, setOpen] = useState(false);
   const activeLabel = entries.find((e) => e.id === activeId)?.label;
 
@@ -337,6 +342,7 @@ function PresetPopup({ entries, activeId, readOnly, onSelect, onRename, onDelete
 
 /* ── Main ─────────────────────────────────────────────────────────── */
 
+interface EqualizerProps { setting: any; preset: any; send: (id: string, raw: string) => void; model: string; defaultOpen?: boolean; customPresets?: Array<{ id: number; name: string; bands: string }>; onPresetsChanged?: () => void }
 export default function Equalizer({
   setting,
   preset,
@@ -345,14 +351,14 @@ export default function Equalizer({
   defaultOpen = false,
   customPresets = [],
   onPresetsChanged,
-}) {
+}: EqualizerProps) {
   const { bandHz, fractionDigits, min, max } = setting.setting;
   const readOnly = !!setting.readOnly;
   const fd = fractionDigits || 0;
 
   const [open, setOpen] = useState(defaultOpen);
   const [bands, setBands] = useState(setting.value || []);
-  const lastEdit = useRef(0);
+  const lastEdit = useRef<number>(0);
   const [showSave, setShowSave] = useState(false);
 
   // Sync from device
@@ -364,29 +370,29 @@ export default function Equalizer({
 
   // Lock scroll when any EQ slider is focused
   useEffect(() => {
-    const lock = (e) => {
-      const target = e.target;
+    const lock = (e: FocusEvent) => {
+      const target = e.target as HTMLElement | null;
       if (target?.getAttribute?.("role") === "slider") {
-        let el = target.parentElement;
+        let el: HTMLElement | null = target.parentElement;
         while (el && el !== document.body) {
           const style = getComputedStyle(el);
           if (style.overflow === "auto" || style.overflow === "scroll" ||
               style.overflowY === "auto" || style.overflowY === "scroll") {
-            el.dataset.scrollLocked = el.style.overflow;
+            (el as any).dataset.scrollLocked = el.style.overflow;
             el.style.overflow = "hidden";
           }
           el = el.parentElement;
         }
       }
     };
-    const unlock = (e) => {
-      const target = e.target;
+    const unlock = (e: FocusEvent) => {
+      const target = e.target as HTMLElement | null;
       if (target?.getAttribute?.("role") === "slider") {
-        let el = target.parentElement;
+        let el: HTMLElement | null = target.parentElement;
         while (el && el !== document.body) {
-          if (el.dataset.scrollLocked !== undefined) {
-            el.style.overflow = el.dataset.scrollLocked;
-            delete el.dataset.scrollLocked;
+          if ((el as any).dataset.scrollLocked !== undefined) {
+            el.style.overflow = (el as any).dataset.scrollLocked;
+            delete (el as any).dataset.scrollLocked;
           }
           el = el.parentElement;
         }
@@ -402,19 +408,19 @@ export default function Equalizer({
 
   const touch = () => (lastEdit.current = Date.now());
 
-  const commit = (next) => {
+  const commit = (next: number[]) => {
     touch();
     setBands(next);
     send("volumeAdjustments", next.join(","));
   };
 
-  const setBand = (i, v) => {
+  const setBand = (i: number, v: number) => {
     touch();
-    setBands((b) => b.map((x, idx) => (idx === i ? v : x)));
+    setBands((b: number[]) => b.map((x, idx) => (idx === i ? v : x)));
   };
   const pushBands = () => {
     touch();
-    setBands((b) => {
+    setBands((b: number[]) => {
       send("volumeAdjustments", b.join(","));
       return b;
     });
@@ -466,7 +472,7 @@ export default function Equalizer({
     );
   }, [bandStr, customPresets, usingDevicePresets, bandHz.length, fd, min, max]);
 
-  const applyPreset = (id) => {
+  const applyPreset = (id: string) => {
     if (readOnly || !id) return;
     // Saved custom curves win: they're written as raw band values.
     const custom = customPresets.find((p) => p.name === id);
@@ -488,12 +494,12 @@ export default function Equalizer({
 
   const reset = () => !readOnly && commit(bandHz.map(() => 0));
 
-  const handleDeletePreset = async (id) => {
+  const handleDeletePreset = async (id: number) => {
     await deletePreset(id);
     onPresetsChanged?.();
   };
 
-  const handleRenamePreset = async (id, newName) => {
+  const handleRenamePreset = async (id: number, newName: string) => {
     await renamePreset(id, newName);
     onPresetsChanged?.();
   };
@@ -554,7 +560,7 @@ export default function Equalizer({
                 <span className="absolute inset-x-0 top-0 h-px bg-[var(--border-strong)]" />
               </div>
               <div className="relative flex items-end justify-between gap-0.5">
-                {bandHz.map((hz, i) => (
+                {bandHz.map((hz: number, i: number) => (
                   <BandSlider
                     key={hz}
                     hz={hz}
