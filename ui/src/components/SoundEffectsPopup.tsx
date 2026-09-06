@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ChevronLeft, X, Music, Film, Gamepad2 } from "lucide-react";
 import Equalizer from "./Equalizer";
 import {
@@ -18,7 +18,8 @@ const PENDING_GRACE_MS = 2000;
 
 /* ── Radio circle indicator ──────────────────────────────────────── */
 
-function RadioCircle({ active }) {
+interface RadioCircleProps { active: boolean }
+function RadioCircle({ active }: RadioCircleProps) {
   return (
     <span className={"flex h-5 w-5 items-center justify-center rounded-full ring-2 transition " +
       (active ? "bg-brand ring-brand" : "ring-[var(--border-strong)]")}>
@@ -31,33 +32,34 @@ function RadioCircle({ active }) {
 
 // Icon + nicer label per known SpatialAudioMode variant. Unknown variants still
 // render, using the device's own localized label.
-const SPATIAL_MODE_META = {
+const SPATIAL_MODE_META: Record<string, { label: string; Icon: React.ComponentType<{ className?: string }> }> = {
   Music: { label: "Music Mode", Icon: Music },
   Movie: { label: "Movie Mode", Icon: Film },
   Gaming: { label: "Gaming Mode", Icon: Gamepad2 },
 };
 
-function SpatialAudioSection({ s, send, expanded, onToggle }) {
+interface SpatialAudioSectionProps { s: Record<string, any>; send: (id: string, raw: string) => void; expanded: boolean; onToggle: () => void }
+function SpatialAudioSection({ s, send, expanded, onToggle }: SpatialAudioSectionProps) {
   const modeSetting = s.spatialAudioMode;
   const currentMode = modeSetting?.value || "Music";
   const opts = modeSetting?.setting?.options || [];
   const localized = modeSetting?.setting?.localizedOptions || [];
 
-  const modes = (opts.length > 0 ? opts : Object.keys(SPATIAL_MODE_META)).map((id, i) => ({
+  const modes = (opts.length > 0 ? opts : Object.keys(SPATIAL_MODE_META)).map((id: string, i: number) => ({
     id,
     label: SPATIAL_MODE_META[id]?.label || localized[i] || id,
     Icon: SPATIAL_MODE_META[id]?.Icon || Music,
   }));
 
   const [localMode, setLocalMode] = useState(currentMode);
-  const lastEdit = useRef(0);
+  const lastEdit = useRef<number>(0);
 
   useEffect(() => {
     if (Date.now() - lastEdit.current < 500) return;
     setLocalMode(currentMode);
   }, [currentMode]);
 
-  const setMode = (mode) => {
+  const setMode = (mode: string) => {
     lastEdit.current = Date.now();
     setLocalMode(mode);
     send("spatialAudioMode", mode);
@@ -83,7 +85,7 @@ function SpatialAudioSection({ s, send, expanded, onToggle }) {
 
       {expanded && (
         <div className="grid grid-cols-3 gap-2 px-4 pb-4 pt-1">
-          {modes.map(({ id, label, Icon }) => {
+          {modes.map(({ id, label, Icon }: { id: string; label: string; Icon: React.ComponentType<{ className?: string }> }) => {
             const active = id === localMode;
             return (
               <button
@@ -110,7 +112,8 @@ function SpatialAudioSection({ s, send, expanded, onToggle }) {
 
 /* ── Default Preset card ──────────────────────────────────────────── */
 
-function DefaultPresetCard({ s, send, expanded, onToggle }) {
+interface DefaultPresetCardProps { s: Record<string, any>; send: (id: string, raw: string) => void; expanded: boolean; onToggle: () => void }
+function DefaultPresetCard({ s, send, expanded, onToggle }: DefaultPresetCardProps) {
   // NOTE: presetEqualizerProfile nests its options under `select`, not `setting`.
   const options = presetOptions(s);
   const currentPreset = devicePresetId(s);
@@ -120,7 +123,7 @@ function DefaultPresetCard({ s, send, expanded, onToggle }) {
   const min = volAdj?.setting?.min ?? -6;
   const max = volAdj?.setting?.max ?? 6;
 
-  const applyPreset = (id) => {
+  const applyPreset = (id: string) => {
     send("presetEqualizerProfile", id);
   };
 
@@ -180,7 +183,8 @@ function DefaultPresetCard({ s, send, expanded, onToggle }) {
 
 /* ── Curve preview sparkline ──────────────────────────────────────── */
 
-function CurvePreview({ bands, min, max }) {
+interface CurvePreviewProps { bands: number[]; min: number; max: number }
+function CurvePreview({ bands, min, max }: CurvePreviewProps) {
   const w = 200;
   const h = 40;
   const points = bands
@@ -207,7 +211,8 @@ function CurvePreview({ bands, min, max }) {
 
 /* ── Custom EQ card ───────────────────────────────────────────────── */
 
-function CustomEQCard({ customPresetName, expanded, onToggle }) {
+interface CustomEQCardProps { customPresetName: string | null; expanded: boolean; onToggle: () => void }
+function CustomEQCard({ customPresetName, expanded, onToggle }: CustomEQCardProps) {
   return (
     <div className="rounded-2xl bg-surface ring-1 ring-[var(--border-subtle)] overflow-hidden">
       <button
@@ -240,6 +245,7 @@ function CustomEQCard({ customPresetName, expanded, onToggle }) {
 
 /* ── Main popup ───────────────────────────────────────────────────── */
 
+interface SoundEffectsPopupProps { d: any; s: Record<string, any>; send: (id: string, raw: string) => void; onClose: () => void; eqPresets?: Array<{ id: number; name: string; bands: string }>; onEqPresetsChanged?: () => void; customPresetName: string | null }
 export default function SoundEffectsPopup({
   d,
   s,
@@ -248,7 +254,7 @@ export default function SoundEffectsPopup({
   eqPresets = [],
   onEqPresetsChanged,
   customPresetName,
-}) {
+}: SoundEffectsPopupProps) {
   const [showEqualizer, setShowEqualizer] = useState(false);
 
   const showSpatial = hasSpatial(s);
@@ -262,8 +268,8 @@ export default function SoundEffectsPopup({
 
   // Optimistic override so a tap feels instant instead of waiting for the next
   // 900ms poll. Expires on its own, and early once the device agrees.
-  const [pending, setPending] = useState(null);
-  const pendingAt = useRef(0);
+  const [pending, setPending] = useState<string | null>(null);
+  const pendingAt = useRef<number>(0);
   useEffect(() => {
     if (!pending) return;
     if (deviceSection === pending) {
@@ -283,13 +289,13 @@ export default function SoundEffectsPopup({
 
   // Remember the last built-in preset so re-selecting "Default" restores it
   // instead of snapping back to the first option in the list.
-  const lastPresetId = useRef(null);
+  const lastPresetId = useRef<string | null>(null);
   const currentPresetId = devicePresetId(s);
   useEffect(() => {
     if (currentPresetId != null) lastPresetId.current = currentPresetId;
   }, [currentPresetId]);
 
-  const selectSection = (section) => {
+  const selectSection = (section: string) => {
     if (activeSection === section) {
       // Second tap on the already-active custom card drills into the editor.
       if (section === SECTION_CUSTOM) setShowEqualizer(true);
