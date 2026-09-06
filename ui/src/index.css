@@ -62,6 +62,8 @@ html, body, #root {
 
 ::-webkit-scrollbar { width: 7px; }
 ::-webkit-scrollbar-thumb { background: oklch(1 0 0 / 0.12); border-radius: 8px; }
+.scrollbar-hidden::-webkit-scrollbar { display: none; }
+.scrollbar-hidden { -ms-overflow-style: none; scrollbar-width: none; }
 
 @keyframes slide-up {
   from { transform: translateY(100%); opacity: 0; }
