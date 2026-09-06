@@ -254,7 +254,7 @@ function Device({ d, updateInfo, updateProgress, updateError, onStartUpdate, onD
   return (
     <>
       <Header d={d} s={s} updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={onStartUpdate} onDismissUpdate={onDismissUpdate} />
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div className="flex-1 flex flex-col px-4 py-4 gap-4 overflow-hidden">
         {s.ambientSoundMode && <SoundMode s={s} send={send} />}
 
         {/* Sound Effects nav item */}
@@ -279,7 +279,9 @@ function Device({ d, updateInfo, updateProgress, updateError, onStartUpdate, onD
           </button>
         )}
 
-        <QuickToggles s={s} send={send} />
+        <div className="flex-1 overflow-y-auto min-h-0 scrollbar-hidden">
+          <QuickToggles s={s} send={send} />
+        </div>
       </div>
 
       {showSoundEffects && (
