@@ -3,7 +3,12 @@ import appIcon from "../assets/icon.svg";
 
 const GITHUB = "https://github.com/pamod-madubashana/SoundCore-Desktop";
 
-const nav = [
+interface NavItem {
+  label: string;
+  to: string;
+}
+
+const nav: NavItem[] = [
   { label: "Docs", to: "/docs" },
   { label: "Features", to: "/docs/features" },
   { label: "Usage", to: "/docs/usage" },
