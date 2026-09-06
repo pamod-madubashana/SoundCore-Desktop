@@ -1,0 +1,134 @@
+/* theme-windows.css — Windows Fluent (Mica / Acrylic) theme */
+
+/* ── Dark mode ───────────────────────────────────────────────────── */
+
+.theme-windows {
+  --radius: 8px;
+
+  font-family: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  /* Everything transparent so Mica/Acrylic shows through */
+  --background: transparent;
+  --foreground: oklch(0.97 0.003 260);
+  --popover: transparent;
+  --surface: oklch(1 0 0 / 0.10);
+  --surface-elevated: oklch(1 0 0 / 0.14);
+  --muted-foreground: oklch(0.72 0.008 260);
+
+  /* Borders — Fluent 1px white stroke */
+  --border-subtle: oklch(1 0 0 / 0.12);
+  --border-medium: oklch(1 0 0 / 0.16);
+  --border-strong: oklch(1 0 0 / 0.22);
+
+  /* Hover — subtle white overlay */
+  --hover-subtle: oklch(1 0 0 / 0.08);
+  --hover-medium: oklch(1 0 0 / 0.12);
+  --hover-strong: oklch(1 0 0 / 0.16);
+
+  /* Interactive */
+  --toggle-off: oklch(1 0 0 / 0.14);
+  --toggle-thumb: white;
+  --icon-hover: oklch(1 0 0 / 0.10);
+  --track-above: oklch(1 0 0 / 0.45);
+
+  /* Overlays */
+  --overlay-bg: oklch(0 0 0 / 0.45);
+  --scrollbar-thumb: oklch(1 0 0 / 0.18);
+
+  /* Popup — fully transparent, Mica shows through everything */
+  --popup-bg: transparent;
+  --popup-blur: blur(40px) saturate(1.2);
+  --shadow-popup-token:
+    0 16px 48px -8px oklch(0 0 0 / 0.55),
+    0 0 0 1px oklch(1 0 0 / 0.08);
+
+  /* Accent color — set dynamically by ThemeProvider via --accent (hex, lightened) */
+  --brand: var(--accent, #0078D4);
+  --brand-foreground: white;
+  --brand-glow: var(--accent, #0078D4);
+
+  /* Error */
+  --error-text: oklch(0.65 0.22 25);
+}
+
+/* ── Light mode ──────────────────────────────────────────────────── */
+
+.theme-windows[data-mode="light"] {
+  --foreground: oklch(0.12 0.008 260);
+  --surface: oklch(0 0 0 / 0.06);
+  --surface-elevated: oklch(0 0 0 / 0.09);
+  --muted-foreground: oklch(0.38 0.008 260);
+
+  --brand-foreground: white;
+
+  --border-subtle: oklch(0 0 0 / 0.10);
+  --border-medium: oklch(0 0 0 / 0.14);
+  --border-strong: oklch(0 0 0 / 0.20);
+
+  --hover-subtle: oklch(0 0 0 / 0.06);
+  --hover-medium: oklch(0 0 0 / 0.09);
+  --hover-strong: oklch(0 0 0 / 0.12);
+
+  --toggle-off: oklch(0 0 0 / 0.14);
+  --toggle-thumb: white;
+  --icon-hover: oklch(0 0 0 / 0.08);
+  --track-above: oklch(0 0 0 / 0.35);
+
+  --overlay-bg: oklch(0 0 0 / 0.30);
+  --scrollbar-thumb: oklch(0 0 0 / 0.18);
+
+  --popup-bg: transparent;
+  --popup-blur: blur(40px) saturate(1.2);
+  --shadow-popup-token:
+    0 16px 48px -8px oklch(0 0 0 / 0.18),
+    0 0 0 1px oklch(0 0 0 / 0.10);
+
+  --error-text: oklch(0.50 0.22 25);
+}
+
+/* ── Fluent toggle switch ────────────────────────────────────────── */
+
+.theme-windows .toggle-track {
+  position: relative;
+  width: 40px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--toggle-off);
+  transition: background 0.15s ease;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.theme-windows .toggle-track[data-on="true"] {
+  background: var(--brand);
+}
+
+.theme-windows .toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--toggle-thumb);
+  transition: transform 0.15s ease;
+  box-shadow: 0 1px 3px oklch(0 0 0 / 0.3);
+}
+
+.theme-windows .toggle-track[data-on="true"] .toggle-thumb {
+  transform: translateX(20px);
+}
+
+/* ── Fluent card / section ───────────────────────────────────────── */
+
+.theme-windows .fluent-card {
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+}
+
+.theme-windows .fluent-card-elevated {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+}

@@ -5,7 +5,9 @@ mod autostart;
 mod config;
 mod device_colors;
 mod device_images;
+mod platform;
 mod updater;
+mod window_effects;
 mod worker;
 
 use base64::Engine;
@@ -521,6 +523,19 @@ async fn slide_window_y(window: &WebviewWindow, from_y: i32, to_y: i32, duration
     }
 }
 
+/// Slide the window down off-screen and hide it (close animation).
+async fn animated_hide(window: &WebviewWindow) {
+    let start_y = window.outer_position().map(|p| p.y).unwrap_or(0);
+    let monitor_height = window.primary_monitor()
+        .ok()
+        .flatten()
+        .map(|m| m.size().height as i32)
+        .unwrap_or(1080);
+    // Slide past the bottom of the screen
+    slide_window_y(window, start_y, monitor_height + 100, 350).await;
+    let _ = window.hide();
+}
+
 fn toggle_window(app: &AppHandle) {
     // Cancel any pending focus-loss hide
     if let Some(state) = app.try_state::<AppState>() {
@@ -528,7 +543,11 @@ fn toggle_window(app: &AppHandle) {
     }
     if let Some(window) = app.get_webview_window("main") {
         if window.is_visible().unwrap_or(false) {
-            let _ = window.hide();
+            // Slide down and hide
+            let win = window.clone();
+            tauri::async_runtime::spawn(async move {
+                animated_hide(&win).await;
+            });
         } else {
             // Slide up from below
             let win = window.clone();
@@ -540,6 +559,8 @@ fn toggle_window(app: &AppHandle) {
                     start_y,
                 ));
                 let _ = win.show();
+                // Apply backdrop AFTER window is visible so Mica/Acrylic can render
+                window_effects::apply_backdrop(&win);
                 let _ = win.set_focus();
                 slide_window_y(&win, start_y, target_y, 200).await;
             });
@@ -587,7 +608,10 @@ pub fn run() {
             quit_app,
             check_update,
             start_update,
-            is_update_restart
+            is_update_restart,
+            platform::get_platform,
+            platform::get_windows_accent,
+            platform::get_platform_info,
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::Focused(false) = event {
@@ -596,7 +620,7 @@ pub fn run() {
                     return;
                 }
                 let handle = window.app_handle().clone();
-                let win = window.clone();
+                let label = window.label().to_string();
                 if let Some(state) = handle.try_state::<AppState>() {
                     state.hide_cancel.store(false, Ordering::SeqCst);
                 }
@@ -604,7 +628,9 @@ pub fn run() {
                     tokio::time::sleep(Duration::from_millis(100)).await;
                     if let Some(state) = handle.try_state::<AppState>() {
                         if !state.hide_cancel.load(Ordering::SeqCst) {
-                            let _ = win.hide();
+                            if let Some(win) = handle.get_webview_window(&label) {
+                                animated_hide(&win).await;
+                            }
                         }
                     }
                 });
