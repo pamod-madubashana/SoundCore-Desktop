@@ -1,13 +1,13 @@
 import { DocTitle, H2, P, Code } from "../../components/Prose";
 
-const folders = [
+const folders: Array<[string, string]> = [
   ["ui/", "React + Vite frontend for the tray UI and user interaction."],
   ["src-tauri/", "Rust backend with Tauri integration, system APIs, and device handling."],
   ["docs/", "Docusaurus documentation site and markdown content."],
   [".site/", "This website — built with React + Tailwind CSS."],
 ];
 
-const rust = [
+const rust: Array<[string, string]> = [
   ["src-tauri/src/main.rs", "Application launch and Tauri command registration."],
   ["src-tauri/src/worker.rs", "Device connection detection and profile restore logic."],
   ["src-tauri/src/config.rs", "Configuration parsing and app settings."],
@@ -15,13 +15,17 @@ const rust = [
   ["src-tauri/src/autostart.rs", "Optional autostart implementation."],
 ];
 
-const frontend = [
+const frontend: Array<[string, string]> = [
   ["ui/src/App.jsx", "Main React app entry point with all UI components."],
   ["ui/src/main.jsx", "React render logic."],
   ["ui/src/index.css", "Application styling."],
 ];
 
-function FileTable({ rows }) {
+interface FileTableProps {
+  rows: Array<[string, string]>;
+}
+
+function FileTable({ rows }: FileTableProps) {
   return (
     <div className="mt-4 max-w-[68ch] overflow-hidden rounded-lg border border-border">
       {rows.map(([path, body], i) => (
