@@ -37,6 +37,13 @@ sha2 = "0.10"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
+hex = "0.4"
+windows = { version = "0.62", features = [
+    "Devices_Enumeration",
+    "Devices_Bluetooth",
+    "Devices_Radios",
+    "Foundation",
+]}
 
 [profile.release]
 opt-level = 2
