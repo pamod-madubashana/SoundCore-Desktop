@@ -1,10 +1,23 @@
+import React from "react";
 import { SiteHeader } from "../components/SiteHeader";
 import { SiteFooter } from "../components/SiteFooter";
 
 const GITHUB = "https://github.com/pamod-madubashana/SoundCore-Desktop";
 const RELEASE = `${GITHUB}/releases/latest/download`;
 
-const platforms = [
+interface Build {
+  file: string;
+  label: string;
+  primary: boolean;
+}
+
+interface Platform {
+  name: string;
+  meta: string;
+  builds: Build[];
+}
+
+const platforms: Platform[] = [
   {
     name: "Windows",
     meta: "Windows 10 / 11 · x64",
@@ -31,7 +44,7 @@ const platforms = [
   },
 ];
 
-export default function Downloads() {
+export default function Downloads(): React.JSX.Element {
   return (
     <div className="min-h-screen">
       <SiteHeader />

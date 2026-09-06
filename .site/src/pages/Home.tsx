@@ -1,3 +1,4 @@
+import React from "react";
 import { Link } from "react-router-dom";
 import { SiteHeader } from "../components/SiteHeader";
 import { SiteFooter } from "../components/SiteFooter";
@@ -6,7 +7,19 @@ import LiveDemo from "../components/LiveDemo";
 const GITHUB = "https://github.com/pamod-madubashana/SoundCore-Desktop";
 const RELEASE = `${GITHUB}/releases/latest/download`;
 
-const features = [
+interface Feature {
+  n: string;
+  title: string;
+  body: string;
+}
+
+interface Step {
+  n: string;
+  title: string;
+  body: string;
+}
+
+const features: Feature[] = [
   {
     n: "01",
     title: "Automatic profile restore",
@@ -39,7 +52,7 @@ const features = [
   },
 ];
 
-const steps = [
+const steps: Step[] = [
   {
     n: "01",
     title: "Connect your device",
@@ -57,7 +70,7 @@ const steps = [
   },
 ];
 
-export default function Home() {
+export default function Home(): React.JSX.Element {
   return (
     <div className="min-h-screen">
       <SiteHeader />
