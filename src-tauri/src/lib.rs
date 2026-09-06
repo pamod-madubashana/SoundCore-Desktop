@@ -367,6 +367,7 @@ async fn show_notification(
     battery_case: Option<i32>,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
+    tracing::debug!("show_notification called: name={name}, status={status}");
     let handle = {
         let h = state.app_handle.lock().unwrap();
         h.clone().ok_or("app handle ready")?
@@ -590,6 +591,10 @@ pub fn run() {
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::Focused(false) = event {
+                // Don't auto-hide the notification window — it manages its own lifetime
+                if window.label() == "notification" {
+                    return;
+                }
                 let handle = window.app_handle().clone();
                 let win = window.clone();
                 if let Some(state) = handle.try_state::<AppState>() {
