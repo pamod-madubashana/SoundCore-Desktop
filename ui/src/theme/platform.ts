@@ -1,10 +1,11 @@
-const invoke = window.__TAURI__?.core?.invoke ?? (async () => {});
+const invoke: (cmd: string, args?: Record<string, unknown>) => Promise<any> =
+  (window as any).__TAURI__?.core?.invoke ?? (async () => {});
 
 /**
  * Detect the running platform via the Rust backend.
  * Returns "windows", "linux", "macos", or "browser" (if Tauri unavailable).
  */
-export async function detectPlatform() {
+export async function detectPlatform(): Promise<string> {
   try {
     return await invoke("get_platform");
   } catch {
@@ -16,7 +17,7 @@ export async function detectPlatform() {
  * Read the Windows system accent color from the registry.
  * Returns a hex string like "#0078D4", or null on non-Windows / failure.
  */
-export async function getAccentColor() {
+export async function getAccentColor(): Promise<string | null> {
   try {
     return await invoke("get_windows_accent");
   } catch {
@@ -28,7 +29,11 @@ export async function getAccentColor() {
  * Combined call — fetches platform + accent in one round-trip.
  * Returns { os: string, accentColor: string | null, accentLight2: string | null }
  */
-export async function getPlatformInfo() {
+export async function getPlatformInfo(): Promise<{
+  os: string;
+  accentColor: string | null;
+  accentLight2: string | null;
+}> {
   try {
     const info = await invoke("get_platform_info");
     return { os: info.os, accentColor: info.accent_color, accentLight2: info.accent_light2 };
@@ -45,7 +50,7 @@ export async function getPlatformInfo() {
  * Convert a "#RRGGBB" hex color to an OKLCH string.
  * Falls back to a default if conversion fails.
  */
-export function hexToOklch(hex, fallback = "oklch(0.78 0.16 195)") {
+export function hexToOklch(hex: unknown, fallback: string = "oklch(0.78 0.16 195)"): string {
   if (!hex || typeof hex !== "string") return fallback;
 
   const m = hex.match(/^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
@@ -56,8 +61,10 @@ export function hexToOklch(hex, fallback = "oklch(0.78 0.16 195)") {
   const b = parseInt(m[3], 16) / 255;
 
   // sRGB linearization
-  const lin = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-  const rl = lin(r), gl = lin(g), bl = lin(b);
+  const lin: (c: number) => number = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const rl = lin(r),
+    gl = lin(g),
+    bl = lin(b);
 
   // Linear sRGB → OKLab (Björn Ottosson's matrix)
   const l_ = 0.4122214708 * rl + 0.5363325363 * gl + 0.0514459929 * bl;
