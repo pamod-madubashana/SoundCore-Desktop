@@ -324,8 +324,10 @@ async fn device_loop(
             s.message = format!("waiting for {model}...");
         });
 
+        tracing::debug!("attempting connection to {mac} ({model})");
         match timeout(Duration::from_secs(10), session.connect(mac)).await {
             Ok(Ok(device)) => {
+                tracing::debug!("connected to {mac} ({model})");
                 // Publish snapshot first so battery data is available when frontend detects connect
                 publish_snapshot(device.as_ref(), &state, mac);
                 set_device_state(&state, mac, |s| {
@@ -339,16 +341,23 @@ async fn device_loop(
                 publish_snapshot(device.as_ref(), &state, mac);
 
                 if connected_session(device.as_ref(), &mut rx, &state, mac).await {
+                    tracing::debug!("connected_session returned for {mac}, task replaced");
                     return; // channel dropped -> task replaced
                 }
 
+                tracing::debug!("device {mac} disconnected, restarting connection loop");
                 set_device_state(&state, mac, |s| {
                     s.connected = false;
                     s.snapshot = None;
                     s.message = "disconnected".into();
                 });
             }
-            _ => {
+            Ok(Err(err)) => {
+                tracing::warn!("connection to {mac} failed: {err:#}");
+                sleep(poll).await;
+            }
+            Err(_) => {
+                tracing::debug!("connection to {mac} timed out after 10s");
                 sleep(poll).await;
             }
         }
@@ -364,60 +373,119 @@ async fn connected_session(
 ) -> bool {
     let mut conn = device.connection_status();
     let mut changes = device.watch_for_changes();
-    let mut heartbeat = tokio::time::interval(Duration::from_secs(15));
-    heartbeat.tick().await; // consume the first immediate tick
+    // Periodic presence check: every 5 s verify the device is still in the OS
+    // connected-devices list (AQS cache query, no RFCOMM I/O).
+    let mut presence_check = tokio::time::interval(Duration::from_secs(5));
+    presence_check.tick().await; // consume first immediate tick
+    tracing::debug!("entered connected_session for {mac}");
     loop {
         tokio::select! {
             cmd = rx.recv() => match cmd {
                 Some(DeviceCommand::ApplyNow) => {
+                    tracing::debug!("ApplyNow for {mac}");
                     apply_and_report(device, &current_profile(state, mac), state, mac).await;
                     publish_snapshot(device, state, mac);
                 }
                 Some(DeviceCommand::SetSetting { id, value }) => {
+                    tracing::debug!("SetSetting {id} for {mac}");
                     if let Err(err) = device.set_setting_values(vec![(id, value)]).await {
                         warn!("set failed: {err}");
                         if matches!(err, openscq30_lib::device::Error::ConnectionError { .. }) {
+                            tracing::debug!("connection error during set, treating as disconnect for {mac}");
                             return false;
                         }
                         set_device_state(state, mac, |s| s.message = format!("set failed: {err}"));
                     }
                     publish_snapshot(device, state, mac);
                 }
-                None => return true,
+                None => {
+                    tracing::debug!("command channel closed for {mac}, exiting connected_session");
+                    return true;
+                }
             },
             changed = changes.changed() => {
                 if changed.is_ok() {
+                    tracing::trace!("settings changed for {mac}, publishing snapshot");
                     publish_snapshot(device, state, mac);
                 }
             }
             conn_changed = conn.changed() => {
                 if conn_changed.is_err() || *conn.borrow_and_update() == ConnectionStatus::Disconnected {
+                    tracing::debug!("connection_status channel signaled disconnect for {mac}");
                     return false;
                 }
             }
-            _ = heartbeat.tick() => {
-                let probe = {
-                    let map = state.devices.lock().unwrap();
-                    map.get(&mac).and_then(|s| s.snapshot.as_ref()).and_then(|snap| {
-                        for (_, settings) in snap {
-                            for (id, setting) in settings {
-                                if let Setting::Toggle { value, .. } = setting {
-                                    return Some((*id, Value::Bool(*value)));
-                                }
-                            }
-                        }
-                        None
-                    })
-                };
-                if let Some((id, value)) = probe {
-                    if timeout(Duration::from_secs(3), device.set_setting_values(vec![(id, value)])).await.is_err() {
-                        warn!("heartbeat probe failed for {mac}, assuming disconnected");
-                        return false;
-                    }
+            _ = presence_check.tick() => {
+                if is_device_still_connected(mac).await {
+                    tracing::trace!("presence check: {mac} still connected");
+                    publish_snapshot(device, state, mac);
+                } else {
+                    tracing::warn!("presence check: {mac} no longer in connected devices list");
+                    return false;
                 }
             }
         }
     }
+}
+
+/// Lightweight check: queries the OS Bluetooth cache (AQS filter) to see if a
+/// device with the given MAC address is still listed as connected.  No RFCOMM
+/// I/O is performed — this only reads from the Windows Bluetooth stack's
+/// cached device list.
+#[cfg(target_os = "windows")]
+async fn is_device_still_connected(mac: MacAddr6) -> bool {
+    tokio::task::spawn_blocking(move || {
+        use windows::{
+            Devices::{
+                Bluetooth::{BluetoothConnectionStatus, BluetoothDevice},
+                Enumeration::DeviceInformation,
+            },
+            core::HSTRING,
+        };
+
+        let connected_filter =
+            match BluetoothDevice::GetDeviceSelectorFromConnectionStatus(
+                BluetoothConnectionStatus::Connected,
+            ) {
+                Ok(f) => f,
+                Err(err) => {
+                    tracing::debug!("failed to get BT device selector for {mac}: {err}");
+                    return true;
+                }
+            };
+        let mac_hex = hex::encode(mac);
+        let mac_filter = format!(
+            "System.DeviceInterface.Bluetooth.DeviceAddress:=\"{mac_hex}\"",
+        );
+        let filter: HSTRING = format!(
+            "{connected_filter} AND {mac_filter} AND System.Devices.Aep.IsPresent:=System.StructuredQueryType.Boolean#True"
+        ).into();
+        tracing::trace!("presence AQS filter for {mac}: {filter}");
+
+        let collection = match DeviceInformation::FindAllAsyncAqsFilter(&filter) {
+            Ok(op) => match op.join() {
+                Ok(c) => c,
+                Err(err) => {
+                    tracing::debug!("FindAllAsync join failed for {mac}: {err}");
+                    return true;
+                }
+            },
+            Err(err) => {
+                tracing::debug!("FindAllAsync failed for {mac}: {err}");
+                return true;
+            }
+        };
+        let count = collection.Size().unwrap_or(0);
+        tracing::trace!("presence check for {mac}: {count} matching device(s)");
+        count > 0
+    })
+    .await
+    .unwrap_or(true)
+}
+
+#[cfg(not(target_os = "windows"))]
+async fn is_device_still_connected(_mac: MacAddr6) -> bool {
+    true
 }
 
 fn publish_snapshot(device: &(dyn OpenSCQ30Device + Send + Sync), state: &SharedState, mac: MacAddr6) {
