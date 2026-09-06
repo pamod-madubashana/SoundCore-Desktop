@@ -2,7 +2,18 @@ import { Link, Outlet, useLocation } from "react-router-dom";
 import { SiteHeader } from "../components/SiteHeader";
 import { SiteFooter } from "../components/SiteFooter";
 
-const sections = [
+interface DocsLink {
+  to: string;
+  label: string;
+  exact?: boolean;
+}
+
+interface DocsSection {
+  title: string;
+  links: DocsLink[];
+}
+
+const sections: DocsSection[] = [
   {
     title: "Getting started",
     links: [

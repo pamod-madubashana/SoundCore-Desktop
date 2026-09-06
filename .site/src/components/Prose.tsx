@@ -1,4 +1,12 @@
-export function DocTitle({ eyebrow, title, lead }) {
+import type { ReactNode } from "react";
+
+interface DocTitleProps {
+  eyebrow: string;
+  title: string;
+  lead?: string;
+}
+
+export function DocTitle({ eyebrow, title, lead }: DocTitleProps) {
   return (
     <header className="mb-10 border-b border-border pb-8">
       <p className="eyebrow">{eyebrow}</p>
@@ -14,23 +22,31 @@ export function DocTitle({ eyebrow, title, lead }) {
   );
 }
 
-export function H2({ children }) {
+interface ChildrenProps {
+  children?: ReactNode;
+}
+
+export function H2({ children }: ChildrenProps) {
   return (
     <h2 className="mt-12 mb-3 text-[1.15rem] font-semibold tracking-tight first:mt-0">{children}</h2>
   );
 }
 
-export function H3({ children }) {
+export function H3({ children }: ChildrenProps) {
   return <h3 className="mt-8 mb-2 text-[15px] font-semibold tracking-tight">{children}</h3>;
 }
 
-export function P({ children }) {
+export function P({ children }: ChildrenProps) {
   return (
     <p className="mt-3 max-w-[68ch] text-[14.5px] leading-[1.75] text-muted-foreground">{children}</p>
   );
 }
 
-export function UL({ items }) {
+interface ListProps {
+  items: ReactNode[];
+}
+
+export function UL({ items }: ListProps) {
   return (
     <ul className="mt-4 max-w-[68ch] space-y-2">
       {items.map((item, i) => (
@@ -43,7 +59,7 @@ export function UL({ items }) {
   );
 }
 
-export function OL({ items }) {
+export function OL({ items }: ListProps) {
   return (
     <ol className="mt-4 max-w-[68ch] space-y-3">
       {items.map((item, i) => (
@@ -58,7 +74,7 @@ export function OL({ items }) {
   );
 }
 
-export function Code({ children }) {
+export function Code({ children }: ChildrenProps) {
   return (
     <code className="rounded-[4px] border border-border bg-surface px-1.5 py-0.5 font-mono text-[12.5px] text-foreground">
       {children}
@@ -66,7 +82,12 @@ export function Code({ children }) {
   );
 }
 
-export function Terminal({ title = "bash", lines }) {
+interface TerminalProps {
+  title?: string;
+  lines: string[];
+}
+
+export function Terminal({ title = "bash", lines }: TerminalProps) {
   return (
     <div className="mt-4 max-w-[68ch] overflow-hidden rounded-lg border border-border bg-surface">
       <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
@@ -95,7 +116,7 @@ export function Terminal({ title = "bash", lines }) {
   );
 }
 
-export function Note({ children }) {
+export function Note({ children }: ChildrenProps) {
   return (
     <div className="mt-6 max-w-[68ch] rounded-lg border border-primary/25 bg-primary/[0.06] px-4 py-3 text-[13.5px] leading-relaxed text-muted-foreground">
       {children}
