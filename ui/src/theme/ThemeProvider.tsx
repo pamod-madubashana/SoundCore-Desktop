@@ -5,12 +5,12 @@ import { detectPlatform, getPlatformInfo } from "./platform";
  * Resolves the platform theme and accent color before React renders.
  * Sets classes on <html> so the correct CSS theme is active from the start.
  *
- * Usage in main.jsx:
+ * Usage in main.tsx:
  *   const ready = useThemeSetup();
  *   if (!ready) return null;
  *   createRoot(root).render(<App />);
  */
-export function useThemeSetup() {
+export function useThemeSetup(): boolean {
   const [ready, setReady] = useState(false);
   const initRef = useRef(false);
 
@@ -34,7 +34,7 @@ export function useThemeSetup() {
         // Listen for system theme changes
         const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
         if (mq) {
-          const handler = (e) => { html.dataset.mode = e.matches ? "dark" : "light"; };
+          const handler = (e: MediaQueryListEvent): void => { html.dataset.mode = e.matches ? "dark" : "light"; };
           mq.addEventListener("change", handler);
         }
       } else {
