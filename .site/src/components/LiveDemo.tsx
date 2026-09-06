@@ -1,9 +1,27 @@
-import { useState } from "react";
+import React, { useState } from "react";
+import type { ChangeEvent, SVGProps } from "react";
 import appIcon from "../assets/icon.svg";
 import r50iNcImg from "../assets/a3959_black_com_device.png";
 
 /* ── Mock device data ──────────────────────────────────────────────── */
-const MOCK_DEVICE = {
+type SoundModeId = "noise_cancel" | "normal" | "transparency";
+type ToggleKey = "gamingMode" | "windNoise" | "normalInCycle";
+
+interface DeviceState {
+  name: string;
+  model: string;
+  connected: boolean;
+  batteryL: number;
+  batteryR: number;
+  soundMode: SoundModeId;
+  strength: number;
+  eq: number[];
+  gamingMode: boolean;
+  windNoise: boolean;
+  normalInCycle: boolean;
+}
+
+const MOCK_DEVICE: DeviceState = {
   name: "R50i NC",
   model: "A3933",
   connected: true,
@@ -17,25 +35,36 @@ const MOCK_DEVICE = {
   normalInCycle: true,
 };
 
-const EQ_HZ = [100, 200, 400, 800, 1600, 3200, 6400, 12800];
+const EQ_HZ: number[] = [100, 200, 400, 800, 1600, 3200, 6400, 12800];
 const EQ_MIN = -6;
 const EQ_MAX = 6;
-const BAND_LABEL = (hz) => (hz >= 1000 ? hz / 1000 + "k" : String(hz));
+const BAND_LABEL = (hz: number): string => (hz >= 1000 ? hz / 1000 + "k" : String(hz));
 
-const SOUND_MODES = [
+interface SoundMode {
+  id: SoundModeId;
+  label: string;
+  kw: string;
+}
+
+const SOUND_MODES: SoundMode[] = [
   { id: "noise_cancel", label: "Noise Cancel", kw: "noise" },
   { id: "normal", label: "Normal", kw: "normal" },
   { id: "transparency", label: "Transparency", kw: "transparen" },
 ];
 
-const TOGGLES = [
+interface ToggleDef {
+  key: ToggleKey;
+  label: string;
+}
+
+const TOGGLES: ToggleDef[] = [
   { key: "gamingMode", label: "Gaming Mode" },
   { key: "windNoise", label: "Wind Noise Suppression" },
   { key: "normalInCycle", label: "Normal Mode In Cycle" },
 ];
 
 /* ── SVG icons (inline, no lucide dep) ────────────────────────────── */
-function IconEar(props) {
+function IconEar(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10.5" />
@@ -43,7 +72,7 @@ function IconEar(props) {
     </svg>
   );
 }
-function IconVolume(props) {
+function IconVolume(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
@@ -52,7 +81,7 @@ function IconVolume(props) {
     </svg>
   );
 }
-function IconWaves(props) {
+function IconWaves(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M2 12h2a4 4 0 0 0 4-4V6" />
@@ -62,17 +91,26 @@ function IconWaves(props) {
     </svg>
   );
 }
-function IconX(props) {
+function IconX(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M18 6 6 18" /><path d="m6 6 12 12" />
     </svg>
   );
 }
-const ICONS = { noise_cancel: IconEar, normal: IconVolume, transparency: IconWaves };
+const ICONS: Record<SoundModeId, (props: SVGProps<SVGSVGElement>) => React.JSX.Element> = {
+  noise_cancel: IconEar,
+  normal: IconVolume,
+  transparency: IconWaves,
+};
 
 /* ── DeviceArt (earbuds SVG from real app) ─────────────────────────── */
-function DeviceArt({ name = "" }) {
+interface DeviceArtProps {
+  name?: string;
+}
+
+function DeviceArt({ name: _name = "" }: DeviceArtProps) {
+  void _name;
   const fill = "var(--demo-brand)";
   const lineColor = "#888888";
   return (
@@ -95,7 +133,11 @@ function DeviceArt({ name = "" }) {
 }
 
 /* ── Battery icon ──────────────────────────────────────────────────── */
-function BatteryIcon({ level }) {
+interface BatteryIconProps {
+  level?: number;
+}
+
+function BatteryIcon({ level }: BatteryIconProps) {
   const pct = Math.max(0, Math.min(100, level ?? 0));
   const color = pct > 50 ? "text-emerald-400" : pct > 20 ? "text-yellow-400" : "text-red-400";
   return (
@@ -109,13 +151,13 @@ function BatteryIcon({ level }) {
 
 /* ── LiveDemo: self-contained interactive app preview ──────────────── */
 export default function LiveDemo() {
-  const [device, setDevice] = useState({ ...MOCK_DEVICE });
+  const [device, setDevice] = useState<DeviceState>({ ...MOCK_DEVICE });
 
-  const setSoundMode = (mode) => setDevice((d) => ({ ...d, soundMode: mode }));
-  const setStrength = (v) => setDevice((d) => ({ ...d, strength: v }));
-  const setEqBand = (i, v) =>
+  const setSoundMode = (mode: SoundModeId): void => setDevice((d) => ({ ...d, soundMode: mode }));
+  const setStrength = (v: number): void => setDevice((d) => ({ ...d, strength: v }));
+  const setEqBand = (i: number, v: number): void =>
     setDevice((d) => ({ ...d, eq: d.eq.map((x, idx) => (idx === i ? v : x)) }));
-  const toggle = (key) => setDevice((d) => ({ ...d, [key]: !d[key] }));
+  const toggle = (key: ToggleKey): void => setDevice((d) => ({ ...d, [key]: !d[key] }));
 
   return (
     <div className="demo-shell relative rounded-xl border border-white/[0.06] bg-[#16162a] overflow-hidden shadow-2xl">
@@ -144,7 +186,7 @@ export default function LiveDemo() {
               </div>
             </div>
           </div>
-          <button className="-mr-1 -mt-1 self-start rounded-md p-1 text-white/30 transition hover:bg-white/5 hover:text-white/60">
+          <button type="button" className="-mr-1 -mt-1 self-start rounded-md p-1 text-white/30 transition hover:bg-white/5 hover:text-white/60">
             <IconX className="h-4 w-4" />
           </button>
         </header>
@@ -160,6 +202,7 @@ export default function LiveDemo() {
                 return (
                   <button
                     key={m.id}
+                    type="button"
                     onClick={() => setSoundMode(m.id)}
                     className={`relative flex flex-col items-center justify-center gap-1.5 rounded-md py-2.5 text-[11px] font-medium leading-tight transition-all ${
                       active
@@ -185,7 +228,7 @@ export default function LiveDemo() {
                   min={1}
                   max={5}
                   value={device.strength}
-                  onChange={(e) => setStrength(Number(e.target.value))}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setStrength(Number(e.target.value))}
                   className="demo-range w-full"
                 />
               </div>
@@ -206,7 +249,7 @@ export default function LiveDemo() {
                     max={EQ_MAX}
                     step={1}
                     value={device.eq[i]}
-                    onChange={(e) => setEqBand(i, Number(e.target.value))}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => setEqBand(i, Number(e.target.value))}
                     className="demo-eq-slider"
                   />
                   <span className="tabular-nums text-[8.5px] text-white/40">{BAND_LABEL(hz)}</span>
@@ -224,6 +267,7 @@ export default function LiveDemo() {
             {TOGGLES.map((t) => (
               <button
                 key={t.key}
+                type="button"
                 onClick={() => toggle(t.key)}
                 className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-white/[0.02]"
               >
