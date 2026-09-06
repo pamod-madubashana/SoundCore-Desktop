@@ -116,6 +116,8 @@ pub fn infer_model(name: &str) -> Option<DeviceModel> {
         SoundcoreA3935
     } else if n.contains("life 2 neo") || n.contains("life neo") {
         SoundcoreA3033
+    } else if n.contains("life p2 mini") {
+        SoundcoreA3944
     } else if n.contains("life p3") {
         SoundcoreA3939
     } else if n.contains("motion+") {
@@ -126,6 +128,8 @@ pub fn infer_model(name: &str) -> Option<DeviceModel> {
         SoundcoreA3948
     } else if n.contains("p40i") {
         SoundcoreA3955
+    } else if n.contains("q11i") {
+        SoundcoreA3005
     } else if n.contains("q20i") || n.contains("q20") {
         SoundcoreA3004
     } else if n.contains("vortex") {
@@ -138,6 +142,8 @@ pub fn infer_model(name: &str) -> Option<DeviceModel> {
         SoundcoreA3954
     } else if n.contains("v20i") {
         SoundcoreA3876
+    } else if n.contains("c30i") {
+        SoundcoreA3330
     } else if n.contains("c50i") {
         SoundcoreD1101
     } else if n.contains("sleep a30") {
