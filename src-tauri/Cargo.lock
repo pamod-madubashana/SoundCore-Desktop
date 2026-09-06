@@ -2769,11 +2769,11 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
 name = "openscq30-i18n"
-version = "2.11.0"
+version = "2.12.0"
 
 [[package]]
 name = "openscq30-i18n-macros"
-version = "2.11.0"
+version = "2.12.0"
 dependencies = [
  "heck 0.5.0",
  "openscq30-i18n",
@@ -2784,7 +2784,7 @@ dependencies = [
 
 [[package]]
 name = "openscq30-lib"
-version = "2.11.0"
+version = "2.12.0"
 dependencies = [
  "async-trait",
  "bitflags 2.13.0",
@@ -2819,11 +2819,11 @@ dependencies = [
 
 [[package]]
 name = "openscq30-lib-has"
-version = "2.11.0"
+version = "2.12.0"
 
 [[package]]
 name = "openscq30-lib-macros"
-version = "2.11.0"
+version = "2.12.0"
 dependencies = [
  "heck 0.5.0",
  "itertools",
@@ -3961,7 +3961,7 @@ dependencies = [
 
 [[package]]
 name = "soundcore-desktop"
-version = "1.3.0"
+version = "1.4.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
