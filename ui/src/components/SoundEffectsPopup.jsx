@@ -21,7 +21,7 @@ const PENDING_GRACE_MS = 2000;
 function RadioCircle({ active }) {
   return (
     <span className={"flex h-5 w-5 items-center justify-center rounded-full ring-2 transition " +
-      (active ? "bg-brand ring-brand" : "ring-white/20")}>
+      (active ? "bg-brand ring-brand" : "ring-[var(--border-strong)]")}>
       {active && <span className="h-2 w-2 rounded-full bg-white" />}
     </span>
   );
@@ -64,11 +64,11 @@ function SpatialAudioSection({ s, send, expanded, onToggle }) {
   };
 
   return (
-    <div className="rounded-2xl bg-surface ring-1 ring-white/[0.04] overflow-hidden">
+    <div className="rounded-2xl bg-surface ring-1 ring-[var(--border-subtle)] overflow-hidden">
       <button
         type="button"
         onClick={onToggle}
-        className="w-full flex items-center justify-between px-4 py-3 transition hover:bg-white/[0.02]"
+        className="w-full flex items-center justify-between px-4 py-3 transition hover:bg-[var(--hover-subtle)]"
       >
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10 text-brand">
@@ -94,7 +94,7 @@ function SpatialAudioSection({ s, send, expanded, onToggle }) {
                   "flex flex-col items-center justify-center gap-2 rounded-xl py-3 transition-all " +
                   (active
                     ? "bg-brand text-brand-foreground ring-2 ring-brand/50"
-                    : "bg-surface-elevated text-foreground/70 hover:bg-white/[0.06] ring-1 ring-white/[0.04]")
+                    : "bg-surface-elevated text-[color:oklch(from var(--foreground) l c h / 0.7)] hover:bg-[var(--hover-strong)] ring-1 ring-[var(--border-subtle)]")
                 }
               >
                 <Icon className="h-5 w-5" />
@@ -125,11 +125,11 @@ function DefaultPresetCard({ s, send, expanded, onToggle }) {
   };
 
   return (
-    <div className="rounded-2xl bg-surface ring-1 ring-white/[0.04] overflow-hidden">
+    <div className="rounded-2xl bg-surface ring-1 ring-[var(--border-subtle)] overflow-hidden">
       <button
         type="button"
         onClick={onToggle}
-        className="w-full flex items-center justify-between px-4 py-3 transition hover:bg-white/[0.02]"
+        className="w-full flex items-center justify-between px-4 py-3 transition hover:bg-[var(--hover-subtle)]"
       >
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10 text-brand">
@@ -165,7 +165,7 @@ function DefaultPresetCard({ s, send, expanded, onToggle }) {
                   "truncate rounded-full px-3 py-2 text-[12px] font-medium transition " +
                   (id === currentPreset
                     ? "bg-brand text-brand-foreground"
-                    : "bg-surface-elevated text-foreground/80 hover:bg-white/[0.08]")
+                    : "bg-surface-elevated text-[color:oklch(from var(--foreground) l c h / 0.8)] hover:bg-[var(--hover-strong)]")
                 }
               >
                 {label}
@@ -209,11 +209,11 @@ function CurvePreview({ bands, min, max }) {
 
 function CustomEQCard({ customPresetName, expanded, onToggle }) {
   return (
-    <div className="rounded-2xl bg-surface ring-1 ring-white/[0.04] overflow-hidden">
+    <div className="rounded-2xl bg-surface ring-1 ring-[var(--border-subtle)] overflow-hidden">
       <button
         type="button"
         onClick={onToggle}
-        className="w-full flex items-center justify-between px-4 py-3 transition hover:bg-white/[0.02]"
+        className="w-full flex items-center justify-between px-4 py-3 transition hover:bg-[var(--hover-subtle)]"
       >
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10 text-brand">
@@ -322,10 +322,10 @@ export default function SoundEffectsPopup({
 
   if (showEqualizer) {
     return (
-      <div className="absolute inset-0 z-50 flex flex-col bg-background animate-slide-up">
-        <header className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.05]">
+      <div className="absolute inset-0 z-50 flex flex-col animate-slide-up rounded-2xl overflow-hidden" style={{ background: "oklch(0.18 0.015 250)" }}>
+        <header className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border-medium)]">
           <button onClick={() => setShowEqualizer(false)}
-            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/5 transition">
+            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-[var(--hover-medium)] transition">
             <ChevronLeft className="h-5 w-5" />
           </button>
           <h2 className="text-[15px] font-semibold text-foreground">Custom EQ</h2>
@@ -348,16 +348,16 @@ export default function SoundEffectsPopup({
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-background animate-slide-up">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 border-b border-white/[0.05]">
+      <header className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-medium)]">
         <div className="flex items-center gap-3">
           <button onClick={onClose}
-            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/5 transition">
+            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-[var(--hover-medium)] transition">
             <ChevronLeft className="h-5 w-5" />
           </button>
           <h2 className="text-[15px] font-semibold text-foreground">Sound Effects</h2>
         </div>
         <button onClick={onClose}
-          className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/5 transition">
+          className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-[var(--hover-medium)] transition">
           <X className="h-4 w-4" />
         </button>
       </header>

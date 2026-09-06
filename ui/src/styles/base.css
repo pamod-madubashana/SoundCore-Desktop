@@ -1,0 +1,59 @@
+/* base.css — Global resets, Tailwind theme bridge, animations, scrollbar */
+
+/* Tailwind v4 design-token bridge */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-popover: var(--popover);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-success: var(--success);
+  --color-destructive: var(--destructive);
+  --shadow-popup: var(--shadow-popup-token);
+  --shadow-glow: 0 0 32px -4px var(--brand-glow);
+}
+
+/* Global resets */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  color: var(--foreground);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Windows theme: ensure transparency for backdrop */
+.theme-windows html,
+.theme-windows body,
+.theme-windows #root {
+  background: transparent;
+}
+
+* { border-color: var(--border-subtle); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 7px; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 8px; }
+.scrollbar-hidden::-webkit-scrollbar { display: none; }
+.scrollbar-hidden { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Animations */
+@keyframes slide-up {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.animate-slide-up { animation: slide-up 0.25s ease-out; }
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fade-in { animation: fade-in 0.18s ease-out; }

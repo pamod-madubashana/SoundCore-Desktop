@@ -1,0 +1,23 @@
+/* components.css — Shared component styles using semantic tokens */
+
+/* Popup window container — default (opaque) */
+.popup-window {
+  background: var(--popup-bg);
+  backdrop-filter: var(--popup-blur, none);
+  -webkit-backdrop-filter: var(--popup-blur, none);
+  box-shadow: var(--shadow-popup-token);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius);
+}
+
+/* Brand glow effect */
+.brand-glow { box-shadow: var(--shadow-glow); }
+
+/* EQ track gradient */
+.eq-track {
+  background: linear-gradient(180deg, transparent 0%, var(--border-subtle) 50%, transparent 100%);
+}
+.eq-track-readonly {
+  background: linear-gradient(180deg, transparent 0%, var(--border-subtle) 50%, transparent 100%);
+  opacity: 0.6;
+}

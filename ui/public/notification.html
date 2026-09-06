@@ -1,33 +1,57 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <style>
+    /* Default dark theme values (matches SoundCore default) */
+    :root {
+      --bg: rgba(30, 30, 38, 0.95);
+      --text: #f0f0f0;
+      --text-muted: #999;
+      --brand: oklch(0.78 0.16 195);
+      --success: oklch(0.78 0.16 160);
+      --destructive: oklch(0.65 0.22 25);
+      --border: rgba(255, 255, 255, 0.06);
+    }
+
+    /* Windows light mode */
+    html[data-mode="light"] {
+      --bg: rgba(249, 249, 249, 0.95);
+      --text: #1a1a1a;
+      --text-muted: #666;
+      --border: rgba(0, 0, 0, 0.08);
+    }
+
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { background: transparent; overflow: hidden; height: 100%; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+    html, body {
+      background: transparent;
+      overflow: hidden;
+      height: 100%;
+      font-family: "Segoe UI Variable", "Segoe UI", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    }
     .toast {
       display: flex; align-items: center; gap: 14px; height: 100%;
       padding: 14px 20px; border-radius: 14px;
-      background: rgba(30, 30, 38, 0.95);
+      background: var(--bg);
       backdrop-filter: blur(12px);
-      box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.06);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px var(--border);
       animation: slide-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
     }
     .icon {
       width: 52px; height: 52px; border-radius: 12px; overflow: hidden;
       display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0; color: oklch(0.78 0.16 195);
+      flex-shrink: 0; color: var(--brand);
     }
     .icon img { width: 100%; height: 100%; object-fit: cover; }
     .icon svg { width: 36px; height: 36px; }
     .info { min-width: 0; }
-    .name { font-size: 14px; font-weight: 600; color: #f0f0f0; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px; }
+    .name { font-size: 14px; font-weight: 600; color: var(--text); letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 240px; }
     .status { font-size: 12px; font-weight: 500; margin-top: 2px; }
-    .status.connected { color: oklch(0.78 0.16 160); }
-    .status.disconnected { color: oklch(0.65 0.22 25); }
+    .status.connected { color: var(--success); }
+    .status.disconnected { color: var(--destructive); }
     .batteries { display: flex; gap: 14px; margin-top: 6px; }
-    .bat { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #ccc; font-weight: 500; }
-    .bat-label { font-weight: 700; color: #999; font-size: 11px; }
+    .bat { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text); font-weight: 500; }
+    .bat-label { font-weight: 700; color: var(--text-muted); font-size: 11px; }
     .bat-icon { flex-shrink: 0; }
     @keyframes slide-in {
       from { opacity: 0; transform: translateY(10px) scale(0.97); }
@@ -45,6 +69,27 @@
     </div>
   </div>
   <script>
+    // Detect platform and set theme mode before rendering
+    (async function() {
+      const html = document.documentElement;
+      try {
+        const platform = await window.__TAURI__.core.invoke("get_platform");
+        if (platform === "windows") {
+          html.classList.add("theme-windows");
+          const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? true;
+          html.dataset.mode = prefersDark ? "dark" : "light";
+          // Listen for system theme changes
+          window.matchMedia?.("(prefers-color-scheme: dark)")?.addEventListener("change", (e) => {
+            html.dataset.mode = e.matches ? "dark" : "light";
+          });
+        } else {
+          html.dataset.mode = "dark";
+        }
+      } catch {
+        html.dataset.mode = "dark";
+      }
+    })();
+
     const { invoke } = window.__TAURI__.core;
     const { listen } = window.__TAURI__.event;
 

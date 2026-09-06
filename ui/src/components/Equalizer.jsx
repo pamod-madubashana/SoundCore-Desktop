@@ -134,7 +134,7 @@ function BandSlider({ hz, value, min, max, fd, disabled, onChange, onCommit }) {
         }
       >
         <span
-          className="absolute left-1/2 top-0 w-[2px] -translate-x-1/2 rounded-full bg-white/45"
+          className="absolute left-1/2 top-0 w-[2px] -translate-x-1/2 rounded-full bg-[var(--track-above)]"
           style={{ height: `${100 - pct}%` }}
         />
         <span
@@ -196,7 +196,7 @@ function SaveDialog({ bands, model, onSaved, onCancel }) {
   };
 
   return (
-    <div className="flex items-center gap-2 rounded-xl bg-surface-elevated p-3 ring-1 ring-white/[0.06]">
+    <div className="flex items-center gap-2 rounded-xl bg-surface-elevated p-3 ring-1 ring-[var(--border-medium)]">
       <input
         type="text"
         value={name}
@@ -217,7 +217,7 @@ function SaveDialog({ bands, model, onSaved, onCancel }) {
       <button
         type="button"
         onClick={onCancel}
-        className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/5 text-muted-foreground transition hover:text-foreground"
+        className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--hover-medium)] text-muted-foreground transition hover:text-foreground"
       >
         <X className="h-3.5 w-3.5" />
       </button>
@@ -240,7 +240,7 @@ function PresetRow({ entry, active, readOnly, onSelect, onRename, onDelete }) {
 
   if (editing) {
     return (
-      <div className="flex items-center gap-2 border-b border-white/[0.04] px-4 py-2.5">
+      <div className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-4 py-2.5">
         <input
           type="text"
           value={draft}
@@ -265,7 +265,7 @@ function PresetRow({ entry, active, readOnly, onSelect, onRename, onDelete }) {
   return (
     <div
       className={"group flex items-center gap-2 px-4 py-2.5 text-[13px] cursor-pointer transition " +
-        (active ? "bg-brand/15 text-brand" : "text-foreground hover:bg-white/[0.04]")}
+        (active ? "bg-brand/15 text-brand" : "text-foreground hover:bg-[var(--hover-subtle)]")}
       onClick={() => onSelect(id)}
     >
       <span className="flex-1 truncate">{label}</span>
@@ -273,13 +273,13 @@ function PresetRow({ entry, active, readOnly, onSelect, onRename, onDelete }) {
         <span className="hidden group-hover:flex items-center gap-1">
           <button
             onClick={(e) => { e.stopPropagation(); setDraft(label); setEditing(true); }}
-            className="p-0.5 rounded hover:bg-white/10 text-muted-foreground hover:text-foreground"
+            className="p-0.5 rounded hover:bg-[var(--icon-hover)] text-muted-foreground hover:text-foreground"
           >
             <Pencil className="h-3 w-3" />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(customId); }}
-            className="p-0.5 rounded hover:bg-white/10 text-muted-foreground hover:text-red-400"
+            className="p-0.5 rounded hover:bg-[var(--icon-hover)] text-muted-foreground hover:text-[var(--error-text)]"
           >
             <Trash2 className="h-3 w-3" />
           </button>
@@ -298,7 +298,7 @@ function PresetPopup({ entries, activeId, readOnly, onSelect, onRename, onDelete
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex w-full items-center justify-between gap-2 rounded-xl bg-surface-elevated px-3.5 py-2.5 text-[13px] font-medium text-foreground transition hover:bg-white/[0.06] ring-1 ring-white/[0.06]"
+        className="flex w-full items-center justify-between gap-2 rounded-xl bg-surface-elevated px-3.5 py-2.5 text-[13px] font-medium text-foreground transition hover:bg-[var(--hover-strong)] ring-1 ring-[var(--border-medium)]"
       >
         <span className="truncate">{activeLabel || "Custom"}</span>
         <ChevronDown className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
@@ -307,12 +307,12 @@ function PresetPopup({ entries, activeId, readOnly, onSelect, onRename, onDelete
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50" onClick={() => setOpen(false)}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[var(--overlay-bg)]" onClick={() => setOpen(false)}>
       <div
-        className="mx-4 w-full max-w-xs max-h-80 overflow-y-auto rounded-2xl bg-surface-elevated ring-1 ring-white/[0.08] shadow-xl"
+        className="mx-4 w-full max-w-xs max-h-80 overflow-y-auto rounded-2xl bg-surface-elevated ring-1 ring-[var(--border-medium)] shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 flex items-center justify-between border-b border-white/[0.06] bg-surface-elevated px-4 py-3">
+        <div className="sticky top-0 flex items-center justify-between border-b border-[var(--border-medium)] bg-surface-elevated px-4 py-3">
           <span className="text-[14px] font-semibold text-foreground">Presets</span>
           <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground">
             <X className="h-4 w-4" />
@@ -506,13 +506,13 @@ export default function Equalizer({
   const activeLabel = entries.find((e) => e.id === activeId)?.label ?? null;
 
   return (
-    <div className="mb-2 overflow-hidden rounded-2xl bg-surface ring-1 ring-white/[0.04]">
+    <div className="mb-2 overflow-hidden rounded-2xl bg-surface ring-1 ring-[var(--border-subtle)]">
       {/* header / disclosure */}
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="flex w-full items-center gap-2.5 px-3.5 py-3 text-left transition hover:bg-white/[0.02]"
+        className="flex w-full items-center gap-2.5 px-3.5 py-3 text-left transition hover:bg-[var(--hover-subtle)]"
       >
         <SlidersHorizontal className="h-4 w-4 flex-shrink-0 text-brand" />
         <span className="text-[14px] font-semibold text-brand">Equalizer</span>
@@ -547,11 +547,11 @@ export default function Equalizer({
                 {Array.from({ length: 7 }).map((_, i) => (
                   <span
                     key={i}
-                    className="absolute inset-x-0 h-px bg-white/[0.07]"
+                    className="absolute inset-x-0 h-px bg-[var(--border-subtle)]"
                     style={{ top: `${(i / 6) * 100}%` }}
                   />
                 ))}
-                <span className="absolute inset-x-0 top-0 h-px bg-white/25" />
+                <span className="absolute inset-x-0 top-0 h-px bg-[var(--border-strong)]" />
               </div>
               <div className="relative flex items-end justify-between gap-0.5">
                 {bandHz.map((hz, i) => (
@@ -596,7 +596,7 @@ export default function Equalizer({
                 <button
                   type="button"
                   onClick={() => setShowSave(true)}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-surface-elevated px-3 py-2 text-[12px] font-medium text-brand transition hover:bg-white/[0.06] ring-1 ring-white/[0.06]"
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-surface-elevated px-3 py-2 text-[12px] font-medium text-brand transition hover:bg-[var(--hover-strong)] ring-1 ring-[var(--border-medium)]"
                 >
                   <Save className="h-3.5 w-3.5" /> Save as preset
                 </button>
@@ -605,7 +605,7 @@ export default function Equalizer({
                 type="button"
                 onClick={reset}
                 disabled={readOnly}
-                className={"flex items-center justify-center gap-1.5 rounded-xl bg-surface-elevated px-3 py-2 text-[12px] font-medium text-muted-foreground transition hover:text-brand ring-1 ring-white/[0.06] disabled:opacity-50" + (!readOnly && isCustomBands && !showSave ? "" : " flex-1")}
+                className={"flex items-center justify-center gap-1.5 rounded-xl bg-surface-elevated px-3 py-2 text-[12px] font-medium text-muted-foreground transition hover:text-brand ring-1 ring-[var(--border-medium)] disabled:opacity-50" + (!readOnly && isCustomBands && !showSave ? "" : " flex-1")}
               >
                 <RotateCcw className="h-3.5 w-3.5" /> Reset to flat
               </button>

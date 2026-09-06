@@ -184,7 +184,6 @@ export default function App() {
         {active
           ? <Device d={active} updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={handleStartUpdate} onDismissUpdate={handleDismissUpdate} />
           : <Searching updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={handleStartUpdate} onDismissUpdate={handleDismissUpdate} />}
-        <Footer />
       </section>
     </main>
   );
@@ -205,23 +204,23 @@ function Searching({ updateInfo, updateProgress, updateError, onStartUpdate }) {
       )}
       {updateProgress && updateProgress.phase === "downloading" && (
         <div className="mt-2 w-48">
-          <div className="flex items-center justify-between text-[10px] text-muted-foreground/60 mb-1">
+          <div className="flex items-center justify-between text-[10px] text-[color:oklch(from var(--muted-foreground) l c h / 0.6)] mb-1">
             <span>Downloading...</span>
             <span>{Math.round(updateProgress.percent)}%</span>
           </div>
-          <div className="h-1 rounded-full bg-white/10 overflow-hidden">
+          <div className="h-1 rounded-full bg-[var(--toggle-off)] overflow-hidden">
             <div className="h-full rounded-full bg-brand transition-all duration-200" style={{ width: `${updateProgress.percent}%` }} />
           </div>
         </div>
       )}
       {updateProgress && updateProgress.phase !== "downloading" && (
-        <div className="mt-2 flex items-center gap-1.5 text-[10px] text-muted-foreground/60">
+        <div className="mt-2 flex items-center gap-1.5 text-[10px] text-[color:oklch(from var(--muted-foreground) l c h / 0.6)]">
           <Loader2 className="h-3 w-3 animate-spin" />
           <span>{updateProgress.message}</span>
         </div>
       )}
       {updateError && (
-        <div className="mt-2 text-[10px] text-red-400/80 truncate" title={updateError}>{updateError}</div>
+        <div className="mt-2 text-[10px] text-[var(--error-text)] truncate" title={updateError}>{updateError}</div>
       )}
     </div>
   );
@@ -253,36 +252,41 @@ function Device({ d, updateInfo, updateProgress, updateError, onStartUpdate, onD
 
   return (
     <>
-      <Header d={d} s={s} updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={onStartUpdate} onDismissUpdate={onDismissUpdate} />
-      <div className="flex-1 flex flex-col px-4 py-4 gap-4 overflow-hidden">
-        {s.ambientSoundMode && <SoundMode s={s} send={send} />}
+      {!showSoundEffects && (
+        <>
+          <Header d={d} s={s} updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={onStartUpdate} onDismissUpdate={onDismissUpdate} />
+          <div className="flex-1 flex flex-col px-4 py-4 gap-4 overflow-hidden">
+            {s.ambientSoundMode && <SoundMode s={s} send={send} />}
 
-        {/* Sound Effects nav item */}
-        {(s.volumeAdjustments || s.spatialAudio) && (
-          <button
-            type="button"
-            onClick={() => setShowSoundEffects(true)}
-            className="w-full rounded-2xl bg-surface ring-1 ring-white/[0.04] px-4 py-3 flex items-center justify-between transition hover:bg-white/[0.02]"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10 text-brand">
-                <SlidersHorizontal className="h-5 w-5" />
-              </div>
-              <div className="text-left">
-                <span className="text-[14px] font-medium text-foreground">Sound Effects</span>
-                {currentPreset && (
-                  <span className="ml-2 text-[12px] text-muted-foreground">{currentPreset}</span>
-                )}
-              </div>
+            {/* Sound Effects nav item */}
+            {(s.volumeAdjustments || s.spatialAudio) && (
+              <button
+                type="button"
+                onClick={() => setShowSoundEffects(true)}
+                className="w-full rounded-2xl bg-surface ring-1 ring-[var(--border-subtle)] px-4 py-3 flex items-center justify-between transition hover:bg-[var(--hover-subtle)]"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                    <SlidersHorizontal className="h-5 w-5" />
+                  </div>
+                  <div className="text-left">
+                    <span className="text-[14px] font-medium text-foreground">Sound Effects</span>
+                    {currentPreset && (
+                      <span className="ml-2 text-[12px] text-muted-foreground">{currentPreset}</span>
+                    )}
+                  </div>
+                </div>
+                <ChevronRightIcon className="h-4 w-4 text-muted-foreground" />
+              </button>
+            )}
+
+            <div className="flex-1 overflow-y-auto min-h-0 scrollbar-hidden">
+              <QuickToggles s={s} send={send} />
             </div>
-            <ChevronRightIcon className="h-4 w-4 text-muted-foreground" />
-          </button>
-        )}
-
-        <div className="flex-1 overflow-y-auto min-h-0 scrollbar-hidden">
-          <QuickToggles s={s} send={send} />
-        </div>
-      </div>
+          </div>
+          <Footer />
+        </>
+      )}
 
       {showSoundEffects && (
         <SoundEffectsPopup
@@ -303,7 +307,7 @@ const APP_VERSION = "1.3.0";
 
 function Footer() {
   return (
-    <div className="px-3 py-2 flex items-center justify-between text-[10px] text-muted-foreground/60">
+    <div className="px-3 py-2 flex items-center justify-between text-[10px] text-[color:oklch(from var(--muted-foreground) l c h / 0.6)]">
       <span>v{APP_VERSION}</span>
       <button onClick={() => invoke("open_url", { url: "https://github.com/pamod-madubashana/SoundCore-Desktop" })}
         className="hover:text-muted-foreground transition cursor-pointer">GitHub</button>
@@ -335,7 +339,7 @@ function BatteryIcon({ level, label }) {
   return (
     <span className="inline-flex items-center gap-1">
       {label && (
-        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/10 text-[8px] font-bold text-foreground/70">
+        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--toggle-off)] text-[8px] font-bold text-[color:oklch(from var(--foreground) l c h / 0.7)]">
           {label === "Case" ? (
             <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="2" y="7" width="20" height="14" rx="2" />
@@ -364,14 +368,14 @@ function Header({ d, s, updateInfo, updateProgress, updateError, onStartUpdate, 
   const showUpdateBadge = updateInfo && !updateProgress;
 
   return (
-    <header className="p-4 flex items-center gap-4 border-b border-white/[0.05]">
-      <div className={"relative overflow-hidden flex-shrink-0 flex items-center justify-center text-brand " + (d.image ? "h-28 w-28" : "h-14 w-14 rounded-xl bg-surface-elevated ring-1 ring-white/5")}>
+    <header className="p-4 flex items-center gap-4 border-b border-[var(--border-medium)]">
+      <div className={"relative overflow-hidden flex-shrink-0 flex items-center justify-center text-brand " + (d.image ? "h-28 w-28" : "h-14 w-14 rounded-xl bg-surface-elevated ring-1 ring-[var(--border-subtle)]")}>
         <DeviceArt name={d.name} url={d.image} color={d.color} />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <h1 className="text-[15px] font-semibold tracking-tight truncate">{d.name?.replace(/^soundcore\s+/i, '') || d.model}</h1>
-          <span className={"h-1.5 w-1.5 rounded-full " + (d.connected ? "bg-success brand-glow" : "bg-white/20")} />
+          <span className={"h-1.5 w-1.5 rounded-full " + (d.connected ? "bg-success brand-glow" : "bg-[var(--toggle-off)]")} />
         </div>
         {batteries.length > 0 && (
           <div className="flex items-center gap-3 mt-2">
@@ -385,35 +389,35 @@ function Header({ d, s, updateInfo, updateProgress, updateError, onStartUpdate, 
         )}
         {updateProgress && updateProgress.phase === "downloading" && (
           <div className="mt-2">
-            <div className="flex items-center justify-between text-[10px] text-muted-foreground/60 mb-1">
+            <div className="flex items-center justify-between text-[10px] text-[color:oklch(from var(--muted-foreground) l c h / 0.6)] mb-1">
               <span>Downloading update...</span>
               <span>{Math.round(updateProgress.percent)}%</span>
             </div>
-            <div className="h-1 rounded-full bg-white/10 overflow-hidden">
+            <div className="h-1 rounded-full bg-[var(--toggle-off)] overflow-hidden">
               <div className="h-full rounded-full bg-brand transition-all duration-200" style={{ width: `${updateProgress.percent}%` }} />
             </div>
           </div>
         )}
         {updateProgress && updateProgress.phase !== "downloading" && (
-          <div className="mt-2 flex items-center gap-1.5 text-[10px] text-muted-foreground/60">
+          <div className="mt-2 flex items-center gap-1.5 text-[10px] text-[color:oklch(from var(--muted-foreground) l c h / 0.6)]">
             <Loader2 className="h-3 w-3 animate-spin" />
             <span>{updateProgress.message}</span>
           </div>
         )}
         {updateError && (
-          <div className="mt-2 text-[10px] text-red-400/80 truncate" title={updateError}>{updateError}</div>
+          <div className="mt-2 text-[10px] text-[var(--error-text)] truncate" title={updateError}>{updateError}</div>
         )}
       </div>
       <div className="flex items-center gap-0.5 self-start -mt-1 -mr-1">
         {showUpdateBadge && (
           <button onClick={onStartUpdate} title={`Update to v${updateInfo.latest_version}`}
-            className="p-1 rounded-md text-brand hover:bg-brand/10 transition relative">
+            className="p-1 rounded-md text-brand hover:bg-[var(--hover-medium)] transition relative">
             <Download className="h-4 w-4" />
             <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-brand animate-pulse" />
           </button>
         )}
         <button onClick={() => invoke("hide_window")} title="Hide"
-          className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/5 transition">
+          className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-[var(--hover-medium)] transition">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -451,14 +455,14 @@ function SoundMode({ s, send }) {
   };
 
   return (
-    <div className="rounded-xl bg-surface p-3 ring-1 ring-white/[0.04]">
-      <div className="grid grid-cols-3 gap-1.5 p-1 rounded-lg bg-black/30">
+      <div className="rounded-xl bg-surface p-3 ring-1 ring-[var(--border-subtle)]">
+      <div className="grid grid-cols-3 gap-1.5 p-1 rounded-lg bg-[var(--overlay-bg)]">
         {modes.map(({ opt, label, Icon }) => {
           const activeMode = opt === localValue;
           return (
             <button key={opt} onClick={() => handleMode(opt)}
               className={"relative flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-md text-[11px] font-medium leading-tight transition-all " +
-                (activeMode ? "bg-brand text-brand-foreground brand-glow" : "text-muted-foreground hover:text-foreground hover:bg-white/5")}>
+                (activeMode ? "bg-brand text-brand-foreground brand-glow" : "text-muted-foreground hover:text-foreground hover:bg-[var(--hover-medium)]")}>
               <Icon className="h-4 w-4" />
               {label}
             </button>
@@ -506,7 +510,7 @@ function QuickToggles({ s, send }) {
     .sort((a, b) => (/gam/i.test(a.id) ? -1 : /gam/i.test(b.id) ? 1 : 0));
   if (toggles.length === 0) return null;
   return (
-    <div className="rounded-xl bg-surface ring-1 ring-white/[0.04] divide-y divide-white/[0.04]">
+    <div className="rounded-xl bg-surface ring-1 ring-[var(--border-subtle)] divide-y divide-[var(--border-subtle)]">
       {toggles.map((t) => <ToggleRow key={t.id} t={t} send={send} />)}
     </div>
   );
@@ -529,10 +533,10 @@ function ToggleRow({ t, send }) {
 
   return (
     <button onClick={handleClick}
-      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/[0.02] transition text-left">
+      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--hover-subtle)] transition text-left">
       <div className="flex-1 min-w-0 text-[13px] font-medium">{pretty(t.id)}</div>
-      <span className={"relative h-[18px] w-8 rounded-full transition-colors flex-shrink-0 " + (localOn ? "bg-brand" : "bg-white/10")}>
-        <span className={"absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white shadow transition-all " + (localOn ? "left-[16px]" : "left-[2px]")} />
+      <span className={"relative h-[18px] w-8 rounded-full transition-colors flex-shrink-0 " + (localOn ? "bg-brand" : "bg-[var(--toggle-off)]")}>
+        <span className={"absolute top-[2px] h-[14px] w-[14px] rounded-full bg-[var(--toggle-thumb)] shadow transition-all " + (localOn ? "left-[16px]" : "left-[2px]")} />
       </span>
     </button>
   );
