@@ -17,6 +17,10 @@
 }
 
 /* Global resets */
+html {
+  /* ~10% smaller type scale to match the popup zoom. */
+  font-size: 14.5px;
+}
 html, body, #root {
   height: 100%;
   margin: 0;
