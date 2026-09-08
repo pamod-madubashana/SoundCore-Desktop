@@ -3,7 +3,7 @@ import {
   Volume2, Waves, Ear, Loader2, X, Download, SlidersHorizontal,
 } from "lucide-react";
 import SoundEffectsPopup from "./components/SoundEffectsPopup";
-import { matchCustomPreset, soundEffectLabel } from "./lib/soundEffects";
+import { matchCustomPreset, selectEntries, soundEffectLabel } from "./lib/soundEffects";
 const invoke = (window as any).__TAURI__?.core?.invoke ?? (async () => {});
 
 // Device-type illustration picked from the name (no reliable per-model photo source exists).
@@ -434,6 +434,28 @@ function pickOption(options: string[], kw: string): string | undefined {
 }
 
 interface SoundModeProps { s: Record<string, any>; send: (id: string, raw: string) => void }
+// Optimistic grace so a tap survives the 900ms get_states poll.
+const SOUND_MODE_GRACE_MS = 2000;
+
+function SubSelectRow({ setting, localValue, onPick }: { setting: any; localValue: string; onPick: (id: string) => void }) {
+  const entries = selectEntries(setting);
+  if (entries.length === 0) return null;
+  return (
+    <div className={"mt-2 grid w-full gap-1.5 p-1 rounded-lg bg-[var(--overlay-bg)] " + (entries.length <= 2 ? "grid-cols-2" : "grid-cols-3")}>
+      {entries.map(({ id, label }) => {
+        const active = id === localValue;
+        return (
+          <button key={id} onClick={() => { if (id !== localValue) onPick(id); }}
+            className={"relative flex w-full flex-1 flex-col items-center justify-center gap-1.5 py-2.5 rounded-md text-[11px] font-medium leading-tight transition-all " +
+              (active ? "bg-brand text-brand-foreground brand-glow" : "text-muted-foreground hover:text-foreground hover:bg-[var(--hover-medium)]")}>
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function SoundMode({ s, send }: SoundModeProps) {
   const setting = s.ambientSoundMode;
   const opts = setting.setting.options;
@@ -446,12 +468,55 @@ function SoundMode({ s, send }: SoundModeProps) {
   const [localValue, setLocalValue] = useState(setting.value);
   const lastLocal = useRef<number>(0);
   useEffect(() => {
-    if (Date.now() - lastLocal.current < 500) return;
+    if (Date.now() - lastLocal.current < SOUND_MODE_GRACE_MS) return;
     setLocalValue(setting.value);
   }, [setting.value]);
 
+  const transparency = s.transparencyMode;
+  const [transLocal, setTransLocal] = useState<string | undefined>(transparency?.value);
+  const lastTrans = useRef<number>(0);
+  useEffect(() => {
+    if (!transparency) return;
+    if (Date.now() - lastTrans.current < SOUND_MODE_GRACE_MS) return;
+    setTransLocal(transparency.value);
+  }, [transparency?.value]);
+
+  const ncModeSetting = s.noiseCancelingMode;
+  const [ncLocal, setNcLocal] = useState<string | undefined>(ncModeSetting?.value);
+  const lastNc = useRef<number>(0);
+  useEffect(() => {
+    if (!ncModeSetting) return;
+    if (Date.now() - lastNc.current < SOUND_MODE_GRACE_MS) return;
+    setNcLocal(ncModeSetting.value);
+  }, [ncModeSetting?.value]);
+
+  const multiScene = s.multiSceneNoiseCanceling;
+  const [multiLocal, setMultiLocal] = useState<string | undefined>(multiScene?.value);
+  const lastMulti = useRef<number>(0);
+  useEffect(() => {
+    if (!multiScene) return;
+    if (Date.now() - lastMulti.current < SOUND_MODE_GRACE_MS) return;
+    setMultiLocal(multiScene.value);
+  }, [multiScene?.value]);
+
+  const ambientResolved = localValue ?? setting.value;
+  const ambientText = String(ambientResolved ?? "");
+  const isAmbientNoise = /noise/i.test(ambientText);
+  const isAmbientNormal = /normal/i.test(ambientText);
+  const isAmbientTransparency = /transparen/i.test(ambientText);
+  // Strict gate: true only for NoiseCancel. Explicitly false for Normal and
+  // Transparency in all cases (optimistic localValue wins over stale poll
+  // value; case-insensitive so opt-casing mismatches can't leak Strength).
+  const isNoiseCancel = isAmbientNoise && !isAmbientNormal && !isAmbientTransparency;
+  const isTransparency = isAmbientTransparency && !isAmbientNoise && !isAmbientNormal;
+
+  const ncValue = ncLocal ?? ncModeSetting?.value;
+  const isManual = ncModeSetting ? /manual/i.test(String(ncValue ?? "")) : true;
+  const isAdaptive = ncModeSetting ? /adapt/i.test(String(ncValue ?? "")) : false;
+  const isMultiScene = ncModeSetting ? /multi/i.test(String(ncValue ?? "")) : false;
+
   const manual = s.manualNoiseCanceling;
-  const showStrength = manual && /noise/i.test(localValue || "");
+  const showStrength = Boolean(manual) && isNoiseCancel && (ncModeSetting ? isManual : true);
 
   const handleMode = (opt: string) => {
     lastLocal.current = Date.now();
@@ -474,6 +539,21 @@ function SoundMode({ s, send }: SoundModeProps) {
           );
         })}
       </div>
+      {isTransparency && transparency && (
+        <SubSelectRow setting={transparency} localValue={transLocal ?? transparency.value}
+          onPick={(id) => { lastTrans.current = Date.now(); setTransLocal(id); send("transparencyMode", id); }} />
+      )}
+      {isNoiseCancel && ncModeSetting && (
+        <SubSelectRow setting={ncModeSetting} localValue={ncValue ?? ncModeSetting.value}
+          onPick={(id) => { lastNc.current = Date.now(); setNcLocal(id); send("noiseCancelingMode", id); }} />
+      )}
+      {isNoiseCancel && isMultiScene && multiScene && (
+        <SubSelectRow setting={multiScene} localValue={multiLocal ?? multiScene.value}
+          onPick={(id) => { lastMulti.current = Date.now(); setMultiLocal(id); send("multiSceneNoiseCanceling", id); }} />
+      )}
+      {isNoiseCancel && isAdaptive && s.adaptiveNoiseCanceling?.value != null && String(s.adaptiveNoiseCanceling.value) !== "" && (
+        <div className="mt-2 px-1 text-[11px] text-muted-foreground">{String(s.adaptiveNoiseCanceling.value)}</div>
+      )}
       {showStrength && <Strength setting={manual} send={send} />}
     </div>
   );
