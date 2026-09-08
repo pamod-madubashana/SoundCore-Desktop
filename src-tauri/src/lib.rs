@@ -495,11 +495,18 @@ fn position_bottom_right(window: &WebviewWindow) -> Option<(i32, i32)> {
         let mpos = monitor.position();
         let scale = monitor.scale_factor();
         let wsize = window.outer_size().unwrap_or(tauri::PhysicalSize::new(440, 620));
-        let margin = (12.0 * scale) as i32;
+        let margin_x = (12.0 * scale) as i32;
+        // Small consistent gap above the taskbar so the popup sits closer to it.
+        let margin_y = (6.0 * scale) as i32;
         let taskbar = (48.0 * scale) as i32;
-        let x = mpos.x + msize.width as i32 - wsize.width as i32 - margin;
-        let y = mpos.y + msize.height as i32 - wsize.height as i32 - margin - taskbar;
-        let pos = (x.max(0), y.max(0));
+        let x = mpos.x + msize.width as i32 - wsize.width as i32 - margin_x;
+        let y = mpos.y + msize.height as i32 - wsize.height as i32 - margin_y - taskbar;
+        // Clamp to the current monitor so the popup never goes off-screen or
+        // overlaps the taskbar reserve.
+        let max_x = (mpos.x + msize.width as i32 - wsize.width as i32).max(mpos.x);
+        let max_y =
+            (mpos.y + msize.height as i32 - wsize.height as i32 - taskbar).max(mpos.y);
+        let pos = (x.clamp(mpos.x, max_x), y.clamp(mpos.y, max_y));
         let _ = window.set_position(PhysicalPosition::new(pos.0, pos.1));
         return Some(pos);
     }
