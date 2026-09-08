@@ -21,7 +21,7 @@ const PENDING_GRACE_MS = 2000;
 interface RadioCircleProps { active: boolean }
 function RadioCircle({ active }: RadioCircleProps) {
   return (
-    <span className={"flex h-5 w-5 items-center justify-center rounded-full ring-2 transition " +
+    <span className={"flex h-4 w-4 items-center justify-center rounded-full ring-2 transition " +
       (active ? "bg-brand ring-brand" : "ring-[var(--border-strong)]")}>
       {active && <span className="h-2 w-2 rounded-full bg-white" />}
     </span>
@@ -70,11 +70,11 @@ function SpatialAudioSection({ s, send, expanded, onToggle }: SpatialAudioSectio
       <button
         type="button"
         onClick={onToggle}
-        className="w-full flex items-center justify-between px-4 py-3 transition hover:bg-[var(--hover-subtle)]"
+        className="w-full flex items-center justify-between px-3 py-2.5 transition hover:bg-[var(--hover-subtle)]"
       >
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10 text-brand">
-            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand/10 text-brand">
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
             </svg>
           </div>
@@ -84,7 +84,7 @@ function SpatialAudioSection({ s, send, expanded, onToggle }: SpatialAudioSectio
       </button>
 
       {expanded && (
-        <div className="grid grid-cols-3 gap-2 px-4 pb-4 pt-1">
+        <div className="grid grid-cols-3 gap-1.5 px-3 pb-3 pt-1">
           {modes.map(({ id, label, Icon }: { id: string; label: string; Icon: React.ComponentType<{ className?: string }> }) => {
             const active = id === localMode;
             return (
@@ -99,7 +99,7 @@ function SpatialAudioSection({ s, send, expanded, onToggle }: SpatialAudioSectio
                     : "bg-surface-elevated text-[color:oklch(from var(--foreground) l c h / 0.7)] hover:bg-[var(--hover-strong)] ring-1 ring-[var(--border-subtle)]")
                 }
               >
-                <Icon className="h-5 w-5" />
+                <Icon className="h-4 w-4" />
                 <span className="text-[11px] font-medium leading-tight">{label}</span>
               </button>
             );
@@ -132,11 +132,11 @@ function DefaultPresetCard({ s, send, expanded, onToggle }: DefaultPresetCardPro
       <button
         type="button"
         onClick={onToggle}
-        className="w-full flex items-center justify-between px-4 py-3 transition hover:bg-[var(--hover-subtle)]"
+        className="w-full flex items-center justify-between px-3 py-2.5 transition hover:bg-[var(--hover-subtle)]"
       >
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10 text-brand">
-            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand/10 text-brand">
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
               <rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
             </svg>
@@ -152,7 +152,7 @@ function DefaultPresetCard({ s, send, expanded, onToggle }: DefaultPresetCardPro
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 pt-1 space-y-3">
+        <div className="px-3 pb-3 pt-1 space-y-2.5">
           {bands.length > 0 && (
             <div className="flex justify-center">
               <CurvePreview bands={bands} min={min} max={max} />
@@ -218,11 +218,11 @@ function CustomEQCard({ customPresetName, expanded, onToggle }: CustomEQCardProp
       <button
         type="button"
         onClick={onToggle}
-        className="w-full flex items-center justify-between px-4 py-3 transition hover:bg-[var(--hover-subtle)]"
+        className="w-full flex items-center justify-between px-3 py-2.5 transition hover:bg-[var(--hover-subtle)]"
       >
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10 text-brand">
-            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand/10 text-brand">
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" />
               <line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" />
               <line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" />
@@ -329,10 +329,10 @@ export default function SoundEffectsPopup({
   if (showEqualizer) {
     return (
       <div className="absolute inset-0 z-50 flex flex-col animate-slide-up rounded-2xl overflow-hidden" style={{ background: "oklch(0.18 0.015 250)" }}>
-        <header className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border-medium)]">
+        <header className="flex items-center gap-2.5 px-3 py-2.5 border-b border-[var(--border-medium)]">
           <button onClick={() => setShowEqualizer(false)}
             className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-[var(--hover-medium)] transition">
-            <ChevronLeft className="h-5 w-5" />
+            <ChevronLeft className="h-4 w-4" />
           </button>
           <h2 className="text-[15px] font-semibold text-foreground">Custom EQ</h2>
         </header>
@@ -354,11 +354,11 @@ export default function SoundEffectsPopup({
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-background animate-slide-up">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-medium)]">
+      <header className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--border-medium)]">
         <div className="flex items-center gap-3">
           <button onClick={onClose}
             className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-[var(--hover-medium)] transition">
-            <ChevronLeft className="h-5 w-5" />
+            <ChevronLeft className="h-4 w-4" />
           </button>
           <h2 className="text-[15px] font-semibold text-foreground">Sound Effects</h2>
         </div>
@@ -369,7 +369,7 @@ export default function SoundEffectsPopup({
       </header>
 
       {/* Content — radio group: only one section expanded */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
         {showSpatial && (
           <SpatialAudioSection s={s} send={send}
             expanded={activeSection === SECTION_SPATIAL}
