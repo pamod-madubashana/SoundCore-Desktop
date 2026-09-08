@@ -736,6 +736,14 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+
+            // Frosted popup: the config-created "main" window needs its
+            // backdrop applied at runtime so the first show is already
+            // translucent (re-applied after every show in toggle_window).
+            // Positioning/clamp logic and the notification window are untouched.
+            if let Some(main) = app.get_webview_window("main") {
+                window_effects::apply_backdrop(&main);
+            }
             Ok(())
         })
         .run(tauri::generate_context!())

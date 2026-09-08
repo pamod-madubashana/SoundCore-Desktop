@@ -1,17 +1,75 @@
 /* components.css — Shared component styles using semantic tokens */
 
-/* Popup window container — default (opaque) */
+/* Popup window shell — near-solid dark charcoal frost (var(--popup-bg):
+   0.50/0.35 scrim + 0.97/0.96 frosted base, saturate 1.1, blur 28px kept).
+   Text/icons stay fully opaque: only the layered backgrounds carry alpha,
+   never a global opacity. */
 .popup-window {
   background: var(--popup-bg);
-  backdrop-filter: var(--popup-blur, none);
-  -webkit-backdrop-filter: var(--popup-blur, none);
-  box-shadow: var(--shadow-popup-token);
+  backdrop-filter: var(--popup-blur, blur(28px) saturate(1.1));
+  -webkit-backdrop-filter: var(--popup-blur, blur(28px) saturate(1.1));
+  background-clip: padding-box;
+  box-shadow: var(--shadow-popup-token), inset 0 1px 0 0 oklch(1 0 0 / 0.06);
   border: 1px solid var(--border-medium);
   border-radius: var(--radius);
   /* Scale the whole popup down ~10% for a slightly smaller window.
      `zoom` (supported in the Tauri/Chromium webview) reflows layout, so
      nothing overflows or clips — unlike `transform: scale`. */
   zoom: 0.9;
+}
+
+/* Full-popup overlays (e.g. Sound Effects list, Custom EQ editor) —
+   near-solid dark charcoal frost matching the popup shell. Deep scrim
+   (0.50 top / 0.35 bottom) + dark frosted base (0.97/0.96); blur kept.
+   Text/icons stay fully opaque — only these layered fills carry alpha. */
+.popup-overlay {
+  background:
+    linear-gradient(180deg, oklch(0 0 0 / 0.50) 0%, oklch(0 0 0 / 0.35) 100%),
+    linear-gradient(180deg, oklch(0.095 0.011 255 / 0.97) 0%, oklch(0.11 0.012 250 / 0.96) 100%);
+  backdrop-filter: blur(28px) saturate(1.1);
+  -webkit-backdrop-filter: blur(28px) saturate(1.1);
+  background-clip: padding-box;
+  box-shadow: inset 0 1px 0 0 oklch(1 0 0 / 0.06);
+}
+.theme-windows .popup-overlay {
+  background: oklch(0 0 0 / 0.25);
+  backdrop-filter: blur(40px) saturate(1.2);
+  -webkit-backdrop-filter: blur(40px) saturate(1.2);
+}
+.theme-windows[data-mode="light"] .popup-overlay {
+  background: oklch(1 0 0 / 0.35);
+}
+
+/* Cards inside the popup — near-solid dark charcoal frost matching the
+   shell tokens. Backgrounds come from the deepened --surface /
+   --surface-elevated tokens (0.96 / 0.95 alpha); blur + saturate kept.
+   Text/icons stay fully opaque — no global opacity here. */
+.popup-window .bg-surface,
+.popup-overlay .bg-surface {
+  background-color: var(--surface);
+  backdrop-filter: blur(20px) saturate(1.1);
+  -webkit-backdrop-filter: blur(20px) saturate(1.1);
+}
+.popup-window .bg-surface-elevated,
+.popup-overlay .bg-surface-elevated {
+  background-color: var(--surface-elevated);
+  backdrop-filter: blur(20px) saturate(1.1);
+  -webkit-backdrop-filter: blur(20px) saturate(1.1);
+}
+
+/* Segmented rows (SoundMode + SubSelectRow) — near-solid dark track over the
+   same blurred backdrop. The container keeps the --overlay-bg scrim (black
+   0.50); selected buttons stay fully opaque. */
+.segmented-control {
+  background-color: var(--overlay-bg);
+  backdrop-filter: blur(20px) saturate(1.1);
+  -webkit-backdrop-filter: blur(20px) saturate(1.1);
+}
+
+/* Text/icons inside popup + overlay stay fully opaque. */
+.popup-window,
+.popup-overlay {
+  color: var(--foreground);
 }
 
 /* Brand glow effect */

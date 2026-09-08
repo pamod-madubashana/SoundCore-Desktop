@@ -328,7 +328,7 @@ export default function SoundEffectsPopup({
 
   if (showEqualizer) {
     return (
-      <div className="absolute inset-0 z-50 flex flex-col animate-slide-up rounded-2xl overflow-hidden" style={{ background: "oklch(0.18 0.015 250)" }}>
+      <div className="popup-overlay absolute inset-0 z-50 flex flex-col animate-slide-up rounded-2xl overflow-hidden">
         <header className="flex items-center gap-2.5 px-3 py-2.5 border-b border-[var(--border-medium)]">
           <button onClick={() => setShowEqualizer(false)}
             className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-[var(--hover-medium)] transition">
@@ -352,7 +352,7 @@ export default function SoundEffectsPopup({
   }
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col bg-background animate-slide-up">
+    <div className="popup-overlay absolute inset-0 z-50 flex flex-col animate-slide-up">
       {/* Header */}
       <header className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--border-medium)]">
         <div className="flex items-center gap-3">
