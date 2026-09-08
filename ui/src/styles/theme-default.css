@@ -3,12 +3,16 @@
 :root {
   --radius: 0.875rem;
 
-  /* Core palette */
-  --background: oklch(0.18 0.015 250);
+  /* Core palette — near-solid dark charcoal frost so the panel reads
+     decisively dark over dark IDEs/wallpaper. Text/icons stay fully opaque;
+     only these layered fills carry alpha. Base lightness deepened (not just
+     alpha); alphas sit at 0.93-0.97: technically translucent (faint desktop
+     ghost), but reads solid dark at a glance. */
+  --background: oklch(0.11 0.012 250 / 0.97);
   --foreground: oklch(0.97 0.005 250);
-  --popover: oklch(0.16 0.012 255);
-  --surface: oklch(0.21 0.014 255);
-  --surface-elevated: oklch(0.255 0.016 255);
+  --popover: oklch(0.095 0.011 255 / 0.97);
+  --surface: oklch(0.13 0.012 255 / 0.96);
+  --surface-elevated: oklch(0.16 0.013 255 / 0.95);
   --muted-foreground: oklch(0.66 0.018 255);
 
   /* Brand */
@@ -20,10 +24,10 @@
   --success: oklch(0.78 0.16 160);
   --destructive: oklch(0.65 0.22 25);
 
-  /* Borders & overlays */
-  --border-subtle: oklch(1 0 0 / 0.04);
-  --border-medium: oklch(1 0 0 / 0.07);
-  --border-strong: oklch(1 0 0 / 0.12);
+  /* Borders & overlays — slightly lifted so panel edges read on black */
+  --border-subtle: oklch(1 0 0 / 0.08);
+  --border-medium: oklch(1 0 0 / 0.12);
+  --border-strong: oklch(1 0 0 / 0.18);
 
   /* Hover states */
   --hover-subtle: oklch(1 0 0 / 0.02);
@@ -40,10 +44,19 @@
   --overlay-bg: oklch(0 0 0 / 0.50);
   --scrollbar-thumb: oklch(1 0 0 / 0.12);
 
-  /* Popup */
-  --popup-bg: linear-gradient(180deg, var(--popover) 0%, var(--background) 100%);
-  --popup-blur: none;
-  --shadow-popup-token: 0 24px 60px -12px oklch(0 0 0 / 0.6), 0 0 0 1px oklch(1 0 0 / 0.04);
+  /* Popup — near-solid dark charcoal frost over the blurred window
+     backdrop. A deep scrim (0.50 top / 0.35 bottom) is layered first so the
+     popup reads as solid dark over dark backgrounds; the frosted base
+     (0.96-0.97) stays faintly translucent over wallpaper. Saturate 1.1
+     to reduce washout; blur kept at 28px. */
+  --popup-bg:
+    linear-gradient(180deg, oklch(0 0 0 / 0.50) 0%, oklch(0 0 0 / 0.35) 100%),
+    linear-gradient(180deg, oklch(0.095 0.011 255 / 0.97) 0%, oklch(0.11 0.012 250 / 0.96) 100%);
+  --popup-blur: blur(28px) saturate(1.1);
+  --shadow-popup-token:
+    0 24px 60px -12px oklch(0 0 0 / 0.65),
+    0 0 0 1px oklch(1 0 0 / 0.08),
+    inset 0 1px 0 0 oklch(1 0 0 / 0.06);
 
   /* Error */
   --error-text: oklch(0.65 0.22 25);

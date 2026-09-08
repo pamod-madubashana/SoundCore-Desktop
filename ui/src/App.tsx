@@ -441,7 +441,7 @@ function SubSelectRow({ setting, localValue, onPick }: { setting: any; localValu
   const entries = selectEntries(setting);
   if (entries.length === 0) return null;
   return (
-    <div className={"mt-2 grid w-full gap-1.5 p-1 rounded-lg bg-[var(--overlay-bg)] " + (entries.length <= 2 ? "grid-cols-2" : "grid-cols-3")}>
+    <div className={"segmented-control mt-2 grid w-full gap-1.5 p-1 rounded-lg bg-[var(--overlay-bg)] " + (entries.length <= 2 ? "grid-cols-2" : "grid-cols-3")}>
       {entries.map(({ id, label }) => {
         const active = id === localValue;
         return (
@@ -526,7 +526,7 @@ function SoundMode({ s, send }: SoundModeProps) {
 
   return (
       <div className="rounded-xl bg-surface p-2.5 ring-1 ring-[var(--border-subtle)]">
-      <div className="grid grid-cols-3 gap-1.5 p-1 rounded-lg bg-[var(--overlay-bg)]">
+      <div className="segmented-control grid grid-cols-3 gap-1.5 p-1 rounded-lg bg-[var(--overlay-bg)]">
         {modes.map(({ opt, label, Icon }) => {
           const activeMode = opt === localValue;
           return (
