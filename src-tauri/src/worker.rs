@@ -265,16 +265,33 @@ async fn run(
     }
 }
 
+/// True for real Soundcore hardware models. Anything else (notably the
+/// development/test double) is never listened to: no worker task, no connect
+/// attempts, no retry loop.
+fn is_supported_model(model: DeviceModel) -> bool {
+    !matches!(model, DeviceModel::SoundcoreDevelopment)
+}
+
 fn spawn_devices(session: &Arc<OpenSCQ30Session>, state: &Arc<SharedState>, config: &Config) -> DeviceTasks {
     let mut senders = HashMap::new();
     let mut handles = Vec::new();
     for dev in &config.devices {
-        let mac = match dev.parse() {
-            Ok((mac, _)) => mac,
+        let (mac, model) = match dev.parse() {
+            Ok(v) => v,
             Err(err) => {
-                warn!("skipping device '{}': {err:#}", dev.label());
+                // No recognizable Soundcore model (empty/unknown string) or bad
+                // MAC: not Soundcore-supported, so skip entirely with a single
+                // one-time line. Never WARN, never spawn a retry loop.
+                info!("skipping unsupported device '{}': {err:#}", dev.label());
                 continue;
             }
+        };
+        if !is_supported_model(model) {
+            info!(
+                "skipping unsupported device '{}' (model {model}): not a Soundcore-supported device",
+                dev.label()
+            );
+            continue;
         };
         let (dtx, drx) = mpsc::unbounded_channel();
         senders.insert(mac, dtx);
