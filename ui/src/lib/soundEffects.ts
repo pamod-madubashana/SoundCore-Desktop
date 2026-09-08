@@ -87,6 +87,32 @@ export function spatialModeLabel(s: any): string | null {
   return (i >= 0 ? setting.setting?.localizedOptions?.[i] : null) || setting.value || null;
 }
 
+/** Fallback for select ids when localizedOptions is missing: "VocalMode" -> "Vocal Mode". */
+export function prettySelectId(id: unknown): string {
+  return String(id).replace(/([a-z0-9])([A-Z])/g, "$1 $2");
+}
+
+/**
+ * Generic select options as `[{ id, label }]`. `id` is what the device
+ * expects, `label` is the localized text the backend ships alongside it
+ * (`setting.localizedOptions[i] ?? pretty id`). Works for ambientSoundMode,
+ * transparencyMode, noiseCancelingMode, multiSceneNoiseCanceling, etc.
+ */
+export function selectEntries(setting: any): Array<{ id: string; label: string }> {
+  const options: any[] = setting?.setting?.options ?? [];
+  const localized: any[] = setting?.setting?.localizedOptions ?? [];
+  return options.map((id, i) => ({
+    id: String(id),
+    label: typeof localized[i] === "string" && localized[i] ? localized[i] : prettySelectId(id),
+  }));
+}
+
+/** Localized label for a select value, falling back to a prettified id. */
+export function selectLabel(setting: any, id: string | null | undefined): string | null {
+  if (id == null) return null;
+  return selectEntries(setting).find((o) => o.id === id)?.label ?? prettySelectId(id);
+}
+
 const bandsKey = (bands: unknown): string => (Array.isArray(bands) ? (bands as unknown[]).join(",") : "");
 
 /** Name of the saved custom preset whose bands match exactly, or null. */
