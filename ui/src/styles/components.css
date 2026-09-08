@@ -8,6 +8,10 @@
   box-shadow: var(--shadow-popup-token);
   border: 1px solid var(--border-medium);
   border-radius: var(--radius);
+  /* Scale the whole popup down ~10% for a slightly smaller window.
+     `zoom` (supported in the Tauri/Chromium webview) reflows layout, so
+     nothing overflows or clips — unlike `transform: scale`. */
+  zoom: 0.9;
 }
 
 /* Brand glow effect */

@@ -257,7 +257,7 @@ function Device({ d, updateInfo, updateProgress, updateError, onStartUpdate, onD
       {!showSoundEffects && (
         <>
           <Header d={d} s={s} updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={onStartUpdate} onDismissUpdate={onDismissUpdate} />
-          <div className="flex-1 flex flex-col px-4 py-4 gap-4 overflow-hidden">
+          <div className="flex-1 flex flex-col px-3 py-3 gap-3 overflow-hidden">
             {s.ambientSoundMode && <SoundMode s={s} send={send} />}
 
             {/* Sound Effects nav item */}
@@ -265,11 +265,11 @@ function Device({ d, updateInfo, updateProgress, updateError, onStartUpdate, onD
               <button
                 type="button"
                 onClick={() => setShowSoundEffects(true)}
-                className="w-full rounded-2xl bg-surface ring-1 ring-[var(--border-subtle)] px-4 py-3 flex items-center justify-between transition hover:bg-[var(--hover-subtle)]"
+                className="w-full rounded-2xl bg-surface ring-1 ring-[var(--border-subtle)] px-3 py-2.5 flex items-center justify-between transition hover:bg-[var(--hover-subtle)]"
               >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10 text-brand">
-                    <SlidersHorizontal className="h-5 w-5" />
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand/10 text-brand">
+                    <SlidersHorizontal className="h-4 w-4" />
                   </div>
                   <div className="text-left">
                     <span className="text-[14px] font-medium text-foreground">Sound Effects</span>
@@ -372,8 +372,8 @@ function Header({ d, s, updateInfo, updateProgress, updateError, onStartUpdate, 
   const showUpdateBadge = updateInfo && !updateProgress;
 
   return (
-    <header className="p-4 flex items-center gap-4 border-b border-[var(--border-medium)]">
-      <div className={"relative overflow-hidden flex-shrink-0 flex items-center justify-center text-brand " + (d.image ? "h-28 w-28" : "h-14 w-14 rounded-xl bg-surface-elevated ring-1 ring-[var(--border-subtle)]")}>
+    <header className="p-3 flex items-center gap-3 border-b border-[var(--border-medium)]">
+      <div className={"relative overflow-hidden flex-shrink-0 flex items-center justify-center text-brand " + (d.image ? "h-24 w-24" : "h-12 w-12 rounded-xl bg-surface-elevated ring-1 ring-[var(--border-subtle)]")}>
         <DeviceArt name={d.name} url={d.image} color={d.color} />
       </div>
       <div className="min-w-0 flex-1">
@@ -525,15 +525,15 @@ function SoundMode({ s, send }: SoundModeProps) {
   };
 
   return (
-      <div className="rounded-xl bg-surface p-3 ring-1 ring-[var(--border-subtle)]">
+      <div className="rounded-xl bg-surface p-2.5 ring-1 ring-[var(--border-subtle)]">
       <div className="grid grid-cols-3 gap-1.5 p-1 rounded-lg bg-[var(--overlay-bg)]">
         {modes.map(({ opt, label, Icon }) => {
           const activeMode = opt === localValue;
           return (
             <button key={opt} onClick={() => handleMode(opt!)}
-              className={"relative flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-md text-[11px] font-medium leading-tight transition-all " +
+              className={"relative flex flex-col items-center justify-center gap-1 py-2 rounded-md text-[11px] font-medium leading-tight transition-all " +
                 (activeMode ? "bg-brand text-brand-foreground brand-glow" : "text-muted-foreground hover:text-foreground hover:bg-[var(--hover-medium)]")}>
-              <Icon className="h-4 w-4" />
+              <Icon className="h-3.5 w-3.5" />
               {label}
             </button>
           );
