@@ -21,7 +21,9 @@ $entries = @(
     "a3957,black","a3957,white","a3957,blue","a3957,golden","a3957,creamywhite",
     "a3959,black","a3959,white","a3959,blue","a3959,pink","a3959,green","a3959,yellow",
     "a3968,black","a3968,white","a3968,green",
-    "a3005,black","a3005,white"
+    "a3005,black","a3005,white",
+    "a3330,black",
+    "a3944,black","a3944,white","a3944,blue","a3944,pink","a3944,green"
 )
 
 $ok = 0; $fail = 0; $total = $entries.Count
