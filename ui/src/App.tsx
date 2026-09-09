@@ -305,12 +305,16 @@ function Device({ d, updateInfo, updateProgress, updateError, onStartUpdate, onD
   );
 }
 
-const APP_VERSION = "1.4.0";
+const APP_VERSION = "1.5.0";
 
 function Footer() {
+  const [version, setVersion] = useState(APP_VERSION);
+  useEffect(() => {
+    invoke<string>("get_version").then(setVersion).catch(() => {});
+  }, []);
   return (
     <div className="px-3 py-2 flex items-center justify-between text-[10px] text-[color:oklch(from var(--muted-foreground) l c h / 0.6)]">
-      <span>v{APP_VERSION}</span>
+      <span>v{version}</span>
       <button onClick={() => invoke("open_url", { url: "https://github.com/pamod-madubashana/SoundCore-Desktop" })}
         className="hover:text-muted-foreground transition cursor-pointer">GitHub</button>
     </div>
