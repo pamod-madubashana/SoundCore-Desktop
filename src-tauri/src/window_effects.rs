@@ -28,7 +28,7 @@ fn apply_windows_backdrop(window: &WebviewWindow) {
 
     // 1) Native Tauri v2 backdrop: frosted Acrylic, like Windows Quick Settings.
     if apply_tauri_acrylic(window).is_ok() {
-        tracing::info!("applied native Acrylic backdrop");
+        tracing::debug!("applied native Acrylic backdrop");
         return;
     }
 
@@ -36,19 +36,19 @@ fn apply_windows_backdrop(window: &WebviewWindow) {
     // Dark semi-transparent tint matching the SoundCore UI; the low alpha is
     // what lets the desktop show through for the frosted effect.
     if apply_acrylic(window, Some((18, 18, 20, 140))).is_ok() {
-        tracing::info!("applied Acrylic backdrop");
+        tracing::debug!("applied Acrylic backdrop");
         return;
     }
 
     // 3) Last resort: Mica (Windows 11 only, more opaque than Acrylic).
     // Pass None to match system dark/light preference.
     if apply_mica(window, None).is_ok() {
-        tracing::info!("applied Mica backdrop");
+        tracing::debug!("applied Mica backdrop");
         return;
     }
 
     // All failed — window keeps its transparent CSS background, opaque surface.
-    tracing::info!("backdrop effects unavailable, using opaque surface");
+    tracing::debug!("backdrop effects unavailable, using opaque surface");
 }
 
 /// Native Tauri v2 frosted-Acrylic effect (Windows only).
