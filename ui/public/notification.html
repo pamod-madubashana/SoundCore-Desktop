@@ -5,7 +5,7 @@
   <style>
     /* Default dark theme values (matches SoundCore default) */
     :root {
-      --bg: rgba(30, 30, 38, 0.95);
+      --bg: rgba(20, 20, 28, 0.45);
       --text: #f0f0f0;
       --text-muted: #999;
       --brand: oklch(0.78 0.16 195);
@@ -16,7 +16,7 @@
 
     /* Windows light mode */
     html[data-mode="light"] {
-      --bg: rgba(249, 249, 249, 0.95);
+      --bg: rgba(230, 230, 230, 0.45);
       --text: #1a1a1a;
       --text-muted: #666;
       --border: rgba(0, 0, 0, 0.08);
@@ -33,8 +33,8 @@
       display: flex; align-items: center; gap: 14px; height: 100%;
       padding: 14px 20px; border-radius: 14px;
       background: var(--bg);
-      backdrop-filter: blur(12px);
-      box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px var(--border);
+      backdrop-filter: blur(24px) saturate(1.2);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.25), 0 0 0 1px var(--border);
       animation: slide-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
     }
     .icon {
