@@ -166,6 +166,11 @@ fn get_models() -> Vec<String> {
 }
 
 #[tauri::command]
+fn get_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
+#[tauri::command]
 fn get_states(state: tauri::State<AppState>) -> Vec<DeviceStateDto> {
     let cfg = state.config.lock().unwrap().clone();
     let map = state.worker.state.devices.lock().unwrap();
@@ -598,6 +603,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_models,
             get_states,
+            get_version,
             get_config,
             save_config,
             apply_now,
