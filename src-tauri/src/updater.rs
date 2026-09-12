@@ -32,6 +32,22 @@ fn parse_version(v: &str) -> Option<semver::Version> {
     semver::Version::parse(v).ok()
 }
 
+/// Loop guard: the release tag must be strictly newer than the running binary.
+/// Refuses a no-op install whose payload would still report the old version
+/// (e.g. tag bumped without bumping the version files baked into the exe).
+fn ensure_newer(current_str: &str, latest_str: &str) -> Result<(), String> {
+    let current =
+        parse_version(current_str).ok_or_else(|| format!("Invalid current version: {current_str}"))?;
+    let latest =
+        parse_version(latest_str).ok_or_else(|| format!("Invalid latest version: {latest_str}"))?;
+    if latest <= current {
+        return Err(format!(
+            "Already up to date (current v{current}, latest v{latest}); refusing no-op install"
+        ));
+    }
+    Ok(())
+}
+
 fn get_updates_dir() -> Result<PathBuf, String> {
     let local_app_data = std::env::var("LOCALAPPDATA").map_err(|e| e.to_string())?;
     let dir = PathBuf::from(local_app_data)
@@ -229,9 +245,36 @@ pub async fn download_update(info: &UpdateInfo, app: &tauri::AppHandle) -> Resul
     Ok(download_path)
 }
 
-pub fn install_update(download_path: &PathBuf, app: &tauri::AppHandle) -> Result<(), String> {
+pub fn install_update(
+    download_path: &PathBuf,
+    expected_version: &str,
+    app: &tauri::AppHandle,
+) -> Result<(), String> {
+    // Re-verify freshness at install time: check_for_update ran earlier, so a
+    // stale/mismatched payload must fail here instead of "succeeding" into a loop.
+    ensure_newer(&get_current_version(), expected_version)?;
+
+    let staged_len = fs::metadata(download_path)
+        .map_err(|e| format!("Failed to stat staged update: {e}"))?
+        .len();
+    if staged_len == 0 {
+        return Err("Staged update is empty; aborting install".to_string());
+    }
+
     let exe_dir = get_exe_dir()?;
     let current_exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    // Location guard: the portable exe must replace the running binary. If the
+    // user renamed the running file, writing a sibling copy would leave the old
+    // version in place and re-offer the same update forever.
+    let current_name = current_exe
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("");
+    if current_name != ASSET_NAME {
+        return Err(format!(
+            "Running exe is '{current_name}', expected '{ASSET_NAME}'; replace it manually to avoid a version loop"
+        ));
+    }
     let old_exe = exe_dir.join(format!("{ASSET_NAME}.old"));
     let target_exe = exe_dir.join(ASSET_NAME);
     let temp_exe = exe_dir.join(format!("{ASSET_NAME}.update"));
@@ -267,6 +310,19 @@ pub fn install_update(download_path: &PathBuf, app: &tauri::AppHandle) -> Result
         let _ = fs::rename(&old_exe, &current_exe);
         format!("Failed to replace exe: {e}")
     })?;
+
+    // Verify the replacement actually landed: a missing/empty target would
+    // restart into the old version and re-offer the same update forever.
+    let target_len = fs::metadata(&target_exe)
+        .map_err(|e| format!("Update vanished after replace: {e}"))?
+        .len();
+    if target_len == 0 || target_len != staged_len {
+        let _ = fs::rename(&old_exe, &current_exe);
+        let _ = fs::remove_file(&target_exe);
+        return Err(format!(
+            "Installed exe looks wrong (expected {staged_len} bytes, got {target_len}); rolled back"
+        ));
+    }
 
     let _ = fs::remove_file(download_path);
 
