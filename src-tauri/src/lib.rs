@@ -475,8 +475,23 @@ async fn check_update() -> Result<updater::UpdateInfo, String> {
 #[tauri::command]
 async fn start_update(app: AppHandle) -> Result<(), String> {
     let info = updater::check_for_update().await?;
+    // Defense in depth: check_for_update already enforces latest > current, but
+    // re-verify here so a stale or mismatched payload can never reach install.
+    let current = semver::Version::parse(
+        info.current_version.trim().strip_prefix('v').unwrap_or(info.current_version.trim()),
+    )
+    .map_err(|e| format!("Invalid current version: {e}"))?;
+    let latest = semver::Version::parse(
+        info.latest_version.trim().strip_prefix('v').unwrap_or(info.latest_version.trim()),
+    )
+    .map_err(|e| format!("Invalid latest version: {e}"))?;
+    if latest <= current {
+        return Err(format!(
+            "Already up to date (current v{current}, latest v{latest}); refusing no-op install"
+        ));
+    }
     let download_path = updater::download_update(&info, &app).await?;
-    updater::install_update(&download_path, &app)?;
+    updater::install_update(&download_path, &info.latest_version, &app)?;
     Ok(())
 }
 

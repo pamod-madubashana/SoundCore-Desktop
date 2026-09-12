@@ -57,6 +57,28 @@ jobs:
           npm install
           npm --prefix ui install
 
+      - name: Verify version consistency
+        shell: bash
+        run: |
+          set -e
+          pkg="$(node -p "require('./package.json').version")"
+          cargo_ver="$(sed -n -E 's/^version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' src-tauri/Cargo.toml | head -n1)"
+          tauri_ver="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          pkg="${pkg#v}"; cargo_ver="${cargo_ver#v}"; tauri_ver="${tauri_ver#v}"
+          echo "Versions: package.json=$pkg Cargo.toml=$cargo_ver tauri.conf.json=$tauri_ver"
+          if [ "$pkg" != "$cargo_ver" ] || [ "$pkg" != "$tauri_ver" ]; then
+            echo "::error::Version mismatch: package.json=$pkg Cargo.toml=$cargo_ver tauri.conf.json=$tauri_ver. Bump all three before releasing."
+            exit 1
+          fi
+          if [ -n "${{ inputs.version }}" ]; then
+            input="${{ inputs.version }}"
+            input="${input#v}"
+            if [ "$input" != "$pkg" ]; then
+              echo "::error::Input version '${{ inputs.version }}' does not match version files ($pkg). Bump version files first."
+              exit 1
+            fi
+          fi
+
       - name: Build Tauri bundle
         run: npm run tauri build
 
@@ -115,10 +137,24 @@ jobs:
         id: tag
         shell: bash
         run: |
+          set -e
           if [ -n "${{ inputs.version }}" ]; then
             tag="${{ inputs.version }}"
           else
-            tag="$(node -p "require('./package.json').version")"
+            tag="v$(node -p "require('./package.json').version")"
+          fi
+          # Normalize to v-prefix so `1.5.1` and `v1.5.1` mean the same release.
+          case "$tag" in
+            v*) ;;
+            *) tag="v$tag";;
+          esac
+          # The tag must match the version baked into the binaries, otherwise
+          # the updater loops (new tag, old embedded CARGO_PKG_VERSION).
+          file_ver="$(node -p "require('./package.json').version")"
+          file_ver="v${file_ver#v}"
+          if [ "$tag" != "$file_ver" ]; then
+            echo "::error::Release tag $tag does not match version files ($file_ver). Bump version files first."
+            exit 1
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
