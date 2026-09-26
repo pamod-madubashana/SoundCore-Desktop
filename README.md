@@ -139,6 +139,15 @@ npm run tauri build
 - **Left-click tray icon**: Show/hide control panel
 - **Right-click tray icon**: Open context menu (Show/Hide, Apply now, Quit)
 
+
+## Code Signing
+
+Windows releases of SoundCore-Desktop are signed through the 
+[SignPath Foundation](https://signpath.org/) open-source signing program.
+
+This helps verify that released binaries are built from the official project source.
+
+
 ## Credits
 
 - This project uses and credits [OpenSCQ30](https://github.com/Oppzippy/OpenSCQ30) for the underlying Soundcore Bluetooth support and device handling.
