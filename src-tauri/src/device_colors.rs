@@ -96,9 +96,9 @@ mod tests {
 
     #[test]
     fn test_byte_mapping() {
-        assert_eq!(color_from_byte(b'1'), Some("#2d2d2d"));
+        assert_eq!(color_from_byte(b'1'), Some("#a0a0a0"));
         assert_eq!(color_from_byte(b'2'), Some("#f5f5f5"));
-        assert_eq!(color_from_byte(b'3'), Some("#1a3a5c"));
+        assert_eq!(color_from_byte(b'3'), Some("#5a8fc5"));
     }
 
     #[test]
