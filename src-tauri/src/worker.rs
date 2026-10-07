@@ -648,6 +648,13 @@ pub fn parse_value(setting: &Setting, raw: &str) -> anyhow::Result<Value> {
         Setting::HueColorPicker { .. } => {
             Ok(Value::String(std::borrow::Cow::from(raw.to_owned())))
         }
+        Setting::TimeOfDay { .. } => {
+            let n = i32::from_str(raw.trim())?;
+            if !(0..1440).contains(&n) {
+                bail!("{n} is not a valid time of day (expected minutes after midnight in 0..1440)");
+            }
+            Ok(Value::I32(n))
+        }
     }
 }
 

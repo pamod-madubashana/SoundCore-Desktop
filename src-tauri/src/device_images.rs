@@ -225,4 +225,21 @@ mod tests {
         let url = zip_url("SoundcoreA3959", "1");
         assert!(url.contains("a3959/black/a3959_black.zip"));
     }
+
+    #[test]
+    fn test_bundled_images_present() {
+        for (model, color) in [
+            ("SoundcoreA3388", "1"),
+            ("SoundcoreA3388", "2"),
+            ("SoundcoreA3388", "3"),
+            ("SoundcoreA3388", "5"),
+            ("SoundcoreA3876", "1"),
+            ("SoundcoreA3330", "1"),
+        ] {
+            assert!(
+                bundled_image_url(model, color).is_some(),
+                "missing bundled image for {model} color {color}"
+            );
+        }
+    }
 }

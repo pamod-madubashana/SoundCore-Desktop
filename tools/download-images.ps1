@@ -23,6 +23,8 @@ $entries = @(
     "a3968,black","a3968,white","a3968,green",
     "a3005,black","a3005,white",
     "a3330,black",
+    "a3388,black","a3388,white","a3388,blue","a3388,pink",
+    "a3876,black","a3876,white","a3876,blue",
     "a3944,black","a3944,white","a3944,blue","a3944,pink","a3944,green"
 )
 

@@ -143,7 +143,7 @@ jobs:
           else
             tag="v$(node -p "require('./package.json').version")"
           fi
-          # Normalize to v-prefix so `1.5.1` and `v1.5.1` mean the same release.
+          # Normalize to v-prefix so `1.6.0` and `v1.6.0` mean the same release.
           case "$tag" in
             v*) ;;
             *) tag="v$tag";;
