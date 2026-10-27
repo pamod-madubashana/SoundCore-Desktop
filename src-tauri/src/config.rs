@@ -43,6 +43,11 @@ pub struct DeviceConfig {
     pub poll_seconds: u64,
     #[serde(default = "default_apply_delay")]
     pub apply_delay_seconds: u64,
+    /// Push the profile to the device on every connect. Set to false to keep the
+    /// app from writing anything automatically — useful when isolating a device
+    /// misbehaving after profile application. Manual "Apply now" still works.
+    #[serde(default = "default_true")]
+    pub apply_profile_on_connect: bool,
     /// Settings to push on every connect, in order.
     #[serde(default)]
     pub profile: Vec<SettingEntry>,
@@ -161,6 +166,7 @@ impl Default for DeviceConfig {
             model: "SoundcoreA3959".to_owned(),
             poll_seconds: 5,
             apply_delay_seconds: 2,
+            apply_profile_on_connect: true,
             profile: Vec::new(),
             image: None,
             color: None,

@@ -360,8 +360,15 @@ async fn device_loop(
                 if !apply_delay.is_zero() {
                     sleep(apply_delay).await;
                 }
-                apply_and_report(device.as_ref(), &current_profile(&state, mac), &state, mac).await;
-                publish_snapshot(device.as_ref(), &state, mac);
+                if dev.apply_profile_on_connect {
+                    apply_and_report(device.as_ref(), &current_profile(&state, mac), &state, mac).await;
+                    publish_snapshot(device.as_ref(), &state, mac);
+                } else {
+                    tracing::debug!("apply_profile_on_connect=false, skipping profile push for {mac}");
+                    set_device_state(&state, mac, |s| {
+                        s.message = "connected (profile push disabled)".into();
+                    });
+                }
 
                 if connected_session(device.as_ref(), &mut rx, &state, mac).await {
                     tracing::debug!("connected_session returned for {mac}, task replaced");
