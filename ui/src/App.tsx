@@ -305,7 +305,7 @@ function Device({ d, updateInfo, updateProgress, updateError, onStartUpdate, onD
   );
 }
 
-const APP_VERSION = "1.6.0";
+const APP_VERSION = "1.7.0";
 
 function Footer() {
   const [version, setVersion] = useState(APP_VERSION);
