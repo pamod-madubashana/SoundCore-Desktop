@@ -62,7 +62,6 @@ struct DeviceStateDto {
     model: String,
     poll_seconds: u64,
     apply_delay_seconds: u64,
-    apply_profile_on_connect: bool,
     connected: bool,
     message: String,
     image: Option<String>,
@@ -194,7 +193,6 @@ fn get_states(state: tauri::State<AppState>) -> Vec<DeviceStateDto> {
                 model: d.model.clone(),
                 poll_seconds: d.poll_seconds,
                 apply_delay_seconds: d.apply_delay_seconds,
-                apply_profile_on_connect: d.apply_profile_on_connect,
                 connected,
                 message,
                 image: d.image.clone().or_else(|| {
@@ -706,7 +704,6 @@ pub fn run() {
                                         model: model.to_string(),
                                         poll_seconds: 5,
                                         apply_delay_seconds: 2,
-                                        apply_profile_on_connect: true,
                                         profile: Vec::new(),
                                         image: None,
                                         color: None,
@@ -774,8 +771,82 @@ pub fn run() {
         .expect("error while running SoundCore-Desktop");
 }
 
+/// Appends log lines to a file, rotating the current file to `<name>.log.1`
+/// once it would exceed `max_bytes`. The installed windowed app has no
+/// console, so this is what makes device communication debuggable in
+/// production.
+struct CappedLog {
+    path: PathBuf,
+    max_bytes: u64,
+    file: Mutex<std::fs::File>,
+}
+
+impl CappedLog {
+    fn open(path: PathBuf, max_bytes: u64) -> std::io::Result<Self> {
+        let file = std::fs::OpenOptions::new().create(true).append(true).open(&path)?;
+        Ok(Self { path, max_bytes, file: Mutex::new(file) })
+    }
+
+    fn write(&self, buf: &[u8]) -> std::io::Result<()> {
+        use std::io::Write as _;
+        let mut file = self.file.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let over_cap = file.metadata()?.len().saturating_add(buf.len() as u64) > self.max_bytes;
+        if over_cap {
+            let _ = std::fs::rename(&self.path, self.path.with_extension("log.1"));
+            *file = std::fs::OpenOptions::new().create(true).append(true).open(&self.path)?;
+        }
+        file.write_all(buf)?;
+        file.flush()
+    }
+}
+
+struct CappedWriter<'a>(&'a CappedLog);
+
+impl std::io::Write for CappedWriter<'_> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0.write(buf)?;
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for CappedLog {
+    type Writer = CappedWriter<'a>;
+
+    fn make_writer(&'a self) -> Self::Writer {
+        CappedWriter(self)
+    }
+}
+
 fn init_logging() {
-    use tracing_subscriber::EnvFilter;
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    let _ = tracing_subscriber::fmt().with_env_filter(filter).with_target(false).try_init();
+    use tracing_subscriber::{EnvFilter, fmt, prelude::*};
+
+    // RUST_LOG overrides everything. The default keeps app context at debug and
+    // every OpenSCQ30 event at trace: the RFCOMM layer logs each raw packet in
+    // both directions ("wrote packet" / "received packet") and the packet layer
+    // logs every parsed command — i.e. every communication with the device.
+    let filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("info,soundcore_desktop_lib=debug,openscq30_lib=trace"));
+
+    let stdout = fmt::layer().with_target(false).with_filter(filter.clone());
+
+    // Everything also goes to a capped log file next to config.toml, because
+    // the installed exe is windowed and discards stdout.
+    let file_layer = crate::config::resolve_path(None)
+        .parent()
+        .map(|dir| dir.join("soundcore.log"))
+        .and_then(|path| match CappedLog::open(path.clone(), 5 * 1024 * 1024) {
+            Ok(log) => {
+                Some(fmt::layer().with_writer(log).with_target(false).with_filter(filter.clone()))
+            }
+            Err(err) => {
+                eprintln!("cannot open {} for logging: {err}", path.display());
+                None
+            }
+        });
+
+    let _ = tracing_subscriber::registry().with(stdout).with(file_layer).try_init();
 }

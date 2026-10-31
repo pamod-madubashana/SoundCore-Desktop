@@ -1,4 +1,5 @@
-//! Configuration: the devices to watch and the per-device profile to apply on connect.
+//! Configuration: the devices to watch and the per-device profile that is
+//! refreshed FROM the device on every connect (read-only fetch).
 
 use std::{path::PathBuf, str::FromStr};
 
@@ -41,14 +42,13 @@ pub struct DeviceConfig {
     pub model: String,
     #[serde(default = "default_poll_seconds")]
     pub poll_seconds: u64,
+    /// Seconds to wait after connect before reading the device's settings.
     #[serde(default = "default_apply_delay")]
     pub apply_delay_seconds: u64,
-    /// Push the profile to the device on every connect. Set to false to keep the
-    /// app from writing anything automatically — useful when isolating a device
-    /// misbehaving after profile application. Manual "Apply now" still works.
-    #[serde(default = "default_true")]
-    pub apply_profile_on_connect: bool,
-    /// Settings to push on every connect, in order.
+    /// Settings recorded for this device. On every connect this list is REPLACED
+    /// with the device's current settings — a read-only fetch that never writes
+    /// anything to the device. Manual "Apply now" (and live UI changes, which
+    /// write the single setting they touch) still push to the device.
     #[serde(default)]
     pub profile: Vec<SettingEntry>,
     /// Optional product image URL shown in the popup (otherwise a generic illustration).
@@ -166,7 +166,6 @@ impl Default for DeviceConfig {
             model: "SoundcoreA3959".to_owned(),
             poll_seconds: 5,
             apply_delay_seconds: 2,
-            apply_profile_on_connect: true,
             profile: Vec::new(),
             image: None,
             color: None,
