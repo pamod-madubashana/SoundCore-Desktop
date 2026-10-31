@@ -1,14 +1,11 @@
 # SoundCore-Desktop configuration
 #
-# One [[devices]] block per device. Each device's `profile` is pushed to it every time it
-# connects to this PC (unless apply_profile_on_connect = false). You can edit all of this
-# from the tray popup (left-click the tray icon) instead — including picking settings with
-# live controls while the device is connected. Unknown setting ids are reported with a
-# clear message when applied.
-#
-# Setting apply_profile_on_connect = false makes the app push nothing on connect; use it to
-# check whether a profile is behind a device misbehaving (e.g. a microphone that stopped
-# working) — manual "Apply now" still works.
+# One [[devices]] block per device. Every time a device connects, its current
+# settings are READ from the device and stored as that device's `profile` —
+# the fetch is read-only and never writes anything to the device. You can edit
+# all of this from the tray popup (left-click the tray icon): live controls
+# write the single setting you change, and "Apply now" pushes the whole
+# stored profile. Unknown setting ids are reported with a clear message.
 
 # Start automatically at logon (toggle from the popup's "Run at startup" checkbox).
 autostart = true
@@ -18,8 +15,7 @@ name = "R50i NC"
 mac_address = "34:09:C9:B9:EC:30"
 model = "SoundcoreA3959"
 poll_seconds = 5
-apply_delay_seconds = 2
-apply_profile_on_connect = true
+apply_delay_seconds = 2 # seconds to wait after connect before reading the device's settings
 color = "1"
 
 [[devices.profile]]

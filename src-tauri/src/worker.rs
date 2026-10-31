@@ -1,6 +1,7 @@
-//! Background worker: watches every configured device over RFCOMM, applies its profile
-//! on connect, publishes a live snapshot of the device's settings for the UI to render,
-//! and applies individual changes the user makes in the popup.
+//! Background worker: watches every configured device over RFCOMM, fetches its
+//! current profile on connect (read-only — never writes), publishes a live
+//! snapshot of the device's settings for the UI to render, and applies
+//! individual changes the user makes in the popup.
 
 use std::{
     collections::HashMap,
@@ -369,15 +370,16 @@ async fn device_loop(
                 if !apply_delay.is_zero() {
                     sleep(apply_delay).await;
                 }
-                if dev.apply_profile_on_connect {
-                    apply_and_report(device.as_ref(), &current_profile(&state, mac), &state, mac).await;
-                    publish_snapshot(device.as_ref(), &state, mac);
-                } else {
-                    tracing::debug!("apply_profile_on_connect=false, skipping profile push for {mac}");
-                    set_device_state(&state, mac, |s| {
-                        s.message = "connected (profile push disabled)".into();
-                    });
-                }
+                // On connect the device is the source of truth: read its current
+                // settings into the stored profile instead of pushing ours down.
+                // This never writes a packet to the device; manual "Apply now"
+                // and live UI changes still do.
+                let fetched = fetch_profile_from_device(device.as_ref());
+                store_fetched_profile(&state, mac, fetched);
+                publish_snapshot(device.as_ref(), &state, mac);
+                set_device_state(&state, mac, |s| {
+                    s.message = "connected (profile read from device)".into();
+                });
 
                 if connected_session(device.as_ref(), &mut rx, &state, mac).await {
                     tracing::debug!("connected_session returned for {mac}, task replaced");
@@ -535,6 +537,100 @@ fn publish_snapshot(device: &(dyn OpenSCQ30Device + Send + Sync), state: &Shared
         .map(|(cat, settings)| (cat, settings.into_iter().collect()))
         .collect();
     set_device_state(state, mac, |s| s.snapshot = Some(snapshot));
+}
+
+/// Settings that must never end up in a stored profile even if the device
+/// reports them as writable: replaying them via "Apply now" would power off
+/// the buds, ring them, reset buttons, or fire an export the device treats as
+/// a rejected command (which would fail the whole batch).
+const FETCH_SKIP: [SettingId; 4] = [
+    SettingId::PowerOff,
+    SettingId::FindDevice,
+    SettingId::ResetButtonsToDefault,
+    SettingId::ExportCustomEqualizerProfiles,
+];
+
+/// Serializes a setting's current value into the string form the profile
+/// format stores. Must round-trip through `parse_value` so a fetched profile
+/// can be pushed again later by "Apply now". Returns None for value shapes
+/// with no faithful string form (MultiSelectWithRemove lists, hue pickers)
+/// and for read-only / write-only settings.
+fn setting_to_raw(setting: &Setting) -> Option<String> {
+    match setting {
+        Setting::Toggle { value } => Some(value.to_string()),
+        Setting::I32Range { value, .. } => Some(value.to_string()),
+        Setting::Select { value, .. } => Some(value.to_string()),
+        Setting::OptionalSelect { value, .. } => Some(value.as_deref().unwrap_or("").to_owned()),
+        Setting::ModifiableSelect { value, .. } => value.as_ref().map(|v| v.to_string()),
+        Setting::MultiSelect { values, .. } => Some(values.join(",")),
+        Setting::Equalizer { value, .. } => {
+            Some(value.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(","))
+        }
+        Setting::PresetEqualizerProfileSelect { value, .. } => value.as_ref().map(|v| v.to_string()),
+        Setting::TimeOfDay { minutes_after_midnight } => Some(minutes_after_midnight.to_string()),
+        _ => None,
+    }
+}
+
+/// Reads the device's current settings and rebuilds the profile from them.
+/// Purely read-only: `settings_by_category` serves locally cached state — no
+/// packet is sent. Only ReadWrite settings are kept, which excludes
+/// Information (battery, serial…) and Action/ImportString commands.
+fn fetch_profile_from_device(device: &(dyn OpenSCQ30Device + Send + Sync)) -> Vec<SettingEntry> {
+    let mut entries = Vec::new();
+    for (_category, settings) in device.settings_by_category() {
+        for (id, setting) in settings {
+            if FETCH_SKIP.contains(&id) {
+                continue;
+            }
+            if !setting.mode().is_writable() || !setting.mode().is_readable() {
+                continue;
+            }
+            if let Some(raw) = setting_to_raw(&setting) {
+                entries.push(SettingEntry { id: id.to_string(), value: raw });
+            }
+        }
+    }
+    entries
+}
+
+/// Stores a fetched profile: shared state first (ApplyNow sees it instantly),
+/// then persisted to config.toml so UI edits and restarts see device reality.
+/// An empty fetch means the device hadn't reported its state yet — the old
+/// profile is kept rather than wiped.
+fn store_fetched_profile(state: &SharedState, mac: MacAddr6, mut profile: Vec<SettingEntry>) {
+    if profile.is_empty() {
+        warn!("device {mac} reported no settings yet; keeping existing profile");
+        return;
+    }
+    crate::config::prune_profile(&mut profile);
+    let count = profile.len();
+    state.profiles.lock().unwrap().insert(mac, profile.clone());
+
+    let path = crate::config::resolve_path(None);
+    let mut cfg = match Config::load(&path) {
+        Ok(cfg) => cfg,
+        Err(err) => {
+            warn!("could not reload {}: {err:#}; fetched profile kept in memory only", path.display());
+            info!("fetched profile from device: {count} settings (memory only)");
+            return;
+        }
+    };
+    let key = mac.to_string();
+    let device = cfg
+        .devices
+        .iter_mut()
+        .find(|d| d.mac_address.eq_ignore_ascii_case(&key) || MacAddr6::from_str(d.mac_address.trim()).is_ok_and(|m| m == mac));
+    match device {
+        Some(d) => {
+            d.profile = profile;
+            if let Err(err) = cfg.save(&path) {
+                warn!("failed to persist fetched profile to {}: {err:#}", path.display());
+            }
+        }
+        None => tracing::debug!("device {mac} not present in {}; fetched profile kept in memory only", path.display()),
+    }
+    info!("fetched profile from device: {count} settings stored for {mac}");
 }
 
 async fn apply_and_report(
@@ -703,4 +799,135 @@ async fn open_session() -> anyhow::Result<OpenSCQ30Session> {
     OpenSCQ30Session::new(db_path)
         .await
         .map_err(|e| anyhow!("failed to open database: {e}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::borrow::Cow;
+
+    use openscq30_lib::settings::{Equalizer, Range};
+
+    use super::*;
+
+    fn select(options: &[&'static str]) -> Select {
+        Select {
+            options: options.iter().copied().map(Cow::from).collect(),
+            localized_options: options.iter().map(|o| o.to_string()).collect(),
+        }
+    }
+
+    /// A fetched profile is only useful if every stored string can be pushed
+    /// again later by "Apply now" — `setting_to_raw` must invert `parse_value`.
+    #[test]
+    fn setting_to_raw_round_trips_through_parse_value() {
+        let band_hz: Cow<'static, [u16]> = Cow::Borrowed(&[100, 200]);
+        let cases: Vec<(Setting, Value)> = vec![
+            (Setting::Toggle { value: true }, Value::Bool(true)),
+            (Setting::Toggle { value: false }, Value::Bool(false)),
+            (
+                Setting::I32Range { setting: Range { range: 0..=10, step: 1 }, value: 7 },
+                Value::I32(7),
+            ),
+            (
+                Setting::Select { setting: select(&["Normal", "Transparency"]), value: Cow::Borrowed("Transparency") },
+                Value::String(Cow::Borrowed("Transparency")),
+            ),
+            (
+                Setting::OptionalSelect { setting: select(&["a", "b"]), value: Some(Cow::Borrowed("a")) },
+                Value::OptionalString(Some(Cow::Borrowed("a"))),
+            ),
+            (
+                Setting::OptionalSelect { setting: select(&["a", "b"]), value: None },
+                Value::OptionalString(None),
+            ),
+            (
+                Setting::MultiSelect {
+                    setting: select(&["x", "y"]),
+                    values: vec![Cow::Borrowed("x"), Cow::Borrowed("y")],
+                },
+                Value::StringVec(vec![Cow::Borrowed("x"), Cow::Borrowed("y")]),
+            ),
+            (
+                Setting::Equalizer {
+                    setting: Equalizer {
+                        band_hz: band_hz.clone(),
+                        fraction_digits: 0,
+                        min: -6,
+                        max: 6,
+                    },
+                    read_only: false,
+                    value: vec![6, -4],
+                },
+                Value::I16Vec(vec![6, -4]),
+            ),
+            (
+                Setting::PresetEqualizerProfileSelect {
+                    equalizer: Equalizer {
+                        band_hz: band_hz.clone(),
+                        fraction_digits: 0,
+                        min: -6,
+                        max: 6,
+                    },
+                    select: select(&["Flat"]),
+                    presets: vec![vec![0, 0]],
+                    value: Some(Cow::Borrowed("Flat")),
+                },
+                Value::String(Cow::Borrowed("Flat")),
+            ),
+            (Setting::TimeOfDay { minutes_after_midnight: 480 }, Value::I32(480)),
+        ];
+
+        for (setting, expected) in cases {
+            let raw = setting_to_raw(&setting).expect("representable setting must serialize");
+            let parsed =
+                parse_value(&setting, &raw).unwrap_or_else(|err| panic!("raw {raw:?} failed to parse: {err}"));
+            assert_eq!(parsed, expected, "raw {raw:?}");
+        }
+    }
+
+    /// Command-shaped and unrepresentable settings must never be captured.
+    #[test]
+    fn setting_to_raw_skips_unrepresentable_shapes() {
+        assert_eq!(
+            setting_to_raw(&Setting::Information {
+                value: "v".to_owned(),
+                translated_value: "v".to_owned()
+            }),
+            None
+        );
+        assert_eq!(setting_to_raw(&Setting::Action), None);
+        assert_eq!(setting_to_raw(&Setting::ImportString { confirmation_message: None }), None);
+        assert_eq!(
+            setting_to_raw(&Setting::ModifiableSelect { setting: select(&["a"]), value: None }),
+            None
+        );
+        assert_eq!(
+            setting_to_raw(&Setting::MultiSelectWithRemove {
+                setting: select(&["a"]),
+                values: vec![Cow::Borrowed("a")]
+            }),
+            None
+        );
+        assert_eq!(setting_to_raw(&Setting::HueColorPicker { hue: 200.0 }), None);
+    }
+
+    #[test]
+    fn fetched_ids_round_trip_through_setting_id_parser() {
+        for id in [
+            SettingId::AmbientSoundMode,
+            SettingId::NoiseCancelingMode,
+            SettingId::VolumeAdjustments,
+            SettingId::SpatialAudio,
+        ] {
+            let raw = id.to_string();
+            assert_eq!(SettingId::from_str(&raw).ok(), Some(id), "raw {raw:?}");
+        }
+    }
+
+    #[test]
+    fn fetch_skip_ids_parse_from_their_string_form() {
+        for id in FETCH_SKIP {
+            assert!(SettingId::from_str(&id.to_string()).is_ok());
+        }
+    }
 }
