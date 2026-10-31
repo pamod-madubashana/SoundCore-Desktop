@@ -62,6 +62,7 @@ struct DeviceStateDto {
     model: String,
     poll_seconds: u64,
     apply_delay_seconds: u64,
+    apply_profile_on_connect: bool,
     connected: bool,
     message: String,
     image: Option<String>,
@@ -193,6 +194,7 @@ fn get_states(state: tauri::State<AppState>) -> Vec<DeviceStateDto> {
                 model: d.model.clone(),
                 poll_seconds: d.poll_seconds,
                 apply_delay_seconds: d.apply_delay_seconds,
+                apply_profile_on_connect: d.apply_profile_on_connect,
                 connected,
                 message,
                 image: d.image.clone().or_else(|| {
@@ -704,6 +706,7 @@ pub fn run() {
                                         model: model.to_string(),
                                         poll_seconds: 5,
                                         apply_delay_seconds: 2,
+                                        apply_profile_on_connect: true,
                                         profile: Vec::new(),
                                         image: None,
                                         color: None,

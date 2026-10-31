@@ -347,6 +347,15 @@ async fn device_loop(
             s.message = format!("waiting for {model}...");
         });
 
+        // Connectivity is determined from the OS's connected-device list only.
+        // Never send SDP/RFCOMM connect attempts just to find out whether the
+        // earbuds are there — wait until Windows reports them connected.
+        if !is_device_still_connected(mac).await {
+            tracing::debug!("OS does not report {mac} ({model}) connected; skipping RFCOMM connect attempt");
+            sleep(poll).await;
+            continue;
+        }
+
         tracing::debug!("attempting connection to {mac} ({model})");
         match timeout(Duration::from_secs(10), session.connect(mac)).await {
             Ok(Ok(device)) => {
@@ -360,8 +369,15 @@ async fn device_loop(
                 if !apply_delay.is_zero() {
                     sleep(apply_delay).await;
                 }
-                apply_and_report(device.as_ref(), &current_profile(&state, mac), &state, mac).await;
-                publish_snapshot(device.as_ref(), &state, mac);
+                if dev.apply_profile_on_connect {
+                    apply_and_report(device.as_ref(), &current_profile(&state, mac), &state, mac).await;
+                    publish_snapshot(device.as_ref(), &state, mac);
+                } else {
+                    tracing::debug!("apply_profile_on_connect=false, skipping profile push for {mac}");
+                    set_device_state(&state, mac, |s| {
+                        s.message = "connected (profile push disabled)".into();
+                    });
+                }
 
                 if connected_session(device.as_ref(), &mut rx, &state, mac).await {
                     tracing::debug!("connected_session returned for {mac}, task replaced");
@@ -452,9 +468,10 @@ async fn connected_session(
 }
 
 /// Lightweight check: queries the OS Bluetooth cache (AQS filter) to see if a
-/// device with the given MAC address is still listed as connected.  No RFCOMM
-/// I/O is performed — this only reads from the Windows Bluetooth stack's
-/// cached device list.
+/// device with the given MAC address is listed as connected.  No RFCOMM I/O is
+/// performed — this only reads from the Windows Bluetooth stack's cached
+/// device list.  Used both to gate outgoing connect attempts (`device_loop`)
+/// and as the in-session presence check (`connected_session`).
 #[cfg(target_os = "windows")]
 async fn is_device_still_connected(mac: MacAddr6) -> bool {
     tokio::task::spawn_blocking(move || {
