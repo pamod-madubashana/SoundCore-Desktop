@@ -773,24 +773,22 @@ fn fetch_profile_from_device(device: &(dyn OpenSCQ30Device + Send + Sync)) -> Ve
     entries
 }
 
-/// Persists a fetched profile to config.toml so UI edits and restarts see
-/// device reality.
+/// Persists connect state for a device to config.toml so UI edits and restarts
+/// see device reality: stamps `last_connected` on every successful connect and
+/// stores the fetched profile so the idle list sorts newest-first.
 /// An empty fetch means the device hadn't reported its state yet — the old
-/// profile is kept rather than wiped.
+/// profile is kept rather than wiped, but the connect is still recorded.
 fn store_fetched_profile(mac: MacAddr6, mut profile: Vec<SettingEntry>) {
-    if profile.is_empty() {
-        warn!("device {mac} reported no settings yet; keeping existing profile");
-        return;
+    if !profile.is_empty() {
+        crate::config::prune_profile(&mut profile);
     }
-    crate::config::prune_profile(&mut profile);
     let count = profile.len();
 
     let path = crate::config::resolve_path(None);
     let mut cfg = match Config::load(&path) {
         Ok(cfg) => cfg,
         Err(err) => {
-            warn!("could not reload {}: {err:#}; fetched profile not persisted", path.display());
-            info!("fetched profile from device: {count} settings (not persisted)");
+            warn!("could not reload {}: {err:#}; connect recency and profile not persisted", path.display());
             return;
         }
     };
@@ -801,14 +799,27 @@ fn store_fetched_profile(mac: MacAddr6, mut profile: Vec<SettingEntry>) {
         .find(|d| d.mac_address.eq_ignore_ascii_case(&key) || MacAddr6::from_str(d.mac_address.trim()).is_ok_and(|m| m == mac));
     match device {
         Some(d) => {
-            d.profile = profile;
-            if let Err(err) = cfg.save(&path) {
-                warn!("failed to persist fetched profile to {}: {err:#}", path.display());
+            d.last_connected = Some(now_unix());
+            if profile.is_empty() {
+                warn!("device {mac} reported no settings yet; keeping existing profile");
+            } else {
+                d.profile = profile;
             }
+            if let Err(err) = cfg.save(&path) {
+                warn!("failed to persist connect state to {}: {err:#}", path.display());
+            }
+            info!("connect recorded for {mac}: {count} settings stored");
         }
-        None => tracing::debug!("device {mac} not present in {}; fetched profile not persisted", path.display()),
+        None => tracing::debug!("device {mac} not present in {}; connect recency not persisted", path.display()),
     }
-    info!("fetched profile from device: {count} settings stored for {mac}");
+}
+
+/// Current unix time in seconds; 0 if the clock is before the epoch.
+fn now_unix() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }
 
 async fn scan(session: &OpenSCQ30Session, state: &SharedState, model: DeviceModel) {
