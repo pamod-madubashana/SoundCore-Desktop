@@ -2,7 +2,7 @@
 name = "soundcore-desktop"
 version = "1.7.0"
 edition = "2024"
-description = "Cross-platform desktop tray app that auto-applies Soundcore profiles (gaming mode, ANC, EQ) the moment a device connects. Windows & Linux."
+description = "Cross-platform desktop tray app that mirrors Soundcore earbud settings (gaming mode, ANC, EQ) — fetch-only on connect, live single-setting controls from the tray. Windows & Linux."
 
 [lib]
 name = "soundcore_desktop_lib"

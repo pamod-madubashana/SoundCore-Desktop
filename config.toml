@@ -4,8 +4,9 @@
 # settings are READ from the device and stored as that device's `profile` —
 # the fetch is read-only and never writes anything to the device. You can edit
 # all of this from the tray popup (left-click the tray icon): live controls
-# write the single setting you change, and "Apply now" pushes the whole
-# stored profile. Unknown setting ids are reported with a clear message.
+# write the single setting you change and update this file for reference; the
+# stored profile is never pushed back to the device. Unknown setting ids are
+# reported with a clear message.
 
 # Start automatically at logon (toggle from the popup's "Run at startup" checkbox).
 autostart = true
