@@ -47,8 +47,8 @@ pub struct DeviceConfig {
     pub apply_delay_seconds: u64,
     /// Settings recorded for this device. On every connect this list is REPLACED
     /// with the device's current settings — a read-only fetch that never writes
-    /// anything to the device. Manual "Apply now" (and live UI changes, which
-    /// write the single setting they touch) still push to the device.
+    /// anything to the device. Live UI changes write the single setting they
+    /// touch and update this list for reference; it is never pushed back.
     #[serde(default)]
     pub profile: Vec<SettingEntry>,
     /// Optional product image URL shown in the popup (otherwise a generic illustration).
@@ -84,12 +84,12 @@ fn is_enabling_spatial(id: &str, value: &str) -> bool {
 
 /// Drops entries that cannot coexist with `id`.
 ///
-/// The whole profile is replayed in a single `set_setting_values` call on connect,
-/// and the device folds it into one target state before sending anything. Writing
-/// any equalizer value clears spatial audio device-side, and two equalizer sources
-/// simply overwrite each other — so a profile holding e.g. both `volumeAdjustments`
-/// and `spatialAudio = true` silently loses spatial audio on every reconnect.
-/// Keeping the profile internally consistent is what makes the mode stick.
+/// The device folds conflicting equalizer state into one target state: writing
+/// any equalizer value clears spatial audio device-side, and two equalizer
+/// sources simply overwrite each other. The stored profile must mirror that —
+/// holding e.g. both `volumeAdjustments` and `spatialAudio = true` would
+/// misrepresent what the device is actually doing. Keeping the record
+/// internally consistent is what makes it a faithful mirror.
 fn prune_conflicts(list: &mut Vec<SettingEntry>, id: &str, value: &str) {
     let eq_source = is_eq_source(id);
     if !eq_source && !is_enabling_spatial(id, value) {
