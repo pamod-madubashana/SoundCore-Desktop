@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Volume2, Waves, Ear, Loader2, X, Download, SlidersHorizontal,
+  Volume2, Waves, Ear, Loader2, X, Download, SlidersHorizontal, Bluetooth,
 } from "lucide-react";
 import SoundEffectsPopup from "./components/SoundEffectsPopup";
 import { matchCustomPreset, selectEntries, soundEffectLabel } from "./lib/soundEffects";
@@ -204,36 +204,99 @@ function Searching({ updateInfo, updateProgress, updateError, onStartUpdate }: S
   );
 }
 
+// Product-kind subtitle for a device card, mirroring the name-based category
+// guess in DeviceArt. Appends "· Noise cancelling" for NC/ANC models.
+function deviceKindLabel(name: string): string {
+  const n = name.toLowerCase();
+  if (/motion|boom|flare|select|rave/.test(n)) return "Speaker";
+  if (/space|vortex|life tune|life q|(^|\s)q\d/.test(n)) return "Over-ear headphones";
+  const nc = /(^|\W)(nc|anc)($|\W)/.test(n) ? " · Noise cancelling" : "";
+  return `Wireless earbuds${nc}`;
+}
+
 // Idle list of remembered devices, newest-connect first (the backend sorts
 // get_states by last_connected). Display-only: a card means "saved", and the
 // Not Connected status just means the buds aren't up via Bluetooth right now.
 interface MyDevicesProps { devices: any[]; updateInfo: any; updateProgress: any; updateError: string | null; onStartUpdate: () => void }
 function MyDevices({ devices, updateInfo, updateProgress, updateError, onStartUpdate }: MyDevicesProps) {
+  // Footer radio/scan state, polled only while this screen is mounted.
+  // btOn stays null until the first reply so we fail open ("on") rather than
+  // flashing a bogus red "Bluetooth off".
+  const [btOn, setBtOn] = useState<boolean | null>(null);
+  const [scanning, setScanning] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    const tick = async () => {
+      try {
+        const [on, scan] = await Promise.all([invoke("get_bluetooth_status"), invoke("get_scan")]);
+        if (!alive) return;
+        setBtOn(on === true);
+        setScanning(!!scan?.scanning);
+      } catch { /* ignore */ }
+    };
+    tick();
+    const t = setInterval(tick, 2000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
+
+  const off = btOn === false;
+  const statusText = off
+    ? "Bluetooth off"
+    : scanning
+      ? "Bluetooth is on · Scanning…"
+      : "Bluetooth is on · Watching for devices";
+
   return (
     <div className="flex-1 flex flex-col min-h-0 relative">
-      <div className="px-4 pt-4 pb-2 text-center">
-        <p className="text-[15px] font-semibold text-foreground">My Devices</p>
-        <p className="text-[11px] text-muted-foreground mt-0.5">Connect a device to control it.</p>
+      {/* Header */}
+      <div className="px-4 pt-4 pb-3 flex items-center gap-3">
+        <div className="h-9 w-9 shrink-0 rounded-xl bg-brand/15 ring-1 ring-brand/40 flex items-center justify-center">
+          <Bluetooth className="h-[18px] w-[18px] text-brand" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-[19px] font-bold text-foreground leading-tight">My Devices</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Pick a device to connect and control</p>
+        </div>
       </div>
+      <div className="h-px bg-[var(--border-subtle)]" />
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-3 flex flex-col gap-2">
+      {/* Device list */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-2 flex flex-col gap-2.5">
+        <p className="text-[10px] font-semibold uppercase tracking-[1.4px] text-muted-foreground">Paired</p>
         {devices.map((d: any) => (
-          <div key={d.mac_address} className="rounded-xl bg-surface ring-1 ring-[var(--border-subtle)] px-3 py-2.5 flex items-center gap-3">
-            <div className="h-11 w-11 shrink-0 rounded-lg bg-surface-elevated ring-1 ring-[var(--border-subtle)] p-1.5 overflow-hidden">
+          <div key={d.mac_address} className="rounded-[20px] bg-surface ring-1 ring-[var(--border-subtle)] p-3.5 flex items-center gap-3.5">
+            <div className="h-14 w-14 shrink-0 rounded-2xl bg-surface-elevated ring-1 ring-[var(--border-subtle)] p-1.5 overflow-hidden">
               <DeviceArt name={d.name || d.model} url={d.image} color={d.color} />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-medium text-foreground truncate">{d.name || d.model}</p>
-              <p className={`text-[11px] ${d.connected ? "text-success" : "text-muted-foreground"}`}>
+              <p className="text-[15px] font-bold text-foreground truncate">{d.name || d.model}</p>
+              <p className="text-[11px] text-muted-foreground truncate mt-0.5">{deviceKindLabel(d.name || d.model)}</p>
+              <span className={
+                d.connected
+                  ? "mt-1.5 inline-flex items-center gap-1.5 h-5 px-2.5 rounded-full bg-[#4ade80]/14 ring-1 ring-[#4ade80]/40 text-[10.5px] font-semibold text-[#86efac]"
+                  : "mt-1.5 inline-flex items-center gap-1.5 h-5 px-2.5 rounded-full bg-[#ff6b6b]/14 ring-1 ring-[#ff6b6b]/40 text-[10.5px] font-semibold text-[#ff9a9a]"
+              }>
+                <span className={"h-1.5 w-1.5 rounded-full " + (d.connected ? "bg-[#4ade80]" : "bg-[#ff6b6b]")} />
                 {d.connected ? "Connected" : "Not Connected"}
-              </p>
+              </span>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="px-4 pb-4 flex justify-center">
+      <div className="px-4 pb-2 flex justify-center">
         <UpdateNotice updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={onStartUpdate} />
+      </div>
+
+      {/* Footer status pill */}
+      <div className="px-3.5 pb-3.5">
+        <div className="h-[42px] rounded-full bg-surface ring-1 ring-[var(--border-subtle)] px-4 flex items-center gap-2.5">
+          <span className="relative flex h-2.5 w-2.5 items-center justify-center">
+            <span className={"absolute h-2.5 w-2.5 rounded-full " + (off ? "bg-[#ff6b6b]/25" : "bg-success/25")} />
+            <span className={"relative h-2 w-2 rounded-full " + (off ? "bg-[#ff6b6b]" : "bg-success")} />
+          </span>
+          <span className={"text-[11.5px] " + (off ? "text-[#ff9a9a]" : "text-foreground/70")}>{statusText}</span>
+        </div>
       </div>
     </div>
   );
