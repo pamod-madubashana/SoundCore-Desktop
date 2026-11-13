@@ -460,12 +460,12 @@ function BatteryPill({ level, label }: BatteryPillProps) {
   return (
     <span className="inline-flex items-center gap-1.5 h-5 pl-1.5 pr-2 rounded-full bg-surface ring-1 ring-[var(--border-subtle)]">
       {label === "Case" ? (
-        <svg className="h-2.5 w-2.5 text-brand" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg className="h-2.5 w-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <rect x="2" y="7" width="20" height="14" rx="2" />
           <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
         </svg>
       ) : label ? (
-        <span className="text-[9.5px] font-bold text-brand leading-none">{label}</span>
+        <span className="text-[9.5px] font-bold text-white leading-none">{label}</span>
       ) : null}
       <span className="h-[9px] w-[22px] rounded-[3px] bg-[var(--toggle-off)] overflow-hidden">
         <span className={"block h-full rounded-[3px] " + fill} style={{ width: `${pct}%` }} />
