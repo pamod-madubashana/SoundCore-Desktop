@@ -4,7 +4,7 @@
 //! individual changes the user makes in the popup.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::PathBuf,
     str::FromStr,
     sync::{Arc, Mutex},
@@ -183,19 +183,19 @@ pub fn spawn(config: Config) -> WorkerHandle {
 
 struct DeviceTasks {
     senders: HashMap<MacAddr6, mpsc::UnboundedSender<DeviceCommand>>,
-    handles: Vec<JoinHandle<()>>,
+    handles: HashMap<MacAddr6, JoinHandle<()>>,
 }
 
 impl DeviceTasks {
     fn abort(self) {
-        for h in self.handles {
+        for h in self.handles.into_values() {
             h.abort();
         }
     }
 }
 
 async fn run(
-    config: Config,
+    mut config: Config,
     mut rx: mpsc::UnboundedReceiver<Command>,
     state: Arc<SharedState>,
 ) {
@@ -212,9 +212,18 @@ async fn run(
     while let Some(cmd) = rx.recv().await {
         match cmd {
             Command::UpdateConfig(new_config) => {
-                std::mem::replace(&mut tasks, DeviceTasks { senders: HashMap::new(), handles: Vec::new() }).abort();
-                state.devices.lock().unwrap().clear();
-                tasks = spawn_devices(&session, &state, &new_config);
+                let (to_abort, to_spawn) = diff_tasks(&config.devices, &new_config.devices);
+                for mac in to_abort {
+                    if let Some(handle) = tasks.handles.remove(&mac) {
+                        handle.abort();
+                    }
+                    tasks.senders.remove(&mac);
+                    state.devices.lock().unwrap().remove(&mac);
+                }
+                for idx in to_spawn {
+                    spawn_device(&session, &state, &new_config.devices[idx], &mut tasks);
+                }
+                config = new_config;
             }
             Command::SetSetting { mac, id, value } => {
                 if let Some(tx) = tasks.senders.get(&mac) {
@@ -241,35 +250,96 @@ fn is_supported_model(model: DeviceModel) -> bool {
     !matches!(model, DeviceModel::SoundcoreDevelopment)
 }
 
-fn spawn_devices(session: &Arc<OpenSCQ30Session>, state: &Arc<SharedState>, config: &Config) -> DeviceTasks {
-    let mut senders = HashMap::new();
-    let mut handles = Vec::new();
-    for dev in &config.devices {
-        let (mac, model) = match dev.parse() {
-            Ok(v) => v,
-            Err(err) => {
-                // No recognizable Soundcore model (empty/unknown string) or bad
-                // MAC: not Soundcore-supported, so skip entirely with a single
-                // one-time line. Never WARN, never spawn a retry loop.
-                info!("skipping unsupported device '{}': {err:#}", dev.label());
-                continue;
-            }
-        };
-        if !is_supported_model(model) {
-            info!(
-                "skipping unsupported device '{}' (model {model}): not a Soundcore-supported device",
-                dev.label()
-            );
-            continue;
-        };
-        let (dtx, drx) = mpsc::unbounded_channel();
-        senders.insert(mac, dtx);
-        let session = session.clone();
-        let state = state.clone();
-        let dev = dev.clone();
-        handles.push(tokio::spawn(async move { device_loop(session, state, dev, drx).await }));
+/// Fingerprint of the device fields that require restarting its task.
+/// `name`, `profile`, `image`, and `color` are UI-only and deliberately absent.
+type TaskFingerprint = (MacAddr6, DeviceModel, u64, u64);
+
+fn task_fingerprint(dev: &DeviceConfig) -> Option<TaskFingerprint> {
+    let (mac, model) = dev.parse().ok()?;
+    Some((mac, model, dev.poll_seconds, dev.apply_delay_seconds))
+}
+
+/// Pure diff between two device lists: (macs whose running task must be aborted,
+/// indices into `new` whose task must be spawned). Entries whose fingerprint is
+/// unchanged keep running untouched — a config edit no longer nukes and respawns
+/// every device task. Duplicate MACs resolve first-wins on both sides, matching
+/// how tasks are keyed.
+fn diff_tasks(old: &[DeviceConfig], new: &[DeviceConfig]) -> (Vec<MacAddr6>, Vec<usize>) {
+    let mut old_fps: HashMap<MacAddr6, TaskFingerprint> = HashMap::new();
+    for dev in old {
+        if let Some(fp) = task_fingerprint(dev) {
+            old_fps.entry(fp.0).or_insert(fp);
+        }
     }
-    DeviceTasks { senders, handles }
+    let mut live: HashSet<MacAddr6> = HashSet::new();
+    let mut to_abort = Vec::new();
+    let mut to_spawn = Vec::new();
+    for (idx, dev) in new.iter().enumerate() {
+        let Some(fp) = task_fingerprint(dev) else { continue };
+        if !live.insert(fp.0) {
+            continue;
+        }
+        match old_fps.get(&fp.0) {
+            Some(prev) if *prev == fp => {}
+            Some(_) => {
+                to_abort.push(fp.0);
+                to_spawn.push(idx);
+            }
+            None => to_spawn.push(idx),
+        }
+    }
+    for mac in old_fps.keys() {
+        if !live.contains(mac) {
+            to_abort.push(*mac);
+        }
+    }
+    (to_abort, to_spawn)
+}
+
+fn spawn_device(
+    session: &Arc<OpenSCQ30Session>,
+    state: &Arc<SharedState>,
+    dev: &DeviceConfig,
+    tasks: &mut DeviceTasks,
+) {
+    let (mac, model) = match dev.parse() {
+        Ok(v) => v,
+        Err(err) => {
+            // No recognizable Soundcore model (empty/unknown string) or bad
+            // MAC: not Soundcore-supported, so skip entirely with a single
+            // one-time line. Never WARN, never spawn a retry loop.
+            info!("skipping unsupported device '{}': {err:#}", dev.label());
+            return;
+        }
+    };
+    if !is_supported_model(model) {
+        info!(
+            "skipping unsupported device '{}' (model {model}): not a Soundcore-supported device",
+            dev.label()
+        );
+        return;
+    }
+    if tasks.senders.contains_key(&mac) {
+        return; // duplicate MAC: first entry wins
+    }
+    let (dtx, drx) = mpsc::unbounded_channel();
+    tasks.senders.insert(mac, dtx);
+    let session = session.clone();
+    let state = state.clone();
+    let dev = dev.clone();
+    let handle = tokio::spawn(async move { device_loop(session, state, dev, drx).await });
+    tasks.handles.insert(mac, handle);
+}
+
+fn spawn_devices(session: &Arc<OpenSCQ30Session>, state: &Arc<SharedState>, config: &Config) -> DeviceTasks {
+    let mut tasks = DeviceTasks {
+        senders: HashMap::new(),
+        handles: HashMap::new(),
+    };
+    for dev in &config.devices {
+        spawn_device(session, state, dev, &mut tasks);
+    }
+    tasks
 }
 
 fn set_device_state(state: &SharedState, mac: MacAddr6, f: impl FnOnce(&mut DeviceState)) {
