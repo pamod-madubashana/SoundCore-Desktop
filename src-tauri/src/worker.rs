@@ -718,10 +718,10 @@ fn publish_snapshot(device: &(dyn OpenSCQ30Device + Send + Sync), state: &Shared
     set_device_state(state, mac, |s| s.snapshot = Some(snapshot));
 }
 
-/// Settings that must never end up in a stored profile even if the device
-/// reports them as writable: replaying them via "Apply now" would power off
-/// the buds, ring them, reset buttons, or fire an export the device treats as
-/// a rejected command (which would fail the whole batch).
+/// One-shot actions (power off, ring, reset, export) that must never end up
+/// in the stored profile even if the device reports them as writable: they
+/// are commands, not state, and a settings record must never describe — let
+/// alone round-trip — something that powers off the buds or fires an export.
 const FETCH_SKIP: [SettingId; 4] = [
     SettingId::PowerOff,
     SettingId::FindDevice,
@@ -731,7 +731,7 @@ const FETCH_SKIP: [SettingId; 4] = [
 
 /// Serializes a setting's current value into the string form the profile
 /// format stores. Must round-trip through `parse_value` so a fetched profile
-/// can be pushed again later by "Apply now". Returns None for value shapes
+/// stays an exact, lossless mirror of the device. Returns None for value shapes
 /// with no faithful string form (MultiSelectWithRemove lists, hue pickers)
 /// and for read-only / write-only settings.
 fn setting_to_raw(setting: &Setting) -> Option<String> {
@@ -964,8 +964,8 @@ mod tests {
         }
     }
 
-    /// A fetched profile is only useful if every stored string can be pushed
-    /// again later by "Apply now" — `setting_to_raw` must invert `parse_value`.
+    /// A fetched profile is only a faithful mirror if every stored string
+    /// round-trips — `setting_to_raw` must invert `parse_value`.
     #[test]
     fn setting_to_raw_round_trips_through_parse_value() {
         let band_hz: Cow<'static, [u16]> = Cow::Borrowed(&[100, 200]);

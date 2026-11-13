@@ -2,7 +2,7 @@
 <h1>SoundCore-Desktop</h1>
 
 <img src='src-tauri/icons/icon.png' width=200>
-<p>SoundCore-Desktop is a lightweight cross-platform tray app that restores your Soundcore device profile automatically when the device connects, so your preferred gaming mode, ANC, and EQ settings land without the phone app.</p>
+<p>SoundCore-Desktop is a lightweight cross-platform tray app that keeps your Soundcore device settings at hand: it reads your device's current profile the moment it connects (never overwriting it), and puts live controls — gaming mode, ANC, and EQ — in the tray, no phone app needed.</p>
 
 
   <a href="https://github.com/pamod-madubashana/SoundCore-Desktop"><img src="https://img.shields.io/badge/version-0.1.0-blue" alt="Version"></a>
@@ -39,8 +39,8 @@
 ## Why This Project Exists
 
 - Problem: Soundcore device settings are often locked behind the mobile app, so desktop users lose access to gaming mode, ANC, or EQ profiles when the device reconnects.
-- Goal: Keep Soundcore device preferences consistent by applying the saved profile automatically from a native desktop tray utility.
-- Outcome: A small tray app that restores your profile at connect, offers quick controls, and removes the need to use the official phone app.
+- Goal: Keep Soundcore device preferences consistent by mirroring the device's own settings into a native desktop tray utility.
+- Outcome: A small tray app that shows live device settings at connect, offers quick controls, and removes the need to use the official phone app.
 
 ## Project Structure
 
@@ -89,7 +89,7 @@
 ## Key Features
 
 - Runs in the system tray with a compact control panel
-- Automatically applies your saved Soundcore profile when a device connects
+- Reads your device's current settings the moment it connects (fetch-only — nothing is pushed back)
 - Supports quick toggles for gaming mode, ANC, and volume presets
 - Build targets for Windows and Linux
 - Minimal distraction and no phone app required once configured
@@ -130,14 +130,14 @@ npm run tauri build
 
 1. Launch SoundCore-Desktop; it will appear in your system tray
 2. Click the tray icon to open the control panel
-3. Add your Soundcore device and configure the profile settings
-4. Use the app popup to apply your profile or save it permanently
-5. The app restores your settings the next time the device connects
+3. Add your Soundcore device (auto-detected on most setups)
+4. Use the app popup to change settings live — each change is written to the device immediately and saved to the synced profile
+5. On the next connect the app re-reads the device's settings, so the popup always reflects reality
 
 ## Keyboard Shortcuts
 
 - **Left-click tray icon**: Show/hide control panel
-- **Right-click tray icon**: Open context menu (Show/Hide, Apply now, Quit)
+- **Right-click tray icon**: Open context menu (Show/Hide, Quit)
 
 
 ## Credits
