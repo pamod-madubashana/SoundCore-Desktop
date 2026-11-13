@@ -337,6 +337,13 @@ fn get_scan(state: tauri::State<AppState>) -> ScanDto {
     ScanDto { scanning, results }
 }
 
+/// OS Bluetooth radio power for the idle screen's footer dot; fail-open true
+/// on platforms/errors that can't tell (see `worker::bluetooth_is_on`).
+#[tauri::command]
+async fn get_bluetooth_status() -> bool {
+    worker::bluetooth_is_on().await
+}
+
 #[tauri::command]
 fn open_url(url: String) {
     let _ = std::process::Command::new(match std::env::consts::OS {
@@ -622,6 +629,7 @@ pub fn run() {
             delete_eq_preset,
             scan,
             get_scan,
+            get_bluetooth_status,
             hide_window,
             open_url,
             show_notification,

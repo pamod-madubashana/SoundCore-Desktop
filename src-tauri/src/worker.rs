@@ -593,6 +593,11 @@ async fn connected_session(
     }
 }
 
+/// Shared BlueZ session for the cheap D-Bus property reads below (presence +
+/// radio power), so repeated checks don't open a new connection each time.
+#[cfg(target_os = "linux")]
+static SESSION: tokio::sync::OnceCell<bluer::Session> = tokio::sync::OnceCell::const_new();
+
 /// Lightweight check: queries the OS Bluetooth cache (AQS filter) to see if a
 /// device with the given MAC address is listed as connected.  No RFCOMM I/O is
 /// performed — this only reads from the Windows Bluetooth stack's cached
@@ -656,8 +661,6 @@ async fn is_device_still_connected(mac: MacAddr6) -> bool {
 /// adapter" returns false.
 #[cfg(target_os = "linux")]
 async fn is_device_still_connected(mac: MacAddr6) -> bool {
-    static SESSION: tokio::sync::OnceCell<bluer::Session> = tokio::sync::OnceCell::const_new();
-
     let session = match SESSION.get_or_try_init(|| bluer::Session::new()).await {
         Ok(session) => session,
         Err(err) => {
@@ -706,6 +709,103 @@ async fn is_device_still_connected(mac: MacAddr6) -> bool {
 /// present so connect attempts — bounded by backoff — still happen.
 #[cfg(not(any(target_os = "windows", target_os = "linux")))]
 async fn is_device_still_connected(_mac: MacAddr6) -> bool {
+    true
+}
+
+/// Whether the OS reports Bluetooth radio power on. Drives the idle screen's
+/// footer dot (green "on" / red "Bluetooth off"). Fail-open: any inability to
+/// determine radio state (no adapter, null radio, query errors, `Unknown`
+/// state) reports `true` so the UI never falsely claims the radio is off;
+/// only a definitive `Off`/`Disabled` radio state is false.
+#[cfg(target_os = "windows")]
+pub async fn bluetooth_is_on() -> bool {
+    tokio::task::spawn_blocking(|| {
+        use windows::Devices::{Bluetooth::BluetoothAdapter, Radios::RadioState};
+
+        let adapter = match BluetoothAdapter::GetDefaultAsync() {
+            Ok(op) => match op.join() {
+                Ok(adapter) => adapter,
+                Err(err) => {
+                    tracing::debug!("no default Bluetooth adapter: {err}");
+                    return true;
+                }
+            },
+            Err(err) => {
+                tracing::debug!("GetDefaultAsync failed: {err}");
+                return true;
+            }
+        };
+        let radio = match adapter.GetRadioAsync() {
+            Ok(op) => match op.join() {
+                Ok(radio) => radio,
+                Err(err) => {
+                    tracing::debug!("GetRadioAsync join failed: {err}");
+                    return true;
+                }
+            },
+            Err(err) => {
+                tracing::debug!("GetRadioAsync failed: {err}");
+                return true;
+            }
+        };
+        match radio.State() {
+            Ok(state) if state == RadioState::Off || state == RadioState::Disabled => false,
+            Ok(_) => true, // On or Unknown — Unknown fails open
+            Err(err) => {
+                tracing::debug!("radio State() failed: {err}");
+                true
+            }
+        }
+    })
+    .await
+    .unwrap_or(true)
+}
+
+/// Linux: any adapter's BlueZ `Powered` property decides the state — one
+/// powered adapter means Bluetooth is on. No adapters is a definitive off.
+#[cfg(target_os = "linux")]
+pub async fn bluetooth_is_on() -> bool {
+    let session = match SESSION.get_or_try_init(|| bluer::Session::new()).await {
+        Ok(session) => session,
+        Err(err) => {
+            tracing::debug!("bluer session unavailable: {err}");
+            return true;
+        }
+    };
+    let adapter_names = match session.adapter_names().await {
+        Ok(names) => names,
+        Err(err) => {
+            tracing::debug!("failed to list bluetooth adapters: {err}");
+            return true;
+        }
+    };
+    if adapter_names.is_empty() {
+        return false;
+    }
+    for name in adapter_names {
+        let adapter = match session.adapter(&name) {
+            Ok(adapter) => adapter,
+            Err(err) => {
+                tracing::debug!("bluetooth adapter {name} unavailable: {err}");
+                return true;
+            }
+        };
+        match adapter.is_powered().await {
+            Ok(true) => return true,
+            Ok(false) => {} // powered off here; check the remaining adapters
+            Err(err) => {
+                tracing::debug!("is_powered failed for {name}: {err}");
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Platforms without a radio-state check: assume on (fail-open, same as the
+/// presence gate) so the footer never shows a bogus "Bluetooth off".
+#[cfg(not(any(target_os = "windows", target_os = "linux")))]
+pub async fn bluetooth_is_on() -> bool {
     true
 }
 
