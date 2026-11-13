@@ -44,24 +44,6 @@ pub struct SharedState {
     pub devices: Mutex<HashMap<MacAddr6, DeviceState>>,
     pub scan_results: Mutex<Vec<ScanResult>>,
     pub scanning: Mutex<bool>,
-    /// Per-device profile applied on connect. Read live so UI changes persist without
-    /// restarting the connection.
-    pub profiles: Mutex<HashMap<MacAddr6, Vec<SettingEntry>>>,
-}
-
-fn load_profiles(config: &Config) -> HashMap<MacAddr6, Vec<SettingEntry>> {
-    config
-        .devices
-        .iter()
-        .filter_map(|d| d.parse().ok().map(|(mac, _)| (mac, d.profile.clone())))
-        .collect()
-}
-
-/// Upsert one entry into a device's on-connect profile (used when the UI changes a setting).
-/// Contradictory sound-effect entries are dropped so the profile stays replayable.
-pub fn upsert_profile_entry(state: &SharedState, mac: MacAddr6, id: String, value: String) {
-    let mut map = state.profiles.lock().unwrap();
-    crate::config::upsert_entry(map.entry(mac).or_default(), id, value);
 }
 
 /// Best-effort Bluetooth-name -> model guess for zero-config auto-detect.
@@ -225,13 +207,11 @@ async fn run(
         }
     };
 
-    *state.profiles.lock().unwrap() = load_profiles(&config);
     let mut tasks = spawn_devices(&session, &state, &config);
 
     while let Some(cmd) = rx.recv().await {
         match cmd {
             Command::UpdateConfig(new_config) => {
-                *state.profiles.lock().unwrap() = load_profiles(&new_config);
                 std::mem::replace(&mut tasks, DeviceTasks { senders: HashMap::new(), handles: Vec::new() }).abort();
                 state.devices.lock().unwrap().clear();
                 tasks = spawn_devices(&session, &state, &new_config);
@@ -359,11 +339,10 @@ async fn device_loop(
                     sleep(apply_delay).await;
                 }
                 // On connect the device is the source of truth: read its current
-                // settings into the stored profile instead of pushing ours down.
-                // This never writes a packet to the device; manual "Apply now"
-                // and live UI changes still do.
+                // settings into the synced profile instead of pushing ours down.
+                // This never writes a packet to the device; live UI changes do.
                 let fetched = fetch_profile_from_device(device.as_ref());
-                store_fetched_profile(&state, mac, fetched);
+                store_fetched_profile(mac, fetched);
                 publish_snapshot(device.as_ref(), &state, mac);
                 set_device_state(&state, mac, |s| {
                     s.message = "connected (profile read from device)".into();
@@ -577,25 +556,24 @@ fn fetch_profile_from_device(device: &(dyn OpenSCQ30Device + Send + Sync)) -> Ve
     entries
 }
 
-/// Stores a fetched profile: shared state first, then persisted to config.toml
-/// so UI edits and restarts see device reality.
+/// Persists a fetched profile to config.toml so UI edits and restarts see
+/// device reality.
 /// An empty fetch means the device hadn't reported its state yet — the old
 /// profile is kept rather than wiped.
-fn store_fetched_profile(state: &SharedState, mac: MacAddr6, mut profile: Vec<SettingEntry>) {
+fn store_fetched_profile(mac: MacAddr6, mut profile: Vec<SettingEntry>) {
     if profile.is_empty() {
         warn!("device {mac} reported no settings yet; keeping existing profile");
         return;
     }
     crate::config::prune_profile(&mut profile);
     let count = profile.len();
-    state.profiles.lock().unwrap().insert(mac, profile.clone());
 
     let path = crate::config::resolve_path(None);
     let mut cfg = match Config::load(&path) {
         Ok(cfg) => cfg,
         Err(err) => {
-            warn!("could not reload {}: {err:#}; fetched profile kept in memory only", path.display());
-            info!("fetched profile from device: {count} settings (memory only)");
+            warn!("could not reload {}: {err:#}; fetched profile not persisted", path.display());
+            info!("fetched profile from device: {count} settings (not persisted)");
             return;
         }
     };
@@ -611,7 +589,7 @@ fn store_fetched_profile(state: &SharedState, mac: MacAddr6, mut profile: Vec<Se
                 warn!("failed to persist fetched profile to {}: {err:#}", path.display());
             }
         }
-        None => tracing::debug!("device {mac} not present in {}; fetched profile kept in memory only", path.display()),
+        None => tracing::debug!("device {mac} not present in {}; fetched profile not persisted", path.display()),
     }
     info!("fetched profile from device: {count} settings stored for {mac}");
 }

@@ -253,8 +253,8 @@ fn set_setting(mac: String, id: String, raw: String, state: tauri::State<AppStat
     let value = worker::parse_value(&setting, &raw).map_err(|e| e.to_string())?;
     let _ = state.worker.tx.send(Command::SetSetting { mac, id: setting_id, value });
 
-    // Persist so it re-applies on the next connect (no worker restart, no reconnect churn).
-    worker::upsert_profile_entry(&state.worker.state, mac, id.clone(), raw.clone());
+    // Persist into the synced profile so the app's copy tracks reality; this is
+    // local bookkeeping only and is never pushed back to the device.
     {
         let mut cfg = state.config.lock().unwrap();
         if let Some(d) = cfg
@@ -262,7 +262,7 @@ fn set_setting(mac: String, id: String, raw: String, state: tauri::State<AppStat
             .iter_mut()
             .find(|d| MacAddr6::from_str(d.mac_address.trim()).ok() == Some(mac))
         {
-            config::upsert_entry(&mut d.profile, id.clone(), raw.clone());
+            config::upsert_entry(&mut d.profile, id, raw);
             let _ = cfg.save(&state.config_path);
         }
     }
