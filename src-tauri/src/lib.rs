@@ -234,13 +234,6 @@ fn get_config(state: tauri::State<AppState>) -> Config {
 }
 
 #[tauri::command]
-fn apply_now(mac: String, state: tauri::State<AppState>) -> Result<(), String> {
-    let mac = MacAddr6::from_str(mac.trim()).map_err(|e| e.to_string())?;
-    let _ = state.worker.tx.send(Command::ApplyNow(mac));
-    Ok(())
-}
-
-#[tauri::command]
 fn set_setting(mac: String, id: String, raw: String, state: tauri::State<AppState>) -> Result<(), String> {
     let mac = MacAddr6::from_str(mac.trim()).map_err(|e| e.to_string())?;
     let setting_id = SettingId::from_str(&id).map_err(|_| format!("unknown setting '{id}'"))?;
@@ -621,7 +614,6 @@ pub fn run() {
             get_version,
             get_config,
             save_config,
-            apply_now,
             set_setting,
             list_eq_presets,
             save_eq_preset,
