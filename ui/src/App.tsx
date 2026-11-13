@@ -488,7 +488,7 @@ function Header({ d, s, updateInfo, updateProgress, updateError, onStartUpdate, 
 
   return (
     <header className="px-3 pt-3 pb-2.5 flex items-start gap-3 border-b border-[var(--border-medium)]">
-      <div className={"relative overflow-hidden shrink-0 h-[52px] w-[58px] rounded-2xl flex items-center justify-center text-brand " + (d.image ? "" : "bg-surface-elevated ring-1 ring-[var(--border-subtle)]")}>
+      <div className={"relative overflow-hidden shrink-0 h-[58px] w-[66px] rounded-2xl flex items-center justify-center text-brand " + (d.image ? "" : "bg-surface-elevated ring-1 ring-[var(--border-subtle)]")}>
         <DeviceArt name={d.name} url={d.image} color={d.color} />
       </div>
       <div className="min-w-0 flex-1">
