@@ -11,7 +11,7 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{Context, anyhow, bail};
+use anyhow::{anyhow, bail};
 use macaddr::MacAddr6;
 use openscq30_lib::{
     DeviceModel, OpenSCQ30Session,
@@ -55,10 +55,6 @@ fn load_profiles(config: &Config) -> HashMap<MacAddr6, Vec<SettingEntry>> {
         .iter()
         .filter_map(|d| d.parse().ok().map(|(mac, _)| (mac, d.profile.clone())))
         .collect()
-}
-
-fn current_profile(state: &SharedState, mac: MacAddr6) -> Vec<SettingEntry> {
-    state.profiles.lock().unwrap().get(&mac).cloned().unwrap_or_default()
 }
 
 /// Upsert one entry into a device's on-connect profile (used when the UI changes a setting).
@@ -166,8 +162,6 @@ pub struct ScanResult {
 pub enum Command {
     /// Rebuild all per-device tasks from a new config.
     UpdateConfig(Config),
-    /// Re-apply the saved profile to a device now.
-    ApplyNow(MacAddr6),
     /// Apply a single live setting change (from a popup widget).
     SetSetting { mac: MacAddr6, id: SettingId, value: Value },
     /// Scan for connectable Bluetooth devices (to pick a MAC).
@@ -178,7 +172,6 @@ pub enum Command {
 /// Commands routed to an individual device task.
 #[derive(Debug)]
 enum DeviceCommand {
-    ApplyNow,
     SetSetting { id: SettingId, value: Value },
 }
 
@@ -242,11 +235,6 @@ async fn run(
                 std::mem::replace(&mut tasks, DeviceTasks { senders: HashMap::new(), handles: Vec::new() }).abort();
                 state.devices.lock().unwrap().clear();
                 tasks = spawn_devices(&session, &state, &new_config);
-            }
-            Command::ApplyNow(mac) => {
-                if let Some(tx) = tasks.senders.get(&mac) {
-                    let _ = tx.send(DeviceCommand::ApplyNow);
-                }
             }
             Command::SetSetting { mac, id, value } => {
                 if let Some(tx) = tasks.senders.get(&mac) {
@@ -422,11 +410,6 @@ async fn connected_session(
     loop {
         tokio::select! {
             cmd = rx.recv() => match cmd {
-                Some(DeviceCommand::ApplyNow) => {
-                    tracing::debug!("ApplyNow for {mac}");
-                    apply_and_report(device, &current_profile(state, mac), state, mac).await;
-                    publish_snapshot(device, state, mac);
-                }
                 Some(DeviceCommand::SetSetting { id, value }) => {
                     tracing::debug!("SetSetting {id} for {mac}");
                     if let Err(err) = device.set_setting_values(vec![(id, value)]).await {
@@ -594,8 +577,8 @@ fn fetch_profile_from_device(device: &(dyn OpenSCQ30Device + Send + Sync)) -> Ve
     entries
 }
 
-/// Stores a fetched profile: shared state first (ApplyNow sees it instantly),
-/// then persisted to config.toml so UI edits and restarts see device reality.
+/// Stores a fetched profile: shared state first, then persisted to config.toml
+/// so UI edits and restarts see device reality.
 /// An empty fetch means the device hadn't reported its state yet — the old
 /// profile is kept rather than wiped.
 fn store_fetched_profile(state: &SharedState, mac: MacAddr6, mut profile: Vec<SettingEntry>) {
@@ -631,43 +614,6 @@ fn store_fetched_profile(state: &SharedState, mac: MacAddr6, mut profile: Vec<Se
         None => tracing::debug!("device {mac} not present in {}; fetched profile kept in memory only", path.display()),
     }
     info!("fetched profile from device: {count} settings stored for {mac}");
-}
-
-async fn apply_and_report(
-    device: &(dyn OpenSCQ30Device + Send + Sync),
-    entries: &[SettingEntry],
-    state: &SharedState,
-    mac: MacAddr6,
-) {
-    match apply_profile(device, entries).await {
-        Ok(()) => {
-            info!("profile applied to {mac}");
-            set_device_state(state, mac, |s| s.message = "profile applied".into());
-        }
-        Err(err) => {
-            warn!("apply failed for {mac}: {err:#}");
-            set_device_state(state, mac, |s| s.message = format!("apply failed: {err:#}"));
-        }
-    }
-}
-
-async fn apply_profile(device: &(dyn OpenSCQ30Device + Send + Sync), entries: &[SettingEntry]) -> anyhow::Result<()> {
-    if entries.is_empty() {
-        return Ok(());
-    }
-    let mut values = Vec::with_capacity(entries.len());
-    for entry in entries {
-        let setting_id = SettingId::from_str(&entry.id)
-            .map_err(|_| anyhow!("setting id '{}' does not exist", entry.id))?;
-        let setting = device
-            .setting(&setting_id)
-            .ok_or_else(|| anyhow!("{} does not expose '{}' right now", device.model(), entry.id))?;
-        let value = parse_value(&setting, &entry.value)
-            .with_context(|| format!("invalid value for '{}'", entry.id))?;
-        values.push((setting_id, value));
-    }
-    device.set_setting_values(values).await.context("device rejected settings")?;
-    Ok(())
 }
 
 async fn scan(session: &OpenSCQ30Session, state: &SharedState, model: DeviceModel) {
