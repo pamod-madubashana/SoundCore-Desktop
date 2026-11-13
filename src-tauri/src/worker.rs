@@ -649,7 +649,62 @@ async fn is_device_still_connected(mac: MacAddr6) -> bool {
     .unwrap_or(true)
 }
 
-#[cfg(not(target_os = "windows"))]
+/// Linux: BlueZ connection state via bluer (D-Bus property reads, no RFCOMM
+/// I/O), mirroring the multi-adapter lookup in OpenSCQ30's linux backend.
+/// Fail-open: any inability to determine presence returns true so the connect
+/// attempt (and its backoff) proceeds; only a definitive "connected on no
+/// adapter" returns false.
+#[cfg(target_os = "linux")]
+async fn is_device_still_connected(mac: MacAddr6) -> bool {
+    static SESSION: tokio::sync::OnceCell<bluer::Session> = tokio::sync::OnceCell::const_new();
+
+    let session = match SESSION.get_or_try_init(|| bluer::Session::new()).await {
+        Ok(session) => session,
+        Err(err) => {
+            tracing::debug!("bluer session unavailable: {err}");
+            return true;
+        }
+    };
+    let adapter_names = match session.adapter_names().await {
+        Ok(names) => names,
+        Err(err) => {
+            tracing::debug!("failed to list bluetooth adapters: {err}");
+            return true;
+        }
+    };
+    if adapter_names.is_empty() {
+        // No adapters: nothing can be connected anywhere.
+        return false;
+    }
+    for name in adapter_names {
+        let adapter = match session.adapter(&name) {
+            Ok(adapter) => adapter,
+            Err(err) => {
+                tracing::debug!("bluetooth adapter {name} unavailable: {err}");
+                return true;
+            }
+        };
+        match adapter.device(mac.into()) {
+            Ok(device) => match device.is_connected().await {
+                Ok(true) => return true,
+                Ok(false) => {} // not on this adapter; keep checking the others
+                Err(err) => {
+                    tracing::debug!("is_connected failed for {mac} on {name}: {err}");
+                    return true;
+                }
+            },
+            Err(err) => {
+                tracing::debug!("device lookup failed for {mac} on {name}: {err}");
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Platforms without a presence check (no Windows AQS, no BlueZ): assume
+/// present so connect attempts — bounded by backoff — still happen.
+#[cfg(not(any(target_os = "windows", target_os = "linux")))]
 async fn is_device_still_connected(_mac: MacAddr6) -> bool {
     true
 }
