@@ -172,7 +172,8 @@ fn get_version() -> String {
 
 #[tauri::command]
 fn get_states(state: tauri::State<AppState>) -> Vec<DeviceStateDto> {
-    let cfg = state.config.lock().unwrap().clone();
+    let mut cfg = state.config.lock().unwrap().clone();
+    config::sort_devices_by_recency(&mut cfg.devices);
     let map = state.worker.state.devices.lock().unwrap();
     cfg.devices
         .iter()
@@ -708,6 +709,7 @@ pub fn run() {
                                             profile: Vec::new(),
                                             image: None,
                                             color: None,
+                                            last_connected: None,
                                         });
                                         changed = true;
                                     }
