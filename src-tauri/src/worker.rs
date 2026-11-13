@@ -812,7 +812,14 @@ fn store_fetched_profile(mac: MacAddr6, mut profile: Vec<SettingEntry>) {
 }
 
 async fn scan(session: &OpenSCQ30Session, state: &SharedState, model: DeviceModel) {
-    *state.scanning.lock().unwrap() = true;
+    {
+        let mut scanning = state.scanning.lock().unwrap();
+        if *scanning {
+            tracing::debug!("scan already in flight; skipping overlapping scan");
+            return;
+        }
+        *scanning = true;
+    }
     let results = match session.list_devices(model).await {
         Ok(devices) => devices
             .into_iter()
