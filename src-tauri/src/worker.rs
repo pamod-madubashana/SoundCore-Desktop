@@ -347,6 +347,56 @@ fn set_device_state(state: &SharedState, mac: MacAddr6, f: impl FnOnce(&mut Devi
     f(map.entry(mac).or_default());
 }
 
+/// Retry pacing for present-but-unconnected devices: 0 → 5s → 10s → 20s →
+/// 40s → 60s → 60s. Never reached while the OS does not report the device
+/// connected (that path stays fully passive and just re-polls).
+const CONNECT_BACKOFF_BASE: Duration = Duration::from_secs(5);
+const CONNECT_BACKOFF_CAP: Duration = Duration::from_secs(60);
+
+/// Doubles `current` up to `cap`, starting from `base` (clamped to `cap`)
+/// when zero.
+fn next_backoff(current: Duration, base: Duration, cap: Duration) -> Duration {
+    if current.is_zero() {
+        base.min(cap)
+    } else {
+        current.saturating_mul(2).min(cap)
+    }
+}
+
+enum WaitOutcome {
+    /// The full wait elapsed with no commands.
+    Elapsed,
+    /// At least one command arrived and was stashed into `pending`.
+    Commands,
+    /// The command channel closed — the task is being replaced.
+    Closed,
+}
+
+/// Waits up to `dur` but returns early when a device command arrives (stashed
+/// into `pending` so nothing is lost) or the channel closes. Used for every
+/// not-connected wait so queued UI writes interrupt long backoffs promptly.
+async fn wait_for_commands(
+    rx: &mut mpsc::UnboundedReceiver<DeviceCommand>,
+    dur: Duration,
+    pending: &mut Vec<DeviceCommand>,
+) -> WaitOutcome {
+    tokio::select! {
+        _ = sleep(dur) => WaitOutcome::Elapsed,
+        cmd = rx.recv() => {
+            let Some(cmd) = cmd else { return WaitOutcome::Closed };
+            pending.push(cmd);
+            loop {
+                match rx.try_recv() {
+                    Ok(cmd) => pending.push(cmd),
+                    Err(mpsc::error::TryRecvError::Empty) => break,
+                    Err(mpsc::error::TryRecvError::Disconnected) => return WaitOutcome::Closed,
+                }
+            }
+            WaitOutcome::Commands
+        }
+    }
+}
+
 async fn device_loop(
     session: Arc<OpenSCQ30Session>,
     state: Arc<SharedState>,
@@ -378,6 +428,8 @@ async fn device_loop(
 
     let poll = Duration::from_secs(dev.poll_seconds.max(1));
     let apply_delay = Duration::from_secs(dev.apply_delay_seconds);
+    let mut backoff = Duration::ZERO;
+    let mut pending: Vec<DeviceCommand> = Vec::new();
 
     loop {
         set_device_state(&state, mac, |s| {
@@ -391,14 +443,18 @@ async fn device_loop(
         // earbuds are there — wait until Windows reports them connected.
         if !is_device_still_connected(mac).await {
             tracing::debug!("OS does not report {mac} ({model}) connected; skipping RFCOMM connect attempt");
-            sleep(poll).await;
-            continue;
+            backoff = Duration::ZERO;
+            match wait_for_commands(&mut rx, poll, &mut pending).await {
+                WaitOutcome::Closed => return,
+                WaitOutcome::Commands | WaitOutcome::Elapsed => continue,
+            }
         }
 
         tracing::debug!("attempting connection to {mac} ({model})");
         match timeout(Duration::from_secs(10), session.connect(mac)).await {
             Ok(Ok(device)) => {
                 tracing::debug!("connected to {mac} ({model})");
+                backoff = Duration::ZERO;
                 // Publish snapshot first so battery data is available when frontend detects connect
                 publish_snapshot(device.as_ref(), &state, mac);
                 set_device_state(&state, mac, |s| {
@@ -418,7 +474,7 @@ async fn device_loop(
                     s.message = "connected (profile read from device)".into();
                 });
 
-                if connected_session(device.as_ref(), &mut rx, &state, mac).await {
+                if connected_session(device.as_ref(), &mut rx, &state, mac, &mut pending).await {
                     tracing::debug!("connected_session returned for {mac}, task replaced");
                     return; // channel dropped -> task replaced
                 }
@@ -432,23 +488,66 @@ async fn device_loop(
             }
             Ok(Err(err)) => {
                 tracing::warn!("connection to {mac} failed: {err:#}");
-                sleep(poll).await;
+                backoff = next_backoff(backoff, CONNECT_BACKOFF_BASE, CONNECT_BACKOFF_CAP);
+                match wait_for_commands(&mut rx, poll.max(backoff), &mut pending).await {
+                    WaitOutcome::Closed => return,
+                    WaitOutcome::Commands => backoff = Duration::ZERO,
+                    WaitOutcome::Elapsed => {}
+                }
             }
             Err(_) => {
                 tracing::debug!("connection to {mac} timed out after 10s");
-                sleep(poll).await;
+                backoff = next_backoff(backoff, CONNECT_BACKOFF_BASE, CONNECT_BACKOFF_CAP);
+                match wait_for_commands(&mut rx, poll.max(backoff), &mut pending).await {
+                    WaitOutcome::Closed => return,
+                    WaitOutcome::Commands => backoff = Duration::ZERO,
+                    WaitOutcome::Elapsed => {}
+                }
             }
         }
     }
 }
 
+/// Applies one device command. Returns false if the connection must be treated
+/// as dead (connection error while writing).
+async fn handle_device_command(
+    device: &(dyn OpenSCQ30Device + Send + Sync),
+    cmd: DeviceCommand,
+    state: &SharedState,
+    mac: MacAddr6,
+) -> bool {
+    match cmd {
+        DeviceCommand::SetSetting { id, value } => {
+            tracing::debug!("SetSetting {id} for {mac}");
+            if let Err(err) = device.set_setting_values(vec![(id, value)]).await {
+                warn!("set failed: {err}");
+                if matches!(err, openscq30_lib::device::Error::ConnectionError { .. }) {
+                    tracing::debug!("connection error during set, treating as disconnect for {mac}");
+                    return false;
+                }
+                set_device_state(state, mac, |s| s.message = format!("set failed: {err}"));
+            }
+            publish_snapshot(device, state, mac);
+            true
+        }
+    }
+}
+
 /// Returns true if the device command channel closed (task is being replaced).
+/// Commands stashed in `pending` while disconnected are applied first.
 async fn connected_session(
     device: &(dyn OpenSCQ30Device + Send + Sync),
     rx: &mut mpsc::UnboundedReceiver<DeviceCommand>,
     state: &SharedState,
     mac: MacAddr6,
+    pending: &mut Vec<DeviceCommand>,
 ) -> bool {
+    let queued = std::mem::take(pending);
+    for cmd in queued {
+        if !handle_device_command(device, cmd, state, mac).await {
+            return false;
+        }
+    }
     let mut conn = device.connection_status();
     let mut changes = device.watch_for_changes();
     // Periodic presence check: every 5 s verify the device is still in the OS
@@ -459,17 +558,10 @@ async fn connected_session(
     loop {
         tokio::select! {
             cmd = rx.recv() => match cmd {
-                Some(DeviceCommand::SetSetting { id, value }) => {
-                    tracing::debug!("SetSetting {id} for {mac}");
-                    if let Err(err) = device.set_setting_values(vec![(id, value)]).await {
-                        warn!("set failed: {err}");
-                        if matches!(err, openscq30_lib::device::Error::ConnectionError { .. }) {
-                            tracing::debug!("connection error during set, treating as disconnect for {mac}");
-                            return false;
-                        }
-                        set_device_state(state, mac, |s| s.message = format!("set failed: {err}"));
+                Some(cmd) => {
+                    if !handle_device_command(device, cmd, state, mac).await {
+                        return false;
                     }
-                    publish_snapshot(device, state, mac);
                 }
                 None => {
                     tracing::debug!("command channel closed for {mac}, exiting connected_session");
