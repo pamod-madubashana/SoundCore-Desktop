@@ -451,28 +451,26 @@ function batteryPct(setting: any): number | null {
   return Number.isFinite(n) ? Math.min(100, n) : null;
 }
 
-interface BatteryIconProps { level: number | null; label: string | null }
-function BatteryIcon({ level, label }: BatteryIconProps) {
-  // level: 0-100, label: "L", "R", or "Case"
-  const pct = Math.max(0, Math.min(100, level ?? 0));
-  const color = pct > 50 ? "text-success" : pct > 20 ? "text-yellow-500" : "text-red-500";
+// Compact battery pill (label + mini bar + percent) used in the control
+// header. Color thresholds match the old icon: green >50, amber >20, red after.
+interface BatteryPillProps { level: number; label: string | null }
+function BatteryPill({ level, label }: BatteryPillProps) {
+  const pct = Math.max(0, Math.min(100, level));
+  const fill = pct > 50 ? "bg-success" : pct > 20 ? "bg-[#fbbf24]" : "bg-[#ff6b6b]";
   return (
-    <span className="inline-flex items-center gap-1">
-      {label && (
-        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--toggle-off)] text-[8px] font-bold text-[color:oklch(from var(--foreground) l c h / 0.7)]">
-          {label === "Case" ? (
-            <svg className="h-2.5 w-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="2" y="7" width="20" height="14" rx="2" />
-              <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
-            </svg>
-          ) : label}
-        </span>
-      )}
-      <svg width="18" height="11" viewBox="0 0 18 11" fill="none" className={color}>
-        <rect x="0.5" y="0.5" width="15" height="10" rx="2" stroke="currentColor" strokeWidth="1" opacity="0.4" />
-        <rect x="16" y="3" width="2" height="5" rx="0.5" fill="currentColor" opacity="0.4" />
-        <rect x="1.5" y="1.5" width={Math.max(0, 13 * pct / 100)} height="8" rx="1" fill="currentColor" />
-      </svg>
+    <span className="inline-flex items-center gap-1.5 h-5 pl-1.5 pr-2 rounded-full bg-surface ring-1 ring-[var(--border-subtle)]">
+      {label === "Case" ? (
+        <svg className="h-2.5 w-2.5 text-brand" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="2" y="7" width="20" height="14" rx="2" />
+          <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+        </svg>
+      ) : label ? (
+        <span className="text-[9.5px] font-bold text-brand leading-none">{label}</span>
+      ) : null}
+      <span className="h-[9px] w-[22px] rounded-[3px] bg-[var(--toggle-off)] overflow-hidden">
+        <span className={"block h-full rounded-[3px] " + fill} style={{ width: `${pct}%` }} />
+      </span>
+      <span className="text-[10.5px] font-semibold text-foreground leading-none">{pct}%</span>
     </span>
   );
 }
@@ -489,22 +487,25 @@ function Header({ d, s, updateInfo, updateProgress, updateError, onStartUpdate, 
   const showUpdateBadge = updateInfo && !updateProgress;
 
   return (
-    <header className="p-3 flex items-center gap-3 border-b border-[var(--border-medium)]">
-      <div className={"relative overflow-hidden flex-shrink-0 flex items-center justify-center text-brand " + (d.image ? "h-24 w-24" : "h-12 w-12 rounded-xl bg-surface-elevated ring-1 ring-[var(--border-subtle)]")}>
+    <header className="px-3 pt-3 pb-2.5 flex items-start gap-3 border-b border-[var(--border-medium)]">
+      <div className={"relative overflow-hidden shrink-0 h-[52px] w-[58px] rounded-2xl flex items-center justify-center text-brand " + (d.image ? "" : "bg-surface-elevated ring-1 ring-[var(--border-subtle)]")}>
         <DeviceArt name={d.name} url={d.image} color={d.color} />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <h1 className="text-[15px] font-semibold tracking-tight truncate">{d.name?.replace(/^soundcore\s+/i, '') || d.model}</h1>
-          <span className={"h-1.5 w-1.5 rounded-full " + (d.connected ? "bg-success brand-glow" : "bg-[var(--toggle-off)]")} />
+        <div className="flex items-center gap-2">
+          <h1 className="text-[18px] font-bold tracking-tight truncate leading-tight">{d.name?.replace(/^soundcore\s+/i, '') || d.model}</h1>
+          <span className="relative flex h-2 w-2 shrink-0 items-center justify-center">
+            <span className="absolute h-3.5 w-3.5 rounded-full bg-success/25" />
+            <span className={"relative h-2 w-2 rounded-full " + (d.connected ? "bg-success" : "bg-[var(--toggle-off)]")} />
+          </span>
         </div>
+        <p className="text-[10.5px] text-muted-foreground mt-0.5">
+          {d.connected ? "Connected" : "Disconnected"} · Soundcore
+        </p>
         {batteries.length > 0 && (
-          <div className="flex items-center gap-3 mt-2">
+          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
             {batteries.map(([label, v]) => (
-              <div key={label || "b"} className="flex items-center gap-1.5 text-[13px]">
-                <BatteryIcon level={v} label={label || null} />
-                <span className="text-foreground font-medium">{v}%</span>
-              </div>
+              <BatteryPill key={label || "b"} level={v as number} label={label || null} />
             ))}
           </div>
         )}
@@ -529,7 +530,7 @@ function Header({ d, s, updateInfo, updateProgress, updateError, onStartUpdate, 
           <div className="mt-2 text-[10px] text-[var(--error-text)] truncate" title={updateError}>{updateError}</div>
         )}
       </div>
-      <div className="flex items-center gap-0.5 self-start -mt-1 -mr-1">
+      <div className="flex items-center gap-1.5 self-start">
         {showUpdateBadge && (
           <button onClick={onStartUpdate} title={`Update to v${updateInfo.latest_version}`}
             className="p-1 rounded-md text-brand hover:bg-[var(--hover-medium)] transition relative">
@@ -538,8 +539,8 @@ function Header({ d, s, updateInfo, updateProgress, updateError, onStartUpdate, 
           </button>
         )}
         <button onClick={() => invoke("hide_window")} title="Hide"
-          className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-[var(--hover-medium)] transition">
-          <X className="h-4 w-4" />
+          className="h-[26px] w-[26px] flex items-center justify-center rounded-full bg-[var(--hover-subtle)] ring-1 ring-[var(--border-subtle)] text-foreground/75 hover:text-foreground transition">
+          <X className="h-3.5 w-3.5" />
         </button>
       </div>
     </header>
