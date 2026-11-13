@@ -174,8 +174,9 @@ export default function App() {
     return () => clearInterval(t);
   }, []);
 
-  // Only surface a device once it's actually connected; otherwise keep searching for
-  // ANY supported Soundcore device rather than pinning to a remembered (offline) one.
+  // A connected device takes over the popup; otherwise show the saved-device
+  // list (newest-connect first) when we know devices, or keep searching for
+  // ANY supported Soundcore device on first run.
   const active = devices.find((d: any) => d.connected) || null;
 
   return (
@@ -183,7 +184,9 @@ export default function App() {
       <section className="popup-window animate-fade-in w-full h-full rounded-2xl flex flex-col">
         {active
           ? <Device d={active} updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={handleStartUpdate} onDismissUpdate={handleDismissUpdate} />
-          : <Searching updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={handleStartUpdate} onDismissUpdate={handleDismissUpdate} />}
+          : devices.length > 0
+            ? <MyDevices devices={devices} updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={handleStartUpdate} />
+            : <Searching updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={handleStartUpdate} onDismissUpdate={handleDismissUpdate} />}
       </section>
     </main>
   );
@@ -196,15 +199,62 @@ function Searching({ updateInfo, updateProgress, updateError, onStartUpdate }: S
       <Loader2 className="h-7 w-7 animate-spin text-brand" />
       <p className="text-[13px]">Searching for a Soundcore device…</p>
       <p className="text-[11px] opacity-70">Connect it via Bluetooth and it'll appear here.</p>
+      <UpdateNotice updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={onStartUpdate} />
+    </div>
+  );
+}
+
+// Idle list of remembered devices, newest-connect first (the backend sorts
+// get_states by last_connected). Display-only: a card means "saved", and the
+// Not Connected status just means the buds aren't up via Bluetooth right now.
+interface MyDevicesProps { devices: any[]; updateInfo: any; updateProgress: any; updateError: string | null; onStartUpdate: () => void }
+function MyDevices({ devices, updateInfo, updateProgress, updateError, onStartUpdate }: MyDevicesProps) {
+  return (
+    <div className="flex-1 flex flex-col min-h-0 relative">
+      <div className="px-4 pt-4 pb-2 text-center">
+        <p className="text-[15px] font-semibold text-foreground">My Devices</p>
+        <p className="text-[11px] text-muted-foreground mt-0.5">Connect a device to control it.</p>
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-3 flex flex-col gap-2">
+        {devices.map((d: any) => (
+          <div key={d.mac_address} className="rounded-xl bg-surface ring-1 ring-[var(--border-subtle)] px-3 py-2.5 flex items-center gap-3">
+            <div className="h-11 w-11 shrink-0 rounded-lg bg-surface-elevated ring-1 ring-[var(--border-subtle)] p-1.5 overflow-hidden">
+              <DeviceArt name={d.name || d.model} url={d.image} color={d.color} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-medium text-foreground truncate">{d.name || d.model}</p>
+              <p className={`text-[11px] ${d.connected ? "text-success" : "text-muted-foreground"}`}>
+                {d.connected ? "Connected" : "Not Connected"}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="px-4 pb-4 flex justify-center">
+        <UpdateNotice updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={onStartUpdate} />
+      </div>
+    </div>
+  );
+}
+
+// Shared update prompt: appears in the idle views while a release is available
+// or a download is running. Renders nothing when there's no update state.
+interface UpdateNoticeProps { updateInfo: any; updateProgress: any; updateError: string | null; onStartUpdate: () => void }
+function UpdateNotice({ updateInfo, updateProgress, updateError, onStartUpdate }: UpdateNoticeProps) {
+  if (!updateInfo && !updateProgress && !updateError) return null;
+  return (
+    <div className="flex flex-col items-center gap-2">
       {updateInfo && !updateProgress && (
         <button onClick={onStartUpdate}
-          className="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand/10 text-brand text-[11px] font-medium hover:bg-brand/20 transition">
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand/10 text-brand text-[11px] font-medium hover:bg-brand/20 transition">
           <Download className="h-3.5 w-3.5" />
           Update to v{updateInfo.latest_version}
         </button>
       )}
       {updateProgress && updateProgress.phase === "downloading" && (
-        <div className="mt-2 w-48">
+        <div className="w-48">
           <div className="flex items-center justify-between text-[10px] text-[color:oklch(from var(--muted-foreground) l c h / 0.6)] mb-1">
             <span>Downloading...</span>
             <span>{Math.round(updateProgress.percent)}%</span>
@@ -215,13 +265,13 @@ function Searching({ updateInfo, updateProgress, updateError, onStartUpdate }: S
         </div>
       )}
       {updateProgress && updateProgress.phase !== "downloading" && (
-        <div className="mt-2 flex items-center gap-1.5 text-[10px] text-[color:oklch(from var(--muted-foreground) l c h / 0.6)]">
+        <div className="flex items-center gap-1.5 text-[10px] text-[color:oklch(from var(--muted-foreground) l c h / 0.6)]">
           <Loader2 className="h-3 w-3 animate-spin" />
           <span>{updateProgress.message}</span>
         </div>
       )}
       {updateError && (
-        <div className="mt-2 text-[10px] text-[var(--error-text)] truncate" title={updateError}>{updateError}</div>
+        <div className="text-[10px] text-[var(--error-text)] truncate max-w-[240px]" title={updateError}>{updateError}</div>
       )}
     </div>
   );
@@ -310,7 +360,7 @@ const APP_VERSION = "1.7.0";
 function Footer() {
   const [version, setVersion] = useState(APP_VERSION);
   useEffect(() => {
-    invoke<string>("get_version").then(setVersion).catch(() => {});
+    invoke("get_version").then(setVersion).catch(() => {});
   }, []);
   return (
     <div className="px-3 py-2 flex items-center justify-between text-[10px] text-[color:oklch(from var(--muted-foreground) l c h / 0.6)]">
