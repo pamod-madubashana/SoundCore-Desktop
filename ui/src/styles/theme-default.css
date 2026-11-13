@@ -1,7 +1,7 @@
 /* theme-default.css — Current SoundCore dark theme (Linux / macOS / Windows fallback) */
 
 :root {
-  --radius: 0.875rem;
+  --radius: 1.125rem;
 
   /* Core palette — near-solid dark charcoal frost so the panel reads
      decisively dark over dark IDEs/wallpaper. Text/icons stay fully opaque;
