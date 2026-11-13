@@ -1078,4 +1078,134 @@ mod tests {
             assert!(SettingId::from_str(&id.to_string()).is_ok());
         }
     }
+
+    fn device_cfg(mac: &str, model: &str, poll_seconds: u64) -> DeviceConfig {
+        DeviceConfig { mac_address: mac.to_owned(), model: model.to_owned(), poll_seconds, ..DeviceConfig::default() }
+    }
+
+    #[test]
+    fn next_backoff_ramps_from_base_to_cap() {
+        let base = Duration::from_secs(5);
+        let cap = Duration::from_secs(60);
+        let mut backoff = Duration::ZERO;
+        let expected = [5u64, 10, 20, 40, 60, 60, 60];
+        for want in expected {
+            backoff = next_backoff(backoff, base, cap);
+            assert_eq!(backoff, Duration::from_secs(want));
+        }
+    }
+
+    #[test]
+    fn next_backoff_clamps_base_and_doubling_to_cap() {
+        assert_eq!(
+            next_backoff(Duration::ZERO, Duration::from_secs(30), Duration::from_secs(10)),
+            Duration::from_secs(10),
+            "base must clamp down to cap"
+        );
+        assert_eq!(
+            next_backoff(Duration::from_secs(40), Duration::from_secs(5), Duration::from_secs(45)),
+            Duration::from_secs(45),
+            "doubling must clamp down to cap"
+        );
+    }
+
+    #[test]
+    fn diff_tasks_unchanged_config_touches_nothing() {
+        let old = [device_cfg("00:11:22:33:44:55", "SoundcoreA3959", 5)];
+        let new = [device_cfg("00:11:22:33:44:55", "SoundcoreA3959", 5)];
+        let (abort, spawn) = diff_tasks(&old, &new);
+        assert!(abort.is_empty());
+        assert!(spawn.is_empty());
+    }
+
+    #[test]
+    fn diff_tasks_spawns_only_added_device() {
+        let old = [device_cfg("00:11:22:33:44:55", "SoundcoreA3959", 5)];
+        let new = [
+            device_cfg("00:11:22:33:44:55", "SoundcoreA3959", 5),
+            device_cfg("00:11:22:33:44:66", "SoundcoreA3947", 5),
+        ];
+        let (abort, spawn) = diff_tasks(&old, &new);
+        assert!(abort.is_empty());
+        assert_eq!(spawn, vec![1]);
+    }
+
+    #[test]
+    fn diff_tasks_aborts_only_removed_device() {
+        let old = [
+            device_cfg("00:11:22:33:44:55", "SoundcoreA3959", 5),
+            device_cfg("00:11:22:33:44:66", "SoundcoreA3947", 5),
+        ];
+        let new = [device_cfg("00:11:22:33:44:55", "SoundcoreA3959", 5)];
+        let (abort, spawn) = diff_tasks(&old, &new);
+        assert_eq!(abort.len(), 1);
+        assert_eq!(abort[0].to_string(), "00:11:22:33:44:66");
+        assert!(spawn.is_empty());
+    }
+
+    #[test]
+    fn diff_tasks_restarts_on_poll_change() {
+        let old = [device_cfg("00:11:22:33:44:55", "SoundcoreA3959", 5)];
+        let new = [device_cfg("00:11:22:33:44:55", "SoundcoreA3959", 30)];
+        let (abort, spawn) = diff_tasks(&old, &new);
+        assert_eq!(abort.len(), 1);
+        assert_eq!(spawn, vec![0]);
+    }
+
+    #[test]
+    fn diff_tasks_restarts_on_model_change() {
+        let old = [device_cfg("00:11:22:33:44:55", "SoundcoreA3959", 5)];
+        let new = [device_cfg("00:11:22:33:44:55", "SoundcoreA3947", 5)];
+        let (abort, spawn) = diff_tasks(&old, &new);
+        assert_eq!(abort.len(), 1);
+        assert_eq!(spawn, vec![0]);
+    }
+
+    #[test]
+    fn diff_tasks_ignores_ui_only_fields() {
+        let old = [device_cfg("00:11:22:33:44:55", "SoundcoreA3959", 5)];
+        let mut new = [device_cfg("00:11:22:33:44:55", "SoundcoreA3959", 5)];
+        new[0].name = "Renamed".to_owned();
+        new[0].profile = vec![crate::config::SettingEntry { id: "gamingMode".into(), value: "true".into() }];
+        new[0].image = Some("https://example.invalid/img.png".into());
+        new[0].color = Some("#123456".into());
+        let (abort, spawn) = diff_tasks(&old, &new);
+        assert!(abort.is_empty(), "ui-only edits must not abort tasks");
+        assert!(spawn.is_empty(), "ui-only edits must not respawn tasks");
+    }
+
+    #[test]
+    fn diff_tasks_duplicate_mac_is_first_wins() {
+        let old = [device_cfg("00:11:22:33:44:55", "SoundcoreA3959", 5)];
+
+        // First entry unchanged, second differs: the second is ignored.
+        let keep = [
+            device_cfg("00:11:22:33:44:55", "SoundcoreA3959", 5),
+            device_cfg("00:11:22:33:44:55", "SoundcoreA3959", 99),
+        ];
+        let (abort, spawn) = diff_tasks(&old, &keep);
+        assert!(abort.is_empty());
+        assert!(spawn.is_empty());
+
+        // First entry changed: restart, second still ignored.
+        let restart = [
+            device_cfg("00:11:22:33:44:55", "SoundcoreA3959", 30),
+            device_cfg("00:11:22:33:44:55", "SoundcoreA3959", 5),
+        ];
+        let (abort, spawn) = diff_tasks(&old, &restart);
+        assert_eq!(abort.len(), 1);
+        assert_eq!(spawn, vec![0]);
+    }
+
+    #[test]
+    fn diff_tasks_skips_unparseable_entries() {
+        let old: [DeviceConfig; 0] = [];
+        let new = [
+            device_cfg("not-a-mac", "SoundcoreA3959", 5),
+            device_cfg("00:11:22:33:44:77", "NotASoundcoreModel", 5),
+        ];
+        let (abort, spawn) = diff_tasks(&old, &new);
+        assert!(abort.is_empty());
+        assert!(spawn.is_empty(), "entries with no fingerprint must never spawn");
+    }
 }
