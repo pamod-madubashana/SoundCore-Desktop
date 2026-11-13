@@ -668,46 +668,56 @@ pub fn run() {
 
             // Auto-detect: periodically scan connected Bluetooth devices and add any
             // recognized Soundcore device to the config (zero manual setup).
+            // The scan is passive (Bluetooth discovery read, no device writes) and
+            // always on — but never overlaps: if a scan is still in flight the
+            // cycle is skipped entirely, including its result-wait.
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 use strum::VariantArray;
                 let any_model = DeviceModel::VARIANTS[0];
                 loop {
-                    {
+                    let scan_sent = {
                         let state = handle.state::<AppState>();
-                        let _ = state.worker.tx.send(Command::Scan { model: any_model });
-                    }
-                    tokio::time::sleep(std::time::Duration::from_millis(2500)).await;
-                    {
-                        let state = handle.state::<AppState>();
-                        let results = state.worker.state.scan_results.lock().unwrap().clone();
-                        let mut cfg = state.config.lock().unwrap().clone();
-                        let mut changed = false;
-                        for r in results {
-                            if let Some(model) = worker::infer_model(&r.name) {
-                                let known = cfg
-                                    .devices
-                                    .iter()
-                                    .any(|d| d.mac_address.eq_ignore_ascii_case(&r.mac_address));
-                                if !known {
-                                    cfg.devices.push(config::DeviceConfig {
-                                        name: r.name.clone(),
-                                        mac_address: r.mac_address.clone(),
-                                        model: model.to_string(),
-                                        poll_seconds: 5,
-                                        apply_delay_seconds: 2,
-                                        profile: Vec::new(),
-                                        image: None,
-                                        color: None,
-                                    });
-                                    changed = true;
+                        if *state.worker.state.scanning.lock().unwrap() {
+                            false
+                        } else {
+                            let _ = state.worker.tx.send(Command::Scan { model: any_model });
+                            true
+                        }
+                    };
+                    if scan_sent {
+                        tokio::time::sleep(std::time::Duration::from_millis(2500)).await;
+                        {
+                            let state = handle.state::<AppState>();
+                            let results = state.worker.state.scan_results.lock().unwrap().clone();
+                            let mut cfg = state.config.lock().unwrap().clone();
+                            let mut changed = false;
+                            for r in results {
+                                if let Some(model) = worker::infer_model(&r.name) {
+                                    let known = cfg
+                                        .devices
+                                        .iter()
+                                        .any(|d| d.mac_address.eq_ignore_ascii_case(&r.mac_address));
+                                    if !known {
+                                        cfg.devices.push(config::DeviceConfig {
+                                            name: r.name.clone(),
+                                            mac_address: r.mac_address.clone(),
+                                            model: model.to_string(),
+                                            poll_seconds: 5,
+                                            apply_delay_seconds: 2,
+                                            profile: Vec::new(),
+                                            image: None,
+                                            color: None,
+                                        });
+                                        changed = true;
+                                    }
                                 }
                             }
-                        }
-                        if changed {
-                            let _ = cfg.save(&state.config_path);
-                            *state.config.lock().unwrap() = cfg.clone();
-                            let _ = state.worker.tx.send(Command::UpdateConfig(cfg));
+                            if changed {
+                                let _ = cfg.save(&state.config_path);
+                                *state.config.lock().unwrap() = cfg.clone();
+                                let _ = state.worker.tx.send(Command::UpdateConfig(cfg));
+                            }
                         }
                     }
                     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
