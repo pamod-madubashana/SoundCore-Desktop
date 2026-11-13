@@ -58,6 +58,11 @@ pub struct DeviceConfig {
     /// Used to tint the SVG device template.
     #[serde(default)]
     pub color: Option<String>,
+    /// Unix timestamp (seconds) of the last successful connect, used to order
+    /// the idle "My Devices" list newest-first. None for never-connected or
+    /// pre-upgrade devices (they sort last).
+    #[serde(default)]
+    pub last_connected: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -169,6 +174,7 @@ impl Default for DeviceConfig {
             profile: Vec::new(),
             image: None,
             color: None,
+            last_connected: None,
         }
     }
 }
@@ -195,6 +201,14 @@ impl DeviceConfig {
             self.name.clone()
         }
     }
+}
+
+/// Orders devices newest-connect first for the idle "My Devices" list.
+/// Never-connected devices (`last_connected: None`) sort last, preserving
+/// config order among themselves. The sort is stable, so equal timestamps
+/// also keep config order.
+pub fn sort_devices_by_recency(devices: &mut [DeviceConfig]) {
+    devices.sort_by_key(|d| std::cmp::Reverse(d.last_connected));
 }
 
 impl Config {
@@ -245,4 +259,49 @@ pub fn load(_app: &tauri::AppHandle) -> Config {
 pub fn save(_app: &tauri::AppHandle, cfg: &Config) -> Result<(), String> {
     let path = resolve_path(None);
     cfg.save(&path).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn dev(mac: &str, last_connected: Option<u64>) -> DeviceConfig {
+        DeviceConfig { mac_address: mac.to_owned(), last_connected, ..DeviceConfig::default() }
+    }
+
+    #[test]
+    fn last_connected_missing_from_toml_defaults_to_none() {
+        let cfg: Config = toml::from_str(
+            r#"
+            [[devices]]
+            mac_address = "34:09:C9:B9:EC:30"
+            model = "SoundcoreA3959"
+            "#,
+        )
+        .expect("config without last_connected should parse");
+        assert_eq!(cfg.devices.len(), 1);
+        assert_eq!(cfg.devices[0].last_connected, None);
+    }
+
+    #[test]
+    fn sort_devices_newest_first_none_last() {
+        let mut devices = vec![
+            dev("aa", None),
+            dev("bb", Some(100)),
+            dev("cc", None),
+            dev("dd", Some(300)),
+            dev("ee", Some(200)),
+        ];
+        sort_devices_by_recency(&mut devices);
+        let order: Vec<&str> = devices.iter().map(|d| d.mac_address.as_str()).collect();
+        assert_eq!(order, vec!["dd", "ee", "bb", "aa", "cc"]);
+    }
+
+    #[test]
+    fn sort_devices_is_stable_for_ties_and_never_connected() {
+        let mut devices = vec![dev("first", Some(100)), dev("second", Some(100)), dev("third", None), dev("fourth", None)];
+        sort_devices_by_recency(&mut devices);
+        let order: Vec<&str> = devices.iter().map(|d| d.mac_address.as_str()).collect();
+        assert_eq!(order, vec!["first", "second", "third", "fourth"]);
+    }
 }
