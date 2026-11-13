@@ -181,7 +181,7 @@ export default function App() {
 
   return (
     <main className="h-screen w-screen flex items-stretch justify-stretch">
-      <section className="popup-window animate-fade-in w-full h-full rounded-2xl flex flex-col">
+      <section className="popup-window animate-fade-in w-full h-full rounded-3xl flex flex-col">
         {active
           ? <Device d={active} updateInfo={updateInfo} updateProgress={updateProgress} updateError={updateError} onStartUpdate={handleStartUpdate} onDismissUpdate={handleDismissUpdate} />
           : devices.length > 0
