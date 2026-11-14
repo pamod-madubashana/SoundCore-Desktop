@@ -589,6 +589,7 @@ fn toggle_window(app: &AppHandle) {
                 let _ = win.show();
                 // Apply backdrop AFTER window is visible so Mica/Acrylic can render
                 window_effects::apply_backdrop(&win);
+                window_effects::apply_rounded_corners(&win);
                 let _ = win.set_focus();
                 slide_window_y(&win, start_y, target_y, 200).await;
             });
@@ -776,6 +777,7 @@ pub fn run() {
             // Positioning/clamp logic and the notification window are untouched.
             if let Some(main) = app.get_webview_window("main") {
                 window_effects::apply_backdrop(&main);
+                window_effects::apply_rounded_corners(&main);
             }
             Ok(())
         })
