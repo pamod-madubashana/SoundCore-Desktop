@@ -23,19 +23,19 @@ pub fn apply_backdrop(window: &WebviewWindow) {
     }
 }
 
-/// Corner radius of the popup window, in logical pixels. Matches `--radius`
-/// in `ui/src/styles/theme-windows.css` so the OS-level window shape and the
-/// CSS surface line up.
+/// Corner radius of the popup window, in logical pixels. Matches the 28px
+/// panel corners of the design mockup. Change this one value to tune the look.
 #[cfg(target_os = "windows")]
-const CORNER_RADIUS: f64 = 12.0;
+const CORNER_RADIUS: f64 = 28.0;
 
 /// Round the corners of the actual OS window (not just the CSS surface), so the
-/// native window frame, the Acrylic/Mica backdrop and the webview are all
-/// clipped to the same rounded shape.
+/// native window, the Acrylic/Mica backdrop and the webview are all clipped to
+/// the same rounded shape.
 ///
-/// On Windows 11 this asks DWM for anti-aliased rounded corners. On Windows 10
-/// (where DWM rejects that attribute) it falls back to clipping the window with
-/// a rounded-rectangle region. On Linux/macOS: no-op.
+/// Windows 11's built-in rounding (DWMWCP_ROUND) is a fixed ~8px radius that
+/// can't be customised, so a larger radius is done by clipping the window with
+/// a rounded-rectangle region on every Windows version. The trade-off is that
+/// region edges are not anti-aliased. On Linux/macOS: no-op.
 ///
 /// Safe to call repeatedly; call it after the window is shown so its size is final.
 pub fn apply_rounded_corners(window: &WebviewWindow) {
@@ -51,12 +51,7 @@ pub fn apply_rounded_corners(window: &WebviewWindow) {
 
 #[cfg(target_os = "windows")]
 fn apply_windows_rounded_corners(window: &WebviewWindow) {
-    use std::ffi::c_void;
     use windows::Win32::Foundation::HWND;
-    use windows::Win32::Graphics::Dwm::{
-        DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND, DWM_WINDOW_CORNER_PREFERENCE,
-        DwmSetWindowAttribute,
-    };
     use windows::Win32::Graphics::Gdi::{CreateRoundRectRgn, SetWindowRgn};
 
     // Tauri links its own `windows` version, so rebuild the handle from the raw
@@ -66,26 +61,10 @@ fn apply_windows_rounded_corners(window: &WebviewWindow) {
     };
     let hwnd = HWND(raw.0);
 
-    // 1) Windows 11: native, anti-aliased rounded corners from DWM.
-    let preference: DWM_WINDOW_CORNER_PREFERENCE = DWMWCP_ROUND;
-    let dwm_result = unsafe {
-        DwmSetWindowAttribute(
-            hwnd,
-            DWMWA_WINDOW_CORNER_PREFERENCE,
-            &preference as *const _ as *const c_void,
-            std::mem::size_of::<DWM_WINDOW_CORNER_PREFERENCE>() as u32,
-        )
-    };
-    if dwm_result.is_ok() {
-        tracing::debug!("applied native rounded window corners");
-        return;
-    }
-
-    // 2) Windows 10: DWM doesn't know this attribute, so clip the window to a
-    // rounded-rectangle region instead (edges are not anti-aliased).
     let (Ok(size), Ok(scale)) = (window.outer_size(), window.scale_factor()) else {
         return;
     };
+    // CreateRoundRectRgn takes the ellipse *diameter*, scaled for monitor DPI.
     let diameter = (CORNER_RADIUS * 2.0 * scale).round() as i32;
     unsafe {
         // +1: CreateRoundRectRgn's right/bottom edges are exclusive.
@@ -100,7 +79,7 @@ fn apply_windows_rounded_corners(window: &WebviewWindow) {
         // On success the system owns the region; don't delete it.
         SetWindowRgn(hwnd, Some(region), true);
     }
-    tracing::debug!("applied region-based rounded window corners");
+    tracing::debug!("applied rounded window region (radius {CORNER_RADIUS}px)");
 }
 
 #[cfg(target_os = "windows")]
