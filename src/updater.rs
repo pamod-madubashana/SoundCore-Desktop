@@ -1,0 +1,338 @@
+use sha2::{Digest, Sha256};
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+
+
+const REPO: &str = "pamod-madubashana/SoundCore-Desktop";
+const ASSET_NAME: &str = "SoundCore-Desktop.exe";
+
+#[derive(Clone, serde::Serialize)]
+pub struct UpdateInfo {
+    pub current_version: String,
+    pub latest_version: String,
+    pub download_url: String,
+    pub digest: String,
+    pub size: u64,
+}
+
+#[derive(Clone, PartialEq, serde::Serialize)]
+pub struct UpdateProgress {
+    pub phase: String,
+    pub percent: f64,
+    pub message: String,
+}
+
+fn get_current_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
+fn parse_version(v: &str) -> Option<semver::Version> {
+    let v = v.trim().strip_prefix('v').unwrap_or(v.trim());
+    semver::Version::parse(v).ok()
+}
+
+/// Loop guard: the release tag must be strictly newer than the running binary.
+/// Refuses a no-op install whose payload would still report the old version
+/// (e.g. tag bumped without bumping the version files baked into the exe).
+fn ensure_newer(current_str: &str, latest_str: &str) -> Result<(), String> {
+    let current =
+        parse_version(current_str).ok_or_else(|| format!("Invalid current version: {current_str}"))?;
+    let latest =
+        parse_version(latest_str).ok_or_else(|| format!("Invalid latest version: {latest_str}"))?;
+    if latest <= current {
+        return Err(format!(
+            "Already up to date (current v{current}, latest v{latest}); refusing no-op install"
+        ));
+    }
+    Ok(())
+}
+
+fn get_updates_dir() -> Result<PathBuf, String> {
+    let local_app_data = std::env::var("LOCALAPPDATA").map_err(|e| e.to_string())?;
+    let dir = PathBuf::from(local_app_data)
+        .join("SoundCore-Desktop")
+        .join("updates");
+    fs::create_dir_all(&dir).map_err(|e| format!("Failed to create updates dir: {e}"))?;
+    Ok(dir)
+}
+
+fn get_exe_dir() -> Result<PathBuf, String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    Ok(exe.parent().unwrap_or(Path::new(".")).to_path_buf())
+}
+
+pub fn cleanup_old_exe() {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let old = dir.join(format!("{ASSET_NAME}.old"));
+            if old.exists() {
+                let _ = fs::remove_file(&old);
+            }
+        }
+    }
+}
+
+fn build_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .user_agent("SoundCore-Updater")
+        .no_gzip()
+        .no_brotli()
+        .no_deflate()
+        .build()
+        .map_err(|e| e.to_string())
+}
+
+pub async fn check_for_update() -> Result<UpdateInfo, String> {
+    let current_version_str = get_current_version();
+    let current_version = parse_version(&current_version_str)
+        .ok_or_else(|| format!("Invalid current version: {current_version_str}"))?;
+
+    let url = format!("https://api.github.com/repos/{REPO}/releases/latest");
+    let client = build_client()?;
+
+    let response = client
+        .get(&url)
+        .header("Accept", "application/vnd.github+json")
+        .send()
+        .await
+        .map_err(|e| format!("Failed to check for updates: {e}"))?;
+
+    if !response.status().is_success() {
+        return Err(format!("GitHub API returned status: {}", response.status()));
+    }
+
+    let release: serde_json::Value = response.json().await.map_err(|e| e.to_string())?;
+
+    let tag_name = release["tag_name"]
+        .as_str()
+        .ok_or("Missing tag_name in release")?;
+    let latest_version = parse_version(tag_name)
+        .ok_or_else(|| format!("Invalid version in tag: {tag_name}"))?;
+
+    if latest_version <= current_version {
+        return Err("No update available".to_string());
+    }
+
+    let assets = release["assets"]
+        .as_array()
+        .ok_or("Missing assets in release")?;
+
+    let asset = assets
+        .iter()
+        .find(|a| a["name"].as_str() == Some(ASSET_NAME))
+        .ok_or_else(|| format!("{ASSET_NAME} not found in release assets"))?;
+
+    let download_url = asset["browser_download_url"]
+        .as_str()
+        .ok_or("Missing download URL")?
+        .to_string();
+
+    let digest = asset["digest"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
+
+    let size = asset["size"].as_u64().unwrap_or(0);
+
+    Ok(UpdateInfo {
+        current_version: current_version_str,
+        latest_version: latest_version.to_string(),
+        download_url,
+        digest,
+        size,
+    })
+}
+
+fn verify_sha256(file_path: &Path, expected_digest: &str) -> Result<bool, String> {
+    if expected_digest.is_empty() {
+        return Ok(true);
+    }
+
+    let expected = expected_digest
+        .strip_prefix("sha256:")
+        .unwrap_or(expected_digest);
+
+    let bytes = fs::read(file_path).map_err(|e| e.to_string())?;
+    let mut hasher = Sha256::new();
+    hasher.update(&bytes);
+    let result = hasher.finalize();
+    let actual = format!("{:x}", result);
+
+    if !actual.eq_ignore_ascii_case(expected) {
+        return Err(format!(
+            "SHA-256 mismatch: expected {expected}, got {actual} (size: {} bytes)",
+            bytes.len()
+        ));
+    }
+
+    Ok(true)
+}
+
+pub async fn download_update(info: &UpdateInfo, progress: &dyn Fn(UpdateProgress)) -> Result<PathBuf, String> {
+    let updates_dir = get_updates_dir()?;
+    let download_path = updates_dir.join(format!("{ASSET_NAME}.download"));
+
+    if download_path.exists() {
+        fs::remove_file(&download_path).map_err(|e| e.to_string())?;
+    }
+
+    progress(UpdateProgress {
+            phase: "downloading".to_string(),
+            percent: 0.0,
+            message: "Starting download...".to_string(),
+        },
+    );
+
+    let client = build_client()?;
+
+    let response = client
+        .get(&info.download_url)
+        .header("Accept", "application/octet-stream")
+        .send()
+        .await
+        .map_err(|e| format!("Failed to start download: {e}"))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Download failed with status: {}", response.status()));
+    }
+
+    let total_size = info.size;
+    let mut downloaded: u64 = 0;
+    let mut file = fs::File::create(&download_path).map_err(|e| e.to_string())?;
+
+    use std::io::Write;
+    let mut stream = response;
+    let mut last_emit = std::time::Instant::now();
+
+    while let Some(chunk) = stream.chunk().await.map_err(|e| format!("Download error: {e}"))? {
+        file.write_all(&chunk).map_err(|e| e.to_string())?;
+        downloaded += chunk.len() as u64;
+
+        if total_size > 0 && last_emit.elapsed().as_millis() > 200 {
+            let percent = (downloaded as f64 / total_size as f64) * 100.0;
+            progress(UpdateProgress {
+                    phase: "downloading".to_string(),
+                    percent,
+                    message: format!("Downloading... {percent:.0}%"),
+                },
+            );
+            last_emit = std::time::Instant::now();
+        }
+    }
+
+    file.flush().map_err(|e| e.to_string())?;
+    drop(file);
+
+    progress(UpdateProgress {
+            phase: "verifying".to_string(),
+            percent: 100.0,
+            message: "Verifying download...".to_string(),
+        },
+    );
+
+    if !verify_sha256(&download_path, &info.digest)? {
+        let _ = fs::remove_file(&download_path);
+        return Err("SHA-256 verification failed".to_string());
+    }
+
+    Ok(download_path)
+}
+
+pub fn install_update(
+    download_path: &PathBuf,
+    expected_version: &str,
+    progress: &dyn Fn(UpdateProgress),
+) -> Result<(), String> {
+    // Re-verify freshness at install time: check_for_update ran earlier, so a
+    // stale/mismatched payload must fail here instead of "succeeding" into a loop.
+    ensure_newer(&get_current_version(), expected_version)?;
+
+    let staged_len = fs::metadata(download_path)
+        .map_err(|e| format!("Failed to stat staged update: {e}"))?
+        .len();
+    if staged_len == 0 {
+        return Err("Staged update is empty; aborting install".to_string());
+    }
+
+    let exe_dir = get_exe_dir()?;
+    let current_exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    // Location guard: the portable exe must replace the running binary. If the
+    // user renamed the running file, writing a sibling copy would leave the old
+    // version in place and re-offer the same update forever.
+    let current_name = current_exe
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("");
+    if current_name != ASSET_NAME {
+        return Err(format!(
+            "Running exe is '{current_name}', expected '{ASSET_NAME}'; replace it manually to avoid a version loop"
+        ));
+    }
+    let old_exe = exe_dir.join(format!("{ASSET_NAME}.old"));
+    let target_exe = exe_dir.join(ASSET_NAME);
+    let temp_exe = exe_dir.join(format!("{ASSET_NAME}.update"));
+
+    progress(UpdateProgress {
+            phase: "installing".to_string(),
+            percent: 0.0,
+            message: "Preparing update...".to_string(),
+        },
+    );
+
+    if old_exe.exists() {
+        fs::remove_file(&old_exe).map_err(|e| format!("Failed to remove old backup: {e}"))?;
+    }
+    if temp_exe.exists() {
+        fs::remove_file(&temp_exe).map_err(|e| format!("Failed to remove old temp: {e}"))?;
+    }
+
+    // Copy download to temp file first (avoids locking issues on Windows)
+    fs::copy(download_path, &temp_exe)
+        .map_err(|e| format!("Failed to prepare new exe: {e}"))?;
+
+    // Rename current exe to .old (Windows allows renaming a running exe)
+    fs::rename(&current_exe, &old_exe).map_err(|e| {
+        let _ = fs::remove_file(&temp_exe);
+        format!("Failed to backup current exe: {e}")
+    })?;
+
+    // Rename temp to target (atomic on same volume)
+    fs::rename(&temp_exe, &target_exe).map_err(|e| {
+        let _ = fs::rename(&old_exe, &current_exe);
+        format!("Failed to replace exe: {e}")
+    })?;
+
+    // Verify the replacement actually landed: a missing/empty target would
+    // restart into the old version and re-offer the same update forever.
+    let target_len = fs::metadata(&target_exe)
+        .map_err(|e| format!("Update vanished after replace: {e}"))?
+        .len();
+    if target_len == 0 || target_len != staged_len {
+        let _ = fs::rename(&old_exe, &current_exe);
+        let _ = fs::remove_file(&target_exe);
+        return Err(format!(
+            "Installed exe looks wrong (expected {staged_len} bytes, got {target_len}); rolled back"
+        ));
+    }
+
+    let _ = fs::remove_file(download_path);
+
+    progress(UpdateProgress {
+            phase: "restarting".to_string(),
+            percent: 100.0,
+            message: "Restarting...".to_string(),
+        },
+    );
+
+    // Mark config that we're restarting for an update
+    let mut cfg = crate::config::load();
+    cfg.update_restart = true;
+    let _ = crate::config::save(&cfg);
+
+    Command::new(&target_exe)
+        .spawn()
+        .map_err(|e| format!("Failed to launch new version: {e}"))?;
+
+    std::process::exit(0);
+}

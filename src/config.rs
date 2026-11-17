@@ -1,0 +1,305 @@
+//! Configuration: the devices to watch and the per-device profile that is
+//! refreshed FROM the device on every connect (read-only fetch).
+
+use std::{path::PathBuf, str::FromStr};
+
+use anyhow::{Context, anyhow};
+use macaddr::MacAddr6;
+use openscq30_lib::DeviceModel;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Config {
+    /// Start automatically when the user logs in.
+    #[serde(default = "default_true")]
+    pub autostart: bool,
+    #[serde(default)]
+    pub devices: Vec<DeviceConfig>,
+    /// Set to true when restarting after an update (cleared on next startup).
+    #[serde(default)]
+    pub update_restart: bool,
+    /// Custom equalizer presets (global + per-device).
+    #[serde(default)]
+    pub eq_presets: Vec<EqPresetEntry>,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self { autostart: true, devices: Vec::new(), update_restart: false, eq_presets: Vec::new() }
+    }
+}
+
+fn default_true() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeviceConfig {
+    /// Friendly label shown in the UI.
+    #[serde(default)]
+    pub name: String,
+    pub mac_address: String,
+    pub model: String,
+    #[serde(default = "default_poll_seconds")]
+    pub poll_seconds: u64,
+    /// Seconds to wait after connect before reading the device's settings.
+    #[serde(default = "default_apply_delay")]
+    pub apply_delay_seconds: u64,
+    /// Settings recorded for this device. On every connect this list is REPLACED
+    /// with the device's current settings — a read-only fetch that never writes
+    /// anything to the device. Live UI changes write the single setting they
+    /// touch and update this list for reference; it is never pushed back.
+    #[serde(default)]
+    pub profile: Vec<SettingEntry>,
+    /// Optional product image URL shown in the popup (otherwise a generic illustration).
+    #[serde(default)]
+    pub image: Option<String>,
+    /// Device color as a hex string (e.g., "#1a1a1a") or a Soundcore color code ("1"-"y").
+    /// Used to tint the SVG device template.
+    #[serde(default)]
+    pub color: Option<String>,
+    /// Unix timestamp (seconds) of the last successful connect, used to order
+    /// the idle "My Devices" list newest-first. None for never-connected or
+    /// pre-upgrade devices (they sort last).
+    #[serde(default)]
+    pub last_connected: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SettingEntry {
+    pub id: String,
+    pub value: String,
+}
+
+/// Settings that each select the *source* of the equalizer curve. Only one can be
+/// in effect at a time.
+const EQ_SOURCE_IDS: [&str; 3] = [
+    "volumeAdjustments",
+    "presetEqualizerProfile",
+    "customEqualizerProfile",
+];
+
+fn is_eq_source(id: &str) -> bool {
+    EQ_SOURCE_IDS.contains(&id)
+}
+
+fn is_enabling_spatial(id: &str, value: &str) -> bool {
+    id == "spatialAudio" && value.trim().eq_ignore_ascii_case("true")
+}
+
+/// Drops entries that cannot coexist with `id`.
+///
+/// The device folds conflicting equalizer state into one target state: writing
+/// any equalizer value clears spatial audio device-side, and two equalizer
+/// sources simply overwrite each other. The stored profile must mirror that —
+/// holding e.g. both `volumeAdjustments` and `spatialAudio = true` would
+/// misrepresent what the device is actually doing. Keeping the record
+/// internally consistent is what makes it a faithful mirror.
+fn prune_conflicts(list: &mut Vec<SettingEntry>, id: &str, value: &str) {
+    let eq_source = is_eq_source(id);
+    if !eq_source && !is_enabling_spatial(id, value) {
+        return;
+    }
+    list.retain(|e| {
+        if e.id == id {
+            return true;
+        }
+        // At most one equalizer source survives, and enabling spatial audio
+        // removes all of them.
+        if is_eq_source(&e.id) {
+            return false;
+        }
+        // Picking an equalizer source turns spatial audio off. `spatialAudioMode`
+        // is kept so the choice is remembered for next time.
+        if e.id == "spatialAudio" && eq_source {
+            return false;
+        }
+        true
+    });
+}
+
+/// Upserts one entry into a profile, dropping anything it contradicts.
+pub fn upsert_entry(list: &mut Vec<SettingEntry>, id: String, value: String) {
+    prune_conflicts(list, &id, &value);
+    match list.iter_mut().find(|e| e.id == id) {
+        Some(e) => e.value = value,
+        None => list.push(SettingEntry { id, value }),
+    }
+}
+
+/// Resolves contradictions in a profile that was written before the rules above
+/// existed. The last conflicting entry wins, matching "most recently changed".
+/// Returns true if anything was removed.
+pub fn prune_profile(list: &mut Vec<SettingEntry>) -> bool {
+    let winner = list
+        .iter()
+        .rposition(|e| is_eq_source(&e.id) || is_enabling_spatial(&e.id, &e.value))
+        .map(|i| (list[i].id.clone(), list[i].value.clone()));
+    let Some((id, value)) = winner else {
+        return false;
+    };
+    let before = list.len();
+    prune_conflicts(list, &id, &value);
+    list.len() != before
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EqPresetEntry {
+    /// Auto-incrementing ID.
+    pub id: i64,
+    /// User-facing name.
+    pub name: String,
+    /// Comma-separated band values (e.g. "6,4,1,0,0").
+    pub bands: String,
+    /// Device model this preset is for, or empty/null for global presets.
+    #[serde(default)]
+    pub model: String,
+}
+
+fn default_poll_seconds() -> u64 {
+    5
+}
+fn default_apply_delay() -> u64 {
+    2
+}
+
+impl Default for DeviceConfig {
+    fn default() -> Self {
+        Self {
+            name: "New device".to_owned(),
+            mac_address: String::new(),
+            model: "SoundcoreA3959".to_owned(),
+            poll_seconds: 5,
+            apply_delay_seconds: 2,
+            profile: Vec::new(),
+            image: None,
+            color: None,
+            last_connected: None,
+        }
+    }
+}
+
+impl DeviceConfig {
+    /// Validates and parses the mac address and model.
+    pub fn parse(&self) -> anyhow::Result<(MacAddr6, DeviceModel)> {
+        let mac = MacAddr6::from_str(self.mac_address.trim())
+            .with_context(|| format!("invalid mac_address '{}'", self.mac_address))?;
+        let model = DeviceModel::from_str(self.model.trim())
+            .map_err(|_| anyhow!("invalid model '{}'", self.model))?;
+        Ok((mac, model))
+    }
+
+    /// A label for the UI, falling back to the mac if no name is set.
+    pub fn label(&self) -> String {
+        if self.name.trim().is_empty() {
+            if self.mac_address.trim().is_empty() {
+                "New device".to_owned()
+            } else {
+                self.mac_address.clone()
+            }
+        } else {
+            self.name.clone()
+        }
+    }
+}
+
+/// Orders devices newest-connect first for the idle "My Devices" list.
+/// Never-connected devices (`last_connected: None`) sort last, preserving
+/// config order among themselves. The sort is stable, so equal timestamps
+/// also keep config order.
+pub fn sort_devices_by_recency(devices: &mut [DeviceConfig]) {
+    devices.sort_by_key(|d| std::cmp::Reverse(d.last_connected));
+}
+
+impl Config {
+    pub fn load(path: &PathBuf) -> anyhow::Result<Self> {
+        let text = std::fs::read_to_string(path)
+            .with_context(|| format!("failed to read {}", path.display()))?;
+        let mut config: Self = toml::from_str(&text)?;
+        for dev in &mut config.devices {
+            if prune_profile(&mut dev.profile) {
+                tracing::info!(
+                    "dropped conflicting sound-effect entries from '{}' profile",
+                    dev.label()
+                );
+            }
+        }
+        Ok(config)
+    }
+
+    pub fn save(&self, path: &PathBuf) -> anyhow::Result<()> {
+        let text = toml::to_string_pretty(self)?;
+        std::fs::write(path, text).with_context(|| format!("failed to write {}", path.display()))
+    }
+}
+
+/// config.toml resolution: explicit path, else next to the exe, else CWD.
+pub fn resolve_path(explicit: Option<String>) -> PathBuf {
+    if let Some(arg) = explicit {
+        return PathBuf::from(arg);
+    }
+    if let Ok(exe) = std::env::current_exe()
+        && let Some(dir) = exe.parent()
+    {
+        let candidate = dir.join("config.toml");
+        if candidate.exists() {
+            return candidate;
+        }
+    }
+    PathBuf::from("config.toml")
+}
+
+pub fn load() -> Config {
+    let path = resolve_path(None);
+    Config::load(&path).unwrap_or_default()
+}
+
+pub fn save(cfg: &Config) -> Result<(), String> {
+    let path = resolve_path(None);
+    cfg.save(&path).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn dev(mac: &str, last_connected: Option<u64>) -> DeviceConfig {
+        DeviceConfig { mac_address: mac.to_owned(), last_connected, ..DeviceConfig::default() }
+    }
+
+    #[test]
+    fn last_connected_missing_from_toml_defaults_to_none() {
+        let cfg: Config = toml::from_str(
+            r#"
+            [[devices]]
+            mac_address = "34:09:C9:B9:EC:30"
+            model = "SoundcoreA3959"
+            "#,
+        )
+        .expect("config without last_connected should parse");
+        assert_eq!(cfg.devices.len(), 1);
+        assert_eq!(cfg.devices[0].last_connected, None);
+    }
+
+    #[test]
+    fn sort_devices_newest_first_none_last() {
+        let mut devices = vec![
+            dev("aa", None),
+            dev("bb", Some(100)),
+            dev("cc", None),
+            dev("dd", Some(300)),
+            dev("ee", Some(200)),
+        ];
+        sort_devices_by_recency(&mut devices);
+        let order: Vec<&str> = devices.iter().map(|d| d.mac_address.as_str()).collect();
+        assert_eq!(order, vec!["dd", "ee", "bb", "aa", "cc"]);
+    }
+
+    #[test]
+    fn sort_devices_is_stable_for_ties_and_never_connected() {
+        let mut devices = vec![dev("first", Some(100)), dev("second", Some(100)), dev("third", None), dev("fourth", None)];
+        sort_devices_by_recency(&mut devices);
+        let order: Vec<&str> = devices.iter().map(|d| d.mac_address.as_str()).collect();
+        assert_eq!(order, vec!["first", "second", "third", "fourth"]);
+    }
+}
