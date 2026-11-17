@@ -12,3 +12,6 @@ build-gpui.rs
 
 # Agent session instructions (local only)
 AGENTS.md
+
+# Local design references
+UI-Target/
