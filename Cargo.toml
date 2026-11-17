@@ -1,0 +1,59 @@
+[package]
+name = "soundcore-desktop"
+version = "1.7.0"
+edition = "2024"
+description = "Cross-platform desktop tray app that mirrors Soundcore earbud settings (gaming mode, ANC, EQ) — fetch-only on connect, live single-setting controls from the tray. Windows & Linux."
+build = "build.rs"
+
+[lib]
+name = "soundcore_desktop_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+path = "src/lib.rs"
+
+[[bin]]
+name = "soundcore-desktop"
+path = "src/main.rs"
+
+[dependencies]
+gpui = "0.2.2"
+tray-icon = { version = "0.26", default-features = false, features = ["ksni"] }
+png = "0.18"
+raw-window-handle = "0.6"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+openscq30-lib = { path = "OpenSCQ30/lib" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
+macaddr = "1"
+strum = "0.28"
+toml = "0.8"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+dirs = "6"
+reqwest = { version = "0.12", features = ["blocking", "json", "stream"] }
+zip = "2"
+base64 = "0.22"
+semver = "1"
+sha2 = "0.10"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.52"
+hex = "0.4"
+windows = { version = "0.62", features = [
+    "Devices_Enumeration",
+    "Devices_Bluetooth",
+    "Devices_Radios",
+    "Foundation",
+    "Win32_System_Registry",
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32",
+] }
+window-vibrancy = "0.8"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+bluer = { version = "0.17", features = ["bluetoothd"] }
+
+[profile.release]
+opt-level = 2
