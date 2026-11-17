@@ -1,9 +1,4 @@
 /target
-/src-tauri/target
-/src-tauri/gen
-/src-tauri/config.toml
-node_modules/
-/ui/dist
 .cotrex/
 .playwright-mcp/
 
@@ -15,3 +10,5 @@ stdout.log
 gpui-run.log
 build-gpui.rs
 
+# Agent session instructions (local only)
+AGENTS.md
