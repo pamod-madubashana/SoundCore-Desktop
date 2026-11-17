@@ -1,0 +1,172 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="826" height="1160" viewBox="0 0 413 580" xmlns:c2pa="http://c2pa.org/manifest">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b0f1a"/>
+      <stop offset="0.55" stop-color="#141a2e"/>
+      <stop offset="1" stop-color="#1b1033"/>
+    </linearGradient>
+    <radialGradient id="glowA" cx="0.15" cy="0.9" r="0.6">
+      <stop offset="0" stop-color="#ff7a45" stop-opacity="0.30"/>
+      <stop offset="1" stop-color="#ff7a45" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowB" cx="0.9" cy="0.05" r="0.6">
+      <stop offset="0" stop-color="#5b8cff" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#5b8cff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.10"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.04"/>
+    </linearGradient>
+    <linearGradient id="panelStroke" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.06"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5b8cff"/>
+      <stop offset="1" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="iconBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2a3354"/>
+      <stop offset="1" stop-color="#1a2038"/>
+    </linearGradient>
+    <linearGradient id="batt" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#34d399"/>
+      <stop offset="1" stop-color="#4ade80"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+    <filter id="glow" x="-30%" y="-50%" width="160%" height="220%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#6d6cff" flood-opacity="0.6"/>
+    </filter>
+    <style>
+      text { font-family: 'Segoe UI', 'Inter', 'Helvetica Neue', Arial, sans-serif; }
+      .seg { font-size: 11.5px; font-weight: 600; fill: #ffffff; fill-opacity: 0.55; text-anchor: middle; }
+      .segA { font-size: 11.5px; font-weight: 700; fill: #ffffff; text-anchor: middle; }
+      .row { font-size: 12.5px; font-weight: 500; fill: #ffffff; fill-opacity: 0.88; }
+      .sep { stroke: #ffffff; stroke-opacity: 0.07; }
+    </style>
+  </defs>
+
+  <rect width="413" height="580" fill="url(#bg)"/>
+  <rect width="413" height="580" fill="url(#glowA)"/>
+  <rect width="413" height="580" fill="url(#glowB)"/>
+
+  <!-- panel -->
+  <rect x="12" y="12" width="389" height="556" rx="28" fill="url(#panel)" stroke="url(#panelStroke)" filter="url(#shadow)"/>
+
+  <!-- header -->
+  <rect x="26" y="26" width="58" height="52" rx="16" fill="url(#iconBg)" stroke="#fff" stroke-opacity="0.14"/>
+  <!-- earbuds -->
+  <g fill="#0d1020" stroke="#c9d6ff" stroke-width="1.6" stroke-linecap="round">
+    <ellipse cx="45" cy="46" rx="8" ry="9"/>
+    <path d="M40 54 L37 68" />
+    <ellipse cx="65" cy="46" rx="8" ry="9"/>
+    <path d="M70 54 L73 68"/>
+  </g>
+  <text x="98" y="48" font-size="18" font-weight="700" fill="#fff">R60i NC</text>
+  <circle cx="162" cy="43" r="4" fill="#4ade80"/>
+  <circle cx="162" cy="43" r="8" fill="#4ade80" fill-opacity="0.2"/>
+  <text x="98" y="62" font-size="10.5" fill="#fff" fill-opacity="0.5">Connected · Soundcore</text>
+
+  <!-- battery pills -->
+  <g>
+    <rect x="98" y="68" width="88" height="0" />
+  </g>
+  <g transform="translate(98,70)">
+    <rect width="86" height="20" rx="10" fill="#fff" fill-opacity="0.07" stroke="#fff" stroke-opacity="0.12"/>
+    <text x="10" y="14" font-size="9.5" font-weight="700" fill="#9db8ff">L</text>
+    <rect x="22" y="6" width="22" height="9" rx="3" fill="url(#batt)"/>
+    <text x="50" y="14" font-size="10.5" font-weight="600" fill="#fff">100%</text>
+  </g>
+  <g transform="translate(192,70)">
+    <rect width="86" height="20" rx="10" fill="#fff" fill-opacity="0.07" stroke="#fff" stroke-opacity="0.12"/>
+    <text x="10" y="14" font-size="9.5" font-weight="700" fill="#9db8ff">R</text>
+    <rect x="22" y="6" width="22" height="9" rx="3" fill="url(#batt)"/>
+    <text x="50" y="14" font-size="10.5" font-weight="600" fill="#fff">100%</text>
+  </g>
+  <g transform="translate(286,70)">
+    <rect width="86" height="20" rx="10" fill="#fff" fill-opacity="0.07" stroke="#fff" stroke-opacity="0.12"/>
+    <rect x="10" y="5" width="9" height="10" rx="3" fill="none" stroke="#9db8ff" stroke-width="1.3"/>
+    <rect x="24" y="6" width="22" height="9" rx="3" fill="#fbbf24"/>
+    <text x="50" y="14" font-size="10.5" font-weight="600" fill="#fff">70%</text>
+  </g>
+
+  <!-- close -->
+  <circle cx="370" cy="40" r="13" fill="#fff" fill-opacity="0.08" stroke="#fff" stroke-opacity="0.14"/>
+  <path d="M365 35 L375 45 M375 35 L365 45" stroke="#fff" stroke-opacity="0.75" stroke-width="1.8" stroke-linecap="round"/>
+
+  <!-- ===== Mode card ===== -->
+  <rect x="26" y="106" width="361" height="148" rx="22" fill="#fff" fill-opacity="0.06" stroke="#fff" stroke-opacity="0.12"/>
+
+  <!-- ANC row -->
+  <rect x="36" y="116" width="341" height="40" rx="14" fill="#000" fill-opacity="0.28"/>
+  <rect x="38" y="118" width="109" height="36" rx="12" fill="url(#accent)" filter="url(#glow)"/>
+  <text x="92" y="141" class="segA">Noise Cancel</text>
+  <text x="207" y="141" class="seg">Normal</text>
+  <text x="322" y="141" class="seg">Transparency</text>
+
+  <!-- sub mode row -->
+  <rect x="36" y="164" width="341" height="36" rx="13" fill="#000" fill-opacity="0.28"/>
+  <rect x="266" y="166" width="109" height="32" rx="11" fill="url(#accent)" filter="url(#glow)"/>
+  <text x="92" y="186" class="seg">Manual</text>
+  <text x="207" y="186" class="seg">Adaptive</text>
+  <text x="321" y="186" class="segA">Multi-Scene</text>
+
+  <!-- scene row -->
+  <rect x="36" y="208" width="341" height="36" rx="13" fill="#000" fill-opacity="0.28"/>
+  <rect x="266" y="210" width="109" height="32" rx="11" fill="url(#accent)" filter="url(#glow)"/>
+  <text x="92" y="230" class="seg">Transport</text>
+  <text x="207" y="230" class="seg">Outdoor</text>
+  <text x="321" y="230" class="segA">Indoor</text>
+
+  <!-- Sound effects -->
+  <rect x="26" y="266" width="361" height="46" rx="18" fill="#fff" fill-opacity="0.06" stroke="#fff" stroke-opacity="0.12"/>
+  <rect x="38" y="275" width="28" height="28" rx="9" fill="#5b8cff" fill-opacity="0.2"/>
+  <path d="M46 289 v0 M50 283 v12 M54 286 v6 M58 281 v16" stroke="#9db8ff" stroke-width="2" stroke-linecap="round"/>
+  <text x="78" y="293" font-size="13" font-weight="700" fill="#fff">Sound Effects</text>
+  <text x="168" y="293" font-size="11" fill="#fff" fill-opacity="0.5">Soundcore Signature</text>
+  <path d="M368 284 L374 289 L368 294" fill="none" stroke="#fff" stroke-opacity="0.5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- ===== Toggle list ===== -->
+  <rect x="26" y="324" width="361" height="206" rx="20" fill="#fff" fill-opacity="0.05" stroke="#fff" stroke-opacity="0.12"/>
+
+  <!-- row 1 ON -->
+  <text x="42" y="346" class="row">Wind Noise Suppression</text>
+  <rect x="337" y="333" width="38" height="20" rx="10" fill="url(#accent)"/>
+  <circle cx="365" cy="343" r="7.5" fill="#fff"/>
+  <line x1="40" x2="373" y1="358" y2="358" class="sep"/>
+
+  <!-- row 2 OFF -->
+  <text x="42" y="380" class="row">Real Time Adaptive Noise Canceling</text>
+  <rect x="337" y="367" width="38" height="20" rx="10" fill="#fff" fill-opacity="0.15"/>
+  <circle cx="347" cy="377" r="7.5" fill="#fff" fill-opacity="0.8"/>
+  <line x1="40" x2="373" y1="392" y2="392" class="sep"/>
+
+  <!-- row 3 OFF -->
+  <text x="42" y="414" class="row">Limit High Volume</text>
+  <rect x="337" y="401" width="38" height="20" rx="10" fill="#fff" fill-opacity="0.15"/>
+  <circle cx="347" cy="411" r="7.5" fill="#fff" fill-opacity="0.8"/>
+  <line x1="40" x2="373" y1="426" y2="426" class="sep"/>
+
+  <!-- row 4 ON -->
+  <text x="42" y="448" class="row">Dual Connections</text>
+  <rect x="337" y="435" width="38" height="20" rx="10" fill="url(#accent)"/>
+  <circle cx="365" cy="445" r="7.5" fill="#fff"/>
+  <line x1="40" x2="373" y1="460" y2="460" class="sep"/>
+
+  <!-- row 5 OFF -->
+  <text x="42" y="482" class="row">Ldac</text>
+  <rect x="337" y="469" width="38" height="20" rx="10" fill="#fff" fill-opacity="0.15"/>
+  <circle cx="347" cy="479" r="7.5" fill="#fff" fill-opacity="0.8"/>
+  <line x1="40" x2="373" y1="494" y2="494" class="sep"/>
+
+  <!-- row 6 ON -->
+  <text x="42" y="516" class="row">Touch Tone</text>
+  <rect x="337" y="503" width="38" height="20" rx="10" fill="url(#accent)"/>
+  <circle cx="365" cy="513" r="7.5" fill="#fff"/>
+
+  <!-- footer -->
+  <text x="28" y="556" font-size="10.5" fill="#fff" fill-opacity="0.4">v1.5.0</text>
+  <text x="385" y="556" font-size="10.5" font-weight="600" fill="#9db8ff" text-anchor="end">GitHub</text>
+<metadata><c2pa:manifest>AAAWgmp1bWIAAAAeanVtZGMycGEAEQAQgAAAqgA4m3EDYzJwYQAAABZcanVtYgAAAEdqdW1kYzJtYQARABCAAACqADibcQN1cm46YzJwYTpkOTRhOTY0Yy04NmFmLTRlYWQtOWMyNi0wMjc3OTdkMmJkNWIAAAADl2p1bWIAAAApanVtZGMyYXMAEQAQgAAAqgA4m3EDYzJwYS5hc3NlcnRpb25zAAAAALxqdW1iAAAARGp1bWRjYm9yABEAEIAAAKoAOJtxE2MycGEuaW5ncmVkaWVudC52MwAAAAAYYzJzaOUE/bFFGKz7oZRRTSVvyNoAAABwY2JvcqNpZGM6Zm9ybWF0bWltYWdlL3N2Zyt4bWxqaW5zdGFuY2VJRHgseG1wOmlpZDo3YjY5ZGEwNC0wODc5LTRhMTItYTQ4Mi01Yzc0MGI2MjlmZDlscmVsYXRpb25zaGlwaHBhcmVudE9mAAAB4mp1bWIAAABBanVtZGNib3IAEQAQgAAAqgA4m3ETYzJwYS5hY3Rpb25zLnYyAAAAABhjMnNoI5MUgcyxf5VClgzG1U7dsgAAAZljYm9yomdhY3Rpb25zgqJmYWN0aW9ua2MycGEub3BlbmVkanBhcmFtZXRlcnOha2luZ3JlZGllbnRzgaJjdXJseC1zZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmluZ3JlZGllbnQudjNkaGFzaFgg8xzb6Fqid0JVW656fJm0RqtKYbbI7s+akLwKGK07AFikZmFjdGlvbngdY29tLmFudGhyb3BpYy5jbGF1ZGUucHJvdmlkZWRqcGFyYW1ldGVyc6F4H2NvbS5hbnRocm9waWMub3JpZ2luLWNvbmZpZGVuY2VndW5rbm93bmtkZXNjcmlwdGlvbnhmQ2xhdWRlIHByb3ZpZGVkIHRoaXMgZmlsZSBhdCB0aGUgcmVxdWVzdCBvZiBhIHVzZXIgYW5kIG1heSBoYXZlIGNyZWF0ZWQgb3IgbW9kaWZpZWQgdGhlIGZpbGUgY29udGVudHMubXNvZnR3YXJlQWdlbnShZG5hbWVmQ2xhdWRlcmFsbEFjdGlvbnNJbmNsdWRlZPUAAADIanVtYgAAAEBqdW1kY2JvcgARABCAAACqADibcRNjMnBhLmhhc2guZGF0YQAAAAAYYzJzaIux9sN+exPP3GWwZ0+z+ssAAACAY2JvcqVjYWxnZnNoYTI1NmNwYWRMAAAAAAAAAAAAAAAAZGhhc2hYIIjC2FH6bPuZFVHSoAhYKCuaggK73L6DyHANcNTSEAyxZG5hbWVuanVtYmYgbWFuaWZlc3RqZXhjbHVzaW9uc4GiZXN0YXJ0GSNUZmxlbmd0aBkeBAAAAj5qdW1iAAAAJ2p1bWRjMmNsABEAEIAAAKoAOJtxA2MycGEuY2xhaW0udjIAAAACD2Nib3KlY2FsZ2ZzaGEyNTZpc2lnbmF0dXJleE1zZWxmI2p1bWJmPS9jMnBhL3VybjpjMnBhOmQ5NGE5NjRjLTg2YWYtNGVhZC05YzI2LTAyNzc5N2QyYmQ1Yi9jMnBhLnNpZ25hdHVyZWppbnN0YW5jZUlEeCx4bXA6aWlkOmJjNTZhNzRiLTIwNWItNGQ3OC1iZmNkLWQ2ODc3MWExOTBiNXJjcmVhdGVkX2Fzc2VydGlvbnODomN1cmx4LXNlbGYjanVtYmY9YzJwYS5hc3NlcnRpb25zL2MycGEuaW5ncmVkaWVudC52M2RoYXNoWCDzHNvoWqJ3QlVbrnp8mbRGq0phtsjuz5qQvAoYrTsAWKJjdXJseCpzZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmFjdGlvbnMudjJkaGFzaFggf2DV8+d/lh2ZpfTDSP+wd4ffNLSgHr298tkv7Fls1ziiY3VybHgpc2VsZiNqdW1iZj1jMnBhLmFzc2VydGlvbnMvYzJwYS5oYXNoLmRhdGFkaGFzaFgg15PhqqGuvpcdrB/tRt+r8PsFKL4ATid83bnRJEGJYY90Y2xhaW1fZ2VuZXJhdG9yX2luZm+jZG5hbWVvQW50aHJvcGljIEZpbGVzZ3ZlcnNpb25lMS4wLjBrc3BlY1ZlcnNpb25lMi40LjAAABA4anVtYgAAAChqdW1kYzJjcwARABCAAACqADibcQNjMnBhLnNpZ25hdHVyZQAAABAIY2JvctKEWQISogEmGCFZAgowggIGMIIBjaADAgECAhRA5aAK7sI50L64g/oGQgU9Z1UTADAKBggqhkjOPQQDAzBJMRcwFQYDVQQKEw5BbnRocm9waWMsIFBCQzEuMCwGA1UEAxMlQW50aHJvcGljIENvbnRlbnQgQ3JlZGVudGlhbHMgUm9vdCBDQTAeFw0yNjA4MDcxODQzNTZaFw0yODA4MDYxOTQzNTZaMEQxFzAVBgNVBAoTDkFudGhyb3BpYywgUEJDMSkwJwYDVQQDEyBBbnRocm9waWMgQ2xhdWRlIENvbnRlbnQgU2lnbmluZzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABJh6CmvLUBgFFNU0vUKlOVtE6djd17L5SuwX0LemFisBM3dkd/3cyjxFA3Qo5S46fX0/ihY0VZ7mfb9KF703t5OjWDBWMA4GA1UdDwEB/wQEAwIHgDAVBgNVHSUEDjAMBgorBgEEAYPoXgIBMAwGA1UdEwEB/wQCMAAwHwYDVR0jBBgwFoAUzlHiBIFOZFsj+OPEz5o+nMHXXMIwCgYIKoZIzj0EAwMDZwAwZAIwMXMdFJ4BetLLVY7ORuE9noqbbAZOZn/aArXyTwFAZfKrPzxF2vPoJNf1+UCdg1XGAjBwX1zd9WGqYkqmL5SFqw1QySjr1zJfpJM9+1rdDwSPLMOPOjKuiXjoU/pUUeG9RwmhY3BhZFkNngAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPZYQC3WPResbvDDlm+5JKcOG7qj9wT2rlQeP6X2irf9dpwCF6tGeZLc8Z8RUepocdrzIiKvRxX+YLxtVRnU7NrEi78=</c2pa:manifest></metadata></svg>
