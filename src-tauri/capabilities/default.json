@@ -1,6 +1,0 @@
-{
-  "identifier": "default",
-  "description": "Permissions for the SoundCore-Desktop popup window.",
-  "windows": ["main"],
-  "permissions": ["core:default"]
-}
