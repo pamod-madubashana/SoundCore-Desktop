@@ -7,42 +7,29 @@ title: Installation
 
 ## Prerequisites
 
-- Node.js 18+
 - Rust toolchain
-- npm installed
+- Git (with submodule support)
 - Windows 10/11 or Linux
 
 ## Install the repository
 
 ```bash
-git clone https://github.com/pamod-madubashana/SoundCore-Desktop.git
+git clone --recurse-submodules https://github.com/pamod-madubashana/SoundCore-Desktop.git
 cd SoundCore-Desktop
-npm install
-npm --prefix ui install
 ```
 
 ## Run the desktop app in development
 
 ```bash
-npm run tauri dev
+cargo run
 ```
 
-This starts the Tauri development environment and opens the app in the system tray.
+This starts the tray app and opens the control popup.
 
 ## Build for production
 
 ```bash
-npm run tauri build
+cargo build --release
 ```
 
-The release output is produced by Tauri and can be packaged for Windows or Linux.
-
-## Run the docs locally
-
-```bash
-cd docs
-npm install
-npm run start
-```
-
-Then open the local development URL shown in the terminal.
+The release binary is produced under `target/release/` for Windows or Linux.

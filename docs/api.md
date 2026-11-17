@@ -5,30 +5,31 @@ title: Architecture
 
 # Architecture
 
-SoundCore-Desktop is structured as a desktop tray application with a React frontend and a Rust Tauri backend.
+SoundCore-Desktop is a native desktop tray application built with GPUI (Rust) and the OpenSCQ30 device library.
 
 ## Core folders
 
-- `ui/` — React + Vite frontend for the tray UI and user interaction.
-- `src-tauri/` — Rust backend with Tauri integration, system APIs, and device handling.
-- `docs/` — Docusaurus documentation site and markdown content.
-- `soundcore-graphify/` — analysis and graph data for the repository.
+- `src/` — application entry, worker, config, and window shell.
+- `src/UI/` — GPUI screens, theme, and data helpers.
+- `assets/` — icons and embedded device images.
+- `docs/` — documentation site and markdown content.
+- `OpenSCQ30/` — git submodule with the device protocol library.
 
 ## Main Rust components
 
-- `src-tauri/src/main.rs` — application launch and Tauri command registration.
-- `src-tauri/src/worker.rs` — device connection detection and profile restore logic.
-- `src-tauri/src/config.rs` — configuration parsing and app settings.
-- `src-tauri/src/autostart.rs` — optional autostart implementation.
+- `src/main.rs` — process entry.
+- `src/lib.rs` — app bootstrap, tray wiring, window show/hide.
+- `src/worker.rs` — device connection detection and profile restore logic.
+- `src/config.rs` — configuration parsing and app settings.
+- `src/shell.rs` — Windows shell: position, acrylic, rounded corners.
+- `src/autostart.rs` — optional autostart implementation.
 
-## Frontend components
+## UI components
 
-- `ui/src/App.jsx` — main React app entry point.
-- `ui/src/main.jsx` — React render logic.
-- `ui/src/index.css` — application styling.
+- `src/UI/mod.rs` — root view and screen routing.
+- `src/UI/screens/` — control, devices, searching, sound effects screens.
+- `src/UI/theme.rs` — palette tokens.
 
 ## Deployment and packaging
 
-The project is built using Tauri for native packaging, with `npm run tauri build` producing desktop installers.
-
-The docs site is a static Docusaurus site served from `docs/build` and published separately to GitHub Pages.
+Release binaries are built with `cargo build --release`. GitHub Actions (`release.yml`) builds Windows and Linux artifacts.

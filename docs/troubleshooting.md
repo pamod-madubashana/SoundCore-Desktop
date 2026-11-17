@@ -25,26 +25,14 @@ If SoundCore-Desktop does not behave as expected, use these steps to diagnose an
 - Reconnect the device and watch for profile restore activity.
 - If the app cannot communicate with the device, restart both the app and the device.
 
-## Docs build issues
-
-If Docusaurus docs fail to build:
-
-```bash
-cd docs
-npm install
-npm run build
-```
-
-Then inspect the terminal output for broken links or missing configuration.
-
 ## Build / packaging issues
 
 - Make sure Rust is installed and up to date.
-- Confirm `npm install` completed successfully.
-- If the Tauri build fails, run:
+- Confirm submodules are cloned (`git submodule update --init`).
+- If the app build fails, run:
 
 ```bash
-npm run tauri build
+cargo check
 ```
 
 and review the error messages.

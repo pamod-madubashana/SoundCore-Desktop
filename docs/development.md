@@ -9,69 +9,50 @@ These notes cover how to contribute to the SoundCore-Desktop project.
 
 ## Project structure
 
-- `ui/` — React + Vite frontend code for the tray UI.
-- `src-tauri/` — Rust backend code and Tauri integration.
-- `docs/` — documentation site powered by Docusaurus.
-- `soundcore-graphify/` — repository analysis and graph data.
+- `src/` — GPUI tray app (UI + backend).
+- `src/UI/` — GPUI screens, theme, and data helpers.
+- `assets/` — icons and embedded device images.
+- `docs/` — documentation site.
+- `OpenSCQ30/` — git submodule (do not edit).
 
 ## Setup for development
 
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/pamod-madubashana/SoundCore-Desktop.git
+git clone --recurse-submodules https://github.com/pamod-madubashana/SoundCore-Desktop.git
 cd SoundCore-Desktop
 ```
 
-2. Install root and UI dependencies:
+2. Documentation pages are plain markdown under `docs/` (no npm build for the app).
 
-```bash
-npm install
-npm --prefix ui install
-```
+## Working on the UI
 
-3. Install docs dependencies if you want to update documentation:
-
-```bash
-cd docs
-npm install
-```
-
-## Working on the frontend
-
-- Edit `ui/src/App.jsx` and `ui/src/main.jsx` for UI changes.
-- Update styles in `ui/src/index.css`.
+- Edit files under `src/UI/` (screens, theme, data).
+- Design references live in `UI-Target/*.svg`.
 
 ## Working on the backend
 
-- Update Tauri integration in `src-tauri/src/main.rs`.
-- Modify device logic in `src-tauri/src/worker.rs`.
-- Adjust configuration parsing in `src-tauri/src/config.rs`.
+- Device/worker logic: `src/worker.rs`.
+- Configuration: `src/config.rs`.
+- Window shell (position, acrylic, corners): `src/shell.rs`.
 
 ## Running the app during development
 
 ```bash
-npm run tauri dev
+cargo run
 ```
 
 ## Building for release
 
 ```bash
-npm run tauri build
+cargo build --release
 ```
-
-This generates native installers for supported platforms.
 
 ## Updating documentation
 
-1. Add or edit markdown files in `docs/docs/`.
-2. Update `docs/sidebars.js` to include new content.
-3. Run the docs site locally:
-
-```bash
-cd docs
-npm run start
-```
+1. Add or edit markdown files under `docs/`.
+2. Marketing/docs site source lives in `.site/` (separate npm project for GitHub Pages).
 
 ## Contributing guidelines
 

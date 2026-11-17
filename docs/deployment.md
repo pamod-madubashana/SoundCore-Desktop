@@ -7,20 +7,11 @@ title: Deployment
 
 ## GitHub Pages
 
-This documentation site can be deployed directly to GitHub Pages from the `gh-pages` branch.
-
-### Build and deploy locally
-
-```bash
-cd docs
-npm install
-npm run build
-npx docusaurus deploy
-```
+The marketing site lives under `.site/` (own `package.json` for the Pages workflow only — not part of the Rust app).
 
 ### GitHub Actions
 
-A workflow can build the site and publish `docs/build` to GitHub Pages automatically whenever the `main` branch changes.
+`.github/workflows/deploy-site.yml` runs `npm ci` + `npm run build` inside `.site/` on pushes to `main` that touch `.site/**`.
 
 ## Alternative hosts
 
@@ -28,4 +19,4 @@ A workflow can build the site and publish `docs/build` to GitHub Pages automatic
 - Vercel
 - GitHub Pages
 
-For static site deployment, build the site with `npm run build` and upload the generated `build` folder.
+Build the site from `.site/` and upload the generated `dist` folder.
