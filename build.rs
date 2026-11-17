@@ -3,7 +3,7 @@ use std::path::Path;
 
 fn main() {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-    let devices_dir = Path::new(&manifest_dir).join("ui/public/devices");
+    let devices_dir = Path::new(&manifest_dir).join("assets/devices");
     let out_dir = std::env::var("OUT_DIR").unwrap();
     let dest = Path::new(&out_dir).join("embedded_devices.rs");
 
@@ -40,5 +40,5 @@ fn main() {
     code.push_str("    _ => None,\n}\n}\n");
 
     fs::write(&dest, code).expect("failed to write embedded_devices.rs");
-    println!("cargo:rerun-if-changed=ui/public/devices");
+    println!("cargo:rerun-if-changed=assets/devices");
 }
