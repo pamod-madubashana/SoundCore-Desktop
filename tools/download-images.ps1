@@ -1,5 +1,5 @@
 # Download all valid Soundcore device images from CDN
-# Extracts *_com_device.png from ZIPs into ui/public/devices/
+# Extracts *_com_device.png from ZIPs into assets/devices/
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
