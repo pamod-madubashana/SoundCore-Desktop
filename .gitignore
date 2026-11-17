@@ -6,3 +6,12 @@ node_modules/
 /ui/dist
 .cotrex/
 .playwright-mcp/
+
+# Local run artifacts
+*.log
+shot.png
+stderr.log
+stdout.log
+gpui-run.log
+build-gpui.rs
+
