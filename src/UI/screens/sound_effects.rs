@@ -1,5 +1,5 @@
 //! Sound Effects popup — full-screen overlay inside the control window.
-//! Mirrors `ui/src/components/SoundEffectsPopup.tsx` (radio-group sections).
+//! Sound effects screen (radio-group sections).
 
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, prelude::*};
 use crate::UI::scale::px;

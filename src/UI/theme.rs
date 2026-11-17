@@ -1,4 +1,4 @@
-//! Color tokens matching `ui/src/styles/theme-windows.css` (Fluent dark).
+//! Color tokens (Fluent dark palette).
 //! The popup sits on acrylic; surfaces are white overlays, not solid fills.
 
 use gpui::{Hsla, rgb, rgba};
@@ -18,9 +18,19 @@ pub fn muted_dim() -> Hsla {
     rgba(0xa8abb599).into()
 }
 
-/// Accent brand — Windows accent fallback `#0078D4`
+/// Accent brand — target UI-Target gradient start `#5b8cff`
 pub fn brand() -> Hsla {
-    rgb(0x0078d4).into()
+    rgb(0x5b8cff).into()
+}
+
+/// Accent brand end — `#8b5cf6` (gradient stop; solid fills use brand())
+pub fn brand_end() -> Hsla {
+    rgb(0x8b5cf6).into()
+}
+
+/// Secondary accent / battery label — `#9db8ff`
+pub fn brand_secondary() -> Hsla {
+    rgb(0x9db8ff).into()
 }
 
 /// Text on brand fills
@@ -30,22 +40,22 @@ pub fn brand_foreground() -> Hsla {
 
 /// Brand at 10% — icon tile backgrounds
 pub fn brand_10() -> Hsla {
-    rgba(0x0078d41a).into()
+    rgba(0x5b8cff1a).into()
 }
 
 /// Brand at 15% — MyDevices header tile
 pub fn brand_15() -> Hsla {
-    rgba(0x0078d426).into()
+    rgba(0x5b8cff26).into()
 }
 
 /// Brand at 40% — header tile ring
 pub fn brand_40() -> Hsla {
-    rgba(0x0078d466).into()
+    rgba(0x5b8cff66).into()
 }
 
 /// Brand at 20% — hover on update pill
 pub fn brand_20() -> Hsla {
-    rgba(0x0078d433).into()
+    rgba(0x5b8cff33).into()
 }
 
 /// Success / connected — oklch(0.78 0.16 160)

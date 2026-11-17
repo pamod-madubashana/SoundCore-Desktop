@@ -442,22 +442,22 @@ pub fn show_window_now(cx: &mut App) {
     let handle = *main_window().lock().unwrap();
     let Some(h) = handle else { return };
 
-    // Position off-screen below + show + polish (one main-thread update).
-    // Re-focus every show: focus-loss auto-hide + is_window_active toggle
-    // both depend on the focus_handle being focused while visible.
+    // Position off-screen below + show (one main-thread update).
+    // Backdrop/corners/topmost run once in finish_show after the show
+    // animation — doing them here too double-applies acrylic and re-enters
+    // GPUI's window RefCell via activate_window().
     let prepared = h.update(cx, |view, window, _| {
-        let (x, _) = shell::outer_pos(window);
-        let target = shell::position_bottom_right(window).map(|p| p.1).unwrap_or(0);
-        let start_y = target + 80;
-        shell::set_pos(window, x, start_y);
+        let (target_x, target_y) = shell::position_bottom_right(window)
+            .unwrap_or_else(|| shell::outer_pos(window));
+        let start_y = target_y + 80;
+        shell::set_pos(window, target_x, start_y);
         shell::show(window);
-        shell::apply_backdrop(window);
-        shell::apply_rounded_corners(window);
-        shell::apply_topmost(window);
         view.focus_handle.focus(window);
         // SW_SHOWNOACTIVATE skips WM_ACTIVATE; bring to foreground explicitly
-        // (matches Tauri win.set_focus()) so focus-loss auto-hide can fire.
+        // so focus-loss auto-hide can fire. Deferred initial_placement is
+        // flushed here; finish_show re-asserts bottom-right after.
         window.activate_window();
+        shell::set_pos(window, target_x, start_y);
     });
     if prepared.is_err() {
         return;
@@ -465,6 +465,9 @@ pub fn show_window_now(cx: &mut App) {
 
     // Snapshot for the animation worker (second main-thread hop).
     if let Some(mut snap) = shell::snapshot(h, cx) {
+        if let Some((x, _)) = shell::position_bottom_right_from_snap(&snap) {
+            snap.x = x;
+        }
         let target = snap.target_y();
         snap.y = target + 80;
         shell::animate(snap, shell::Anim::Show);
@@ -723,8 +726,8 @@ fn open_main_window(cx: &mut App) -> gpui::Result<gpui::WindowHandle<UI::RootVie
             let b = d.bounds();
             let w = px(shell::MAIN_W);
             let h = px(shell::MAIN_H);
-            let margin_x = px(12.0);
-            let margin_y = px(6.0 + 48.0); // gap above taskbar reserve
+            let margin_x = px(shell::MARGIN_X);
+            let margin_y = px(shell::MARGIN_Y + 48.0); // gap above taskbar reserve
             let o = point(
                 (b.origin.x + b.size.width - w - margin_x).max(b.origin.x),
                 (b.origin.y + b.size.height - h - margin_y).max(b.origin.y),
@@ -777,10 +780,10 @@ fn open_main_window(cx: &mut App) -> gpui::Result<gpui::WindowHandle<UI::RootVie
         },
     )?;
 
-    // First-show polish: rounded corners + acrylic once the window exists.
+    // Window exists but is still hidden. Region/DWM are safe early; acrylic
+    // waits until finish_show (DWM ignores backdrop on hidden windows).
     let _ = handle.update(cx, |_, window, _| {
         shell::apply_rounded_corners(window);
-        shell::apply_backdrop(window);
         shell::apply_topmost(window);
     });
 

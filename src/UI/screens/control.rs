@@ -1,4 +1,4 @@
-//! Control screen (connected device) — `ui/src/App.tsx` `Device` + `Header`.
+//! Control screen (connected device + header).
 
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, prelude::*};
 use crate::UI::scale::px;
@@ -364,6 +364,7 @@ fn battery_pill(pct: i32, label: Option<&str>) -> impl IntoElement {
     } else {
         theme::error()
     };
+    let is_case = label == Some("Case");
     div()
         .h(px(20.))
         .pl(px(6.))
@@ -375,13 +376,48 @@ fn battery_pill(pct: i32, label: Option<&str>) -> impl IntoElement {
         .flex()
         .items_center()
         .gap_1_5()
-        .children(label.map(|l| {
+        // Fixed label slot so bar + % align across pills.
+        .child(
             div()
-                .text_size(px(9.5))
-                .font_weight(gpui::FontWeight::BOLD)
-                .text_color(gpui::rgb(0xffffff))
-                .child(l.to_string())
-        }))
+                .w(if is_case { px(12.) } else { px(8.) })
+                .flex_shrink_0()
+                .flex()
+                .items_center()
+                .justify_center()
+                .when(!is_case, |el| {
+                    el.children(label.map(|l| {
+                        div()
+                            .text_size(px(9.5))
+                            .font_weight(gpui::FontWeight::BOLD)
+                            .text_color(gpui::rgb(0xffffff))
+                            .child(l.to_string())
+                    }))
+                })
+                .when(is_case, |el| {
+                    // Compact case glyph: rounded rect + handle notch.
+                    el.child(
+                        div()
+                            .relative()
+                            .w(px(10.))
+                            .h(px(8.))
+                            .border_1()
+                            .border_color(gpui::rgb(0xffffff))
+                            .rounded(px(2.))
+                            .child(
+                                div()
+                                    .absolute()
+                                    .top(px(-3.))
+                                    .left(px(2.))
+                                    .w(px(4.))
+                                    .h(px(3.))
+                                    .border_1()
+                                    .border_color(gpui::rgb(0xffffff))
+                                    .rounded_t(px(1.))
+                                    .bg(theme::surface()),
+                            ),
+                    )
+                }),
+        )
         .child(
             div()
                 .w(px(22.))
@@ -389,6 +425,7 @@ fn battery_pill(pct: i32, label: Option<&str>) -> impl IntoElement {
                 .rounded(px(3.))
                 .bg(theme::toggle_off())
                 .overflow_hidden()
+                .flex_shrink_0()
                 .child(
                     div()
                         .h_full()
@@ -399,6 +436,7 @@ fn battery_pill(pct: i32, label: Option<&str>) -> impl IntoElement {
         )
         .child(
             div()
+                .w(px(28.))
                 .text_size(px(10.5))
                 .font_weight(gpui::FontWeight::SEMIBOLD)
                 .text_color(theme::foreground())
@@ -502,18 +540,21 @@ fn sound_mode(
         .collect();
 
     let mut row = div()
-        .rounded_xl()
-        .bg(theme::surface())
-        .p(px(10.))
+        .rounded_2xl()
+        .bg(gpui::rgba(0xffffff0f))
         .border_1()
-        .border_color(theme::border_subtle())
+        .border_color(gpui::rgba(0xffffff1f))
+        .p(px(10.))
+        .flex()
+        .flex_col()
+        .gap_2()
         .child(
+            // ANC track — black 28%, compact height like the target.
             div()
-                .rounded_md()
-                .bg(theme::overlay_bg())
-                .p_1()
+                .h(px(40.))
+                .rounded_xl()
+                .bg(gpui::rgba(0x00000047))
                 .flex()
-                .gap_1_5()
                 .children(modes.into_iter().map(|(id, label, kw)| {
                     let on = id == active;
                     let view = view.clone();
@@ -522,23 +563,36 @@ fn sound_mode(
                     div()
                         .id(gpui::SharedString::from(format!("mode-{id}")))
                         .flex_1()
+                        .h_full()
                         .flex()
-                        .flex_col()
                         .items_center()
                         .justify_center()
-                        .gap_1()
-                        .py_2()
-                        .rounded_md()
-                        .text_size(px(11.))
-                        .font_weight(gpui::FontWeight::MEDIUM)
+                        .gap_1_5()
+                        .rounded_xl()
+                        .text_size(px(11.5))
+                        .font_weight(if on {
+                            gpui::FontWeight::BOLD
+                        } else {
+                            gpui::FontWeight::SEMIBOLD
+                        })
                         .when(on, |el| {
-                            el.bg(theme::brand())
-                                .text_color(theme::brand_foreground())
+                            el.bg(gpui::linear_gradient(
+                                90.0,
+                                gpui::linear_color_stop(theme::brand(), 0.0),
+                                gpui::linear_color_stop(theme::brand_end(), 1.0),
+                            ))
+                            .text_color(theme::brand_foreground())
+                            .shadow(vec![gpui::BoxShadow {
+                                color: gpui::rgba(0x6d6cff99).into(),
+                                offset: gpui::point(px(0.), px(3.)),
+                                blur_radius: px(5.),
+                                spread_radius: px(0.),
+                            }])
                         })
                         .when(!on, |el| {
-                            el.text_color(theme::muted())
+                            el.text_color(gpui::rgba(0xffffff8c))
                                 .hover(|st| {
-                                    st.text_color(theme::foreground()).bg(theme::hover_medium())
+                                    st.text_color(theme::foreground()).bg(gpui::rgba(0xffffff14))
                                 })
                         })
                         .cursor_pointer()
@@ -568,12 +622,8 @@ fn sound_mode(
                                 cx.notify();
                             });
                         })
-                        .child(super::common::mode_icon(kw, 14., {
-                            if on {
-                                theme::brand_foreground()
-                            } else {
-                                theme::muted()
-                            }
+                        .children((!on).then(|| {
+                            super::common::mode_icon(kw, 13., gpui::rgba(0xffffff8c).into())
                         }))
                         .child(label.to_string())
                 })),
@@ -625,12 +675,10 @@ fn sub_row(
     let active = local.unwrap_or(current);
 
     div()
-        .mt_2()
-        .rounded_md()
-        .bg(theme::overlay_bg())
-        .p_1()
+        .h(px(36.))
+        .rounded_xl()
+        .bg(gpui::rgba(0x00000047))
         .flex()
-        .gap_1_5()
         .children(entries.into_iter().map(|(eid, label)| {
             let on = eid == active;
             let view = view.clone();
@@ -640,21 +688,35 @@ fn sub_row(
             div()
                 .id(gpui::SharedString::from(format!("sub-{id}-{eid}")))
                 .flex_1()
+                .h_full()
                 .flex()
                 .items_center()
                 .justify_center()
                 .gap_1_5()
-                .py_2_5()
-                .rounded_md()
-                .text_size(px(11.))
-                .font_weight(gpui::FontWeight::MEDIUM)
+                .rounded_xl()
+                .text_size(px(11.5))
+                .font_weight(if on {
+                    gpui::FontWeight::BOLD
+                } else {
+                    gpui::FontWeight::SEMIBOLD
+                })
                 .when(on, |el| {
-                    el.bg(theme::brand())
-                        .text_color(theme::brand_foreground())
+                    el.bg(gpui::linear_gradient(
+                        90.0,
+                        gpui::linear_color_stop(theme::brand(), 0.0),
+                        gpui::linear_color_stop(theme::brand_end(), 1.0),
+                    ))
+                    .text_color(theme::brand_foreground())
+                    .shadow(vec![gpui::BoxShadow {
+                        color: gpui::rgba(0x6d6cff99).into(),
+                        offset: gpui::point(px(0.), px(3.)),
+                        blur_radius: px(5.),
+                        spread_radius: px(0.),
+                    }])
                 })
                 .when(!on, |el| {
-                    el.text_color(theme::muted())
-                        .hover(|st| st.text_color(theme::foreground()).bg(theme::hover_medium()))
+                    el.text_color(gpui::rgba(0xffffff8c))
+                        .hover(|st| st.text_color(theme::foreground()).bg(gpui::rgba(0xffffff14)))
                 })
                 .cursor_pointer()
                 .on_click(move |_, _window, cx| {
@@ -664,7 +726,7 @@ fn sub_row(
                     let eid = eid2.clone();
                     view.update(cx, |root, cx| {
                         root.sub_local = Some((mac.clone(), sid.clone(), eid.clone()));
-                                root.sub_local_at = Some(std::time::Instant::now());
+                        root.sub_local_at = Some(std::time::Instant::now());
                         root.send_setting(&mac, &sid, &eid);
                         cx.notify();
                     });
@@ -748,7 +810,7 @@ fn toggle_switch(on: bool) -> impl IntoElement {
         .w(px(32.))
         .h(px(18.))
         .rounded_full()
-        .bg(if on { theme::brand() } else { theme::toggle_off() })
+                .bg(if on { theme::brand() } else { theme::toggle_off() })
         .flex_shrink_0()
         .relative()
         .child(

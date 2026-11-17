@@ -1,9 +1,8 @@
 //! GPUI root view — main 400×560 popup.
 //!
-//! Routing mirrors `ui/src/App.tsx`:
+//! Screen routing:
 //!   connected device → Control; devices known → MyDevices; else Searching.
 
-pub mod background;
 pub mod data;
 pub mod scale;
 pub mod screens;
@@ -460,107 +459,85 @@ impl Render for RootView {
         let active = self.active_device().cloned();
         let show_se = self.show_sound_effects;
 
-        // Baked gradient + glows (PNG). OnceLock inside background.rs.
-        let bg = std::sync::Arc::new(gpui::Image::from_bytes(
-            gpui::ImageFormat::Png,
-            background::png_bytes().to_vec(),
-        ));
-
+        // Root IS the glass: full client rect paint (no rounded clip here —
+        // OS region shapes the window). Clear-color never shows at corners.
         div()
             .track_focus(&self.focus_handle)
             .size_full()
+            .relative()
             .flex()
             .flex_col()
+            .overflow_hidden()
+            .bg(gpui::Hsla {
+                h: 0.63,
+                s: 0.28,
+                l: 0.07,
+                a: 0.78,
+            })
+            .border_1()
+            .border_color(gpui::rgba(0xffffff3d))
             .text_color(theme::foreground())
             .text_size(px(14.))
             .font_family("Segoe UI")
+            // White glass sheen on top of the dark translucent fill.
             .child(
-                // Full-bleed background image behind everything.
+                div()
+                    .absolute()
+                    .left(px(0.))
+                    .top(px(0.))
+                    .right(px(0.))
+                    .bottom(px(0.))
+                    .bg(gpui::linear_gradient(
+                        180.0,
+                        gpui::linear_color_stop(
+                            gpui::Hsla {
+                                h: 0.0,
+                                s: 0.0,
+                                l: 1.0,
+                                a: 0.10,
+                            },
+                            0.0,
+                        ),
+                        gpui::linear_color_stop(
+                            gpui::Hsla {
+                                h: 0.0,
+                                s: 0.0,
+                                l: 1.0,
+                                a: 0.04,
+                            },
+                            1.0,
+                        ),
+                    )),
+            )
+            .child(
                 div()
                     .size_full()
+                    .relative()
                     .flex()
                     .flex_col()
-                    .relative()
-                    .child(
-                        div()
-                            .absolute()
-                            .inset_0()
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .child(gpui::img(bg).object_fit(gpui::ObjectFit::Cover)),
-                    )
-                    // Glass panel: inset ~14px, rounded 28, white gradient fill.
-                    .child(
-                        div()
-                            .absolute()
-                            .left(px(14.))
-                            .top(px(14.))
-                            .right(px(14.))
-                            .bottom(px(14.))
-                            .flex()
-                            .flex_col()
-                            .rounded_3xl()
-                            .overflow_hidden()
-                            .bg(gpui::linear_gradient(
-                                180.0,
-                                gpui::linear_color_stop(
-                                    gpui::Hsla {
-                                        h: 0.0,
-                                        s: 0.0,
-                                        l: 1.0,
-                                        a: 0.10,
-                                    },
-                                    0.0,
-                                ),
-                                gpui::linear_color_stop(
-                                    gpui::Hsla {
-                                        h: 0.0,
-                                        s: 0.0,
-                                        l: 1.0,
-                                        a: 0.04,
-                                    },
-                                    1.0,
-                                ),
-                            ))
-                            .border_1()
-                            .border_color(gpui::rgba(0xffffff24))
-                            .shadow(vec![gpui::BoxShadow {
-                                color: gpui::rgba(0x00000080).into(),
-                                offset: gpui::point(px(0.), px(12.)),
-                                blur_radius: px(14.),
-                                spread_radius: px(0.),
-                            }])
-                            .child(
-                                div()
-                                    .size_full()
-                                    .flex()
-                                    .flex_col()
-                                    .overflow_hidden()
-                                    .when(active.is_some() && !show_se, |el| {
-                                        el.child(screens::control::render(
-                                            self,
-                                            active.as_ref().unwrap(),
-                                            window,
-                                            cx,
-                                        ))
-                                    })
-                                    .when(active.is_none() && !self.devices.is_empty(), |el| {
-                                        el.child(screens::devices::render(self, window, cx))
-                                    })
-                                    .when(active.is_none() && self.devices.is_empty(), |el| {
-                                        el.child(screens::searching::render(self, window, cx))
-                                    })
-                                    .when(active.is_some() && show_se, |el| {
-                                        el.child(screens::sound_effects::render(
-                                            self,
-                                            active.as_ref().unwrap(),
-                                            window,
-                                            cx,
-                                        ))
-                                    }),
-                            ),
-                    ),
+                    .overflow_hidden()
+                    .when(active.is_some() && !show_se, |el| {
+                        el.child(screens::control::render(
+                            self,
+                            active.as_ref().unwrap(),
+                            window,
+                            cx,
+                        ))
+                    })
+                    .when(active.is_none() && !self.devices.is_empty(), |el| {
+                        el.child(screens::devices::render(self, window, cx))
+                    })
+                    .when(active.is_none() && self.devices.is_empty(), |el| {
+                        el.child(screens::searching::render(self, window, cx))
+                    })
+                    .when(active.is_some() && show_se, |el| {
+                        el.child(screens::sound_effects::render(
+                            self,
+                            active.as_ref().unwrap(),
+                            window,
+                            cx,
+                        ))
+                    }),
             )
     }
 }

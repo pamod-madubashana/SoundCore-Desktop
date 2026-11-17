@@ -1,4 +1,4 @@
-//! MyDevices screen — `ui/src/App.tsx` `MyDevices`.
+//! MyDevices screen (saved devices list).
 
 use gpui::{Context, IntoElement, ParentElement, Styled, Window, div, prelude::*, rgba};
 use crate::UI::scale::px;

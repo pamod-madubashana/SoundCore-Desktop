@@ -1,4 +1,4 @@
-//! Searching screen — `ui/src/App.tsx` `Searching`.
+//! Searching screen (device discovery).
 
 use gpui::{Context, IntoElement, ParentElement, Styled, Window, div};
 use crate::UI::scale::px;

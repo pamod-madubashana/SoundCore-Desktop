@@ -6,14 +6,17 @@ use std::time::Duration;
 
 use gpui::{App, Window, WindowHandle};
 
-/// Main popup size in logical pixels (matches tauri.conf.json 400x560).
+/// Main popup size in logical pixels (400x560).
 pub const MAIN_W: f32 = 400.0;
 pub const MAIN_H: f32 = 560.0;
 
 /// Margin from the right edge of the work area (logical px).
-const MARGIN_X: f32 = 12.0;
+pub const MARGIN_X: f32 = 20.0;
 /// Gap above the taskbar reserve (logical px).
-const MARGIN_Y: f32 = 6.0;
+pub const MARGIN_Y: f32 = 8.0;
+
+/// Logical corner radius matching UI `rounded_3xl` (1.5rem × rem_base 13.05).
+pub const CORNER_RADIUS: f32 = 1.5 * 14.5 * 0.9;
 
 // ---- raw HWND helpers (Windows) ----
 
@@ -143,38 +146,69 @@ pub fn outer_pos(window: &Window) -> (i32, i32) {
     (0, 0)
 }
 
-/// Apply 28px (logical) rounded corners via a window region.
+/// Rounded corners: DWM preference + GDI region from the real client rect.
+/// DWM alone does not clip the acrylic composition, so unpainted corners
+/// show the transparent clear-color as white. Region must be applied before
+/// acrylic and use GetClientRect (not MAIN_W×scale) or edges tear.
 #[cfg(windows)]
 pub fn apply_rounded_corners(window: &Window) {
+    use windows::Win32::Foundation::RECT;
+    use windows::Win32::Graphics::Dwm::{
+        DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND, DwmSetWindowAttribute,
+    };
     use windows::Win32::Graphics::Gdi::{CreateRoundRectRgn, SetWindowRgn};
+    use windows::Win32::UI::WindowsAndMessaging::GetClientRect;
 
     let Some(hwnd) = hwnd_of(window) else { return };
-    let scale = window.scale_factor();
-    let w = (MAIN_W * scale) as i32;
-    let h = (MAIN_H * scale) as i32;
-    let r = (28.0 * scale) as i32;
-    // +1 so the region covers the full client area (GDI exclusive right/bottom).
-    // On success SetWindowRgn takes ownership of the region.
+
     unsafe {
-        let region = CreateRoundRectRgn(0, 0, w + 1, h + 1, r, r);
-        let _ = SetWindowRgn(hwnd, Some(region), true);
+        let pref = DWMWCP_ROUND;
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_WINDOW_CORNER_PREFERENCE,
+            &pref as *const _ as *const _,
+            std::mem::size_of_val(&pref) as u32,
+        );
+
+        let mut rc = RECT::default();
+        if GetClientRect(hwnd, &mut rc).is_ok() {
+            let w = rc.right - rc.left;
+            let h = rc.bottom - rc.top;
+            if w > 0 && h > 0 {
+                let scale = window.scale_factor() as f64;
+                // Region radius ≥ paint radius so the clip ⊆ painted area
+                // (no clear-color gap). CreateRoundRectRgn ellipse = 2×r.
+                let r = ((CORNER_RADIUS as f64 * scale) as i32 + 2).max(2);
+                let region = CreateRoundRectRgn(0, 0, w + 1, h + 1, r * 2, r * 2);
+                let _ = SetWindowRgn(hwnd, Some(region), true);
+            }
+        }
     }
+    tracing::debug!("rounded corners applied (dwm + client region)");
 }
 
 /// Dark acrylic tint matching the old window_effects::apply_backdrop.
+/// Call only while the window is visible — DWM ignores backdrop on hidden windows.
 #[cfg(windows)]
 pub fn apply_backdrop(window: &Window) {
-    // Window implements HasWindowHandle; &Window does too (rwh blanket impl).
-    let _ = window_vibrancy::apply_acrylic(window, Some((18, 18, 20, 140)));
+    if !is_visible(window) {
+        tracing::debug!("skip acrylic: window not visible yet");
+        return;
+    }
+    match window_vibrancy::apply_acrylic(window, Some((18, 18, 20, 140))) {
+        Ok(()) => tracing::debug!("acrylic backdrop applied"),
+        Err(err) => tracing::warn!("acrylic backdrop failed: {err}"),
+    }
 }
 
 #[cfg(windows)]
 pub fn apply_topmost(window: &Window) {
     use windows::Win32::UI::WindowsAndMessaging::{
-        HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER, SetWindowPos,
+        HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetWindowPos,
     };
     if let Some(hwnd) = hwnd_of(window) {
         unsafe {
+            // SWP_NOMOVE is required: without it x=0,y=0 relocates the window.
             let _ = SetWindowPos(
                 hwnd,
                 Some(HWND_TOPMOST),
@@ -182,7 +216,7 @@ pub fn apply_topmost(window: &Window) {
                 0,
                 0,
                 0,
-                SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOZORDER,
+                SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOZORDER,
             );
         }
     }
@@ -237,6 +271,42 @@ pub struct Snap {
     pub mon_h: i32,
 }
 
+/// Bottom-right X for a snapshotted HWND (physical px), without moving it.
+#[cfg(windows)]
+pub fn position_bottom_right_from_snap(snap: &Snap) -> Option<(i32, i32)> {
+    use windows::Win32::Foundation::RECT;
+    use windows::Win32::Graphics::Gdi::{
+        GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+    };
+    if snap.hwnd == 0 {
+        return None;
+    }
+    unsafe {
+        let hwnd = windows::Win32::Foundation::HWND(snap.hwnd as *mut _);
+        let monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        let mut mi = MONITORINFO::default();
+        mi.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
+        if GetMonitorInfoW(monitor, &mut mi).as_bool() {
+            let work: RECT = mi.rcWork;
+            let w = (MAIN_W as f64 * snap.scale as f64) as i32;
+            let h = (MAIN_H as f64 * snap.scale as f64) as i32;
+            let margin_x = (MARGIN_X as f64 * snap.scale as f64) as i32;
+            let margin_y = (MARGIN_Y as f64 * snap.scale as f64) as i32;
+            let x = work.right - w - margin_x;
+            let y = work.bottom - h - margin_y;
+            let max_x = (work.right - w).max(work.left);
+            let max_y = (work.bottom - h).max(work.top);
+            return Some((x.clamp(work.left, max_x), y.clamp(work.top, max_y)));
+        }
+    }
+    None
+}
+
+#[cfg(not(windows))]
+pub fn position_bottom_right_from_snap(_snap: &Snap) -> Option<(i32, i32)> {
+    None
+}
+
 /// Snapshot platform state for an animation. Must run on the GPUI main thread.
 pub fn snapshot<V: gpui::Render + 'static>(
     handle: WindowHandle<V>,
@@ -285,12 +355,14 @@ pub fn animate(snap: Snap, mode: Anim) {
         });
 }
 
-/// Post-show polish (backdrop, rounded corners, topmost) on the main thread.
+/// Post-show polish on the main thread. Region first (clips clear-color),
+/// then acrylic, then topmost/position — each once, to avoid RefCell re-entry.
 pub fn finish_show<V: gpui::Render + 'static>(handle: WindowHandle<V>, cx: &mut App) {
     let _ = handle.update(cx, |_, window, _| {
-        apply_backdrop(window);
         apply_rounded_corners(window);
+        apply_backdrop(window);
         apply_topmost(window);
+        position_bottom_right(window);
     });
 }
 

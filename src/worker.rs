@@ -442,7 +442,6 @@ async fn device_loop(
         // Never send SDP/RFCOMM connect attempts just to find out whether the
         // earbuds are there — wait until Windows reports them connected.
         if !is_device_still_connected(mac).await {
-            tracing::debug!("OS does not report {mac} ({model}) connected; skipping RFCOMM connect attempt");
             backoff = Duration::ZERO;
             match wait_for_commands(&mut rx, poll, &mut pending).await {
                 WaitOutcome::Closed => return,

@@ -24,8 +24,9 @@ fn render() -> Vec<u8> {
     let c0 = (0x0bu8, 0x0fu8, 0x1au8);
     let c1 = (0x14u8, 0x1au8, 0x2eu8);
     let c2 = (0x1bu8, 0x10u8, 0x33u8);
-    // Alpha ~92% so acrylic blur subtly shows through (user wants "some blur").
-    let base_a = 235u8;
+    // Alpha ~82% so acrylic blur shows through (user wants "some blur").
+    // Not fully opaque — DWM backdrop is composited behind these pixels.
+    let base_a = 210u8;
 
     for y in 0..h {
         for x in 0..w {

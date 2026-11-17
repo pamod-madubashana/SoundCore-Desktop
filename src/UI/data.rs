@@ -1,4 +1,4 @@
-//! Settings helpers mirroring `ui/src/lib/soundEffects.ts` and App.tsx.
+//! Settings helpers and device data shaping.
 //!
 //! Settings arrive as `SettingDto { id, #[serde(flatten)] Setting }`. We flatten
 //! each into a `serde_json::Value` so the UI can do the same dynamic access as
@@ -390,12 +390,12 @@ pub fn quick_toggles(s: &SettingsMap) -> Vec<(String, bool)> {
             (id.clone(), on)
         })
         .collect();
-    toggles.sort_by_key(|(id, _)| {
-        if id.to_lowercase().contains("gam") {
-            0
-        } else {
-            1
-        }
+    // Game mode first, then alphabetical by id — HashMap iteration order is
+    // unstable across runs, so a single-key sort leaves the rest shuffling.
+    toggles.sort_by(|a, b| {
+        let a_game = a.0.to_lowercase().contains("gam");
+        let b_game = b.0.to_lowercase().contains("gam");
+        b_game.cmp(&a_game).then_with(|| a.0.cmp(&b.0))
     });
     toggles
 }
