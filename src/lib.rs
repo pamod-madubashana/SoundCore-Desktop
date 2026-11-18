@@ -763,21 +763,27 @@ fn open_main_window(cx: &mut App) -> gpui::Result<gpui::WindowHandle<UI::RootVie
             // Focus-loss auto-hide (matches Tauri Focused(false) + 100ms delay).
             let focus_handle = view.read(cx).focus_handle.clone();
             focus_handle.focus(window, cx);
-            let _ = window.on_focus_out(&focus_handle, cx, |_, window, cx| {
-                state().hide_cancel.store(false, Ordering::SeqCst);
-                // The window argument lets us skip a redundant hide when this
-                // focus-out was itself caused by hiding (tray-toggle path).
-                let visible = shell::is_visible(window);
-                cx.spawn(async move |cx| {
-                    cx.background_executor().timer(Duration::from_millis(100)).await;
-                    let _ = cx.update(|cx| {
-                        if visible && !state().hide_cancel.load(Ordering::SeqCst) {
-                            hide_window_now(cx);
-                        }
-                    });
+            // detach(): keep the listener until the window/focus emitter dies.
+            // Dropping the Subscription (e.g. `let _ =`) unsubscribes at once.
+            window
+                .on_focus_out(&focus_handle, cx, |_, window, cx| {
+                    state().hide_cancel.store(false, Ordering::SeqCst);
+                    // The window argument lets us skip a redundant hide when this
+                    // focus-out was itself caused by hiding (tray-toggle path).
+                    let visible = shell::is_visible(window);
+                    cx.spawn(async move |cx| {
+                        cx.background_executor()
+                            .timer(Duration::from_millis(100))
+                            .await;
+                        let _ = cx.update(|cx| {
+                            if visible && !state().hide_cancel.load(Ordering::SeqCst) {
+                                hide_window_now(cx);
+                            }
+                        });
+                    })
+                    .detach();
                 })
                 .detach();
-            });
             view
         },
     )?;
