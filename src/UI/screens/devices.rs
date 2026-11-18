@@ -149,7 +149,8 @@ pub fn render(
                         .px_4()
                         .flex()
                         .items_center()
-                        .gap_1_5()
+                        .justify_center()
+                        .gap(px(6.))
                         .child(status_dot(off))
                         .child(
                             div()
