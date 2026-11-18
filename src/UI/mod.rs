@@ -195,11 +195,7 @@ impl RootView {
         if let Some(prev) = &self.prev_connected {
             for d in &next {
                 let was = prev.contains(&d.mac_address);
-                let name = if d.name.trim().is_empty() {
-                    d.model.clone()
-                } else {
-                    d.name.clone()
-                };
+                let name = data::display_device_name(d);
                 if d.connected && !was {
                     let _ = show_notification(
                         state(),
@@ -464,14 +460,61 @@ impl RootView {
 
     pub fn load_device_image(&self, d: &DeviceStateDto) -> Option<std::sync::Arc<gpui::Image>> {
         let url = d.image.as_deref()?;
+        let key = url.to_owned();
+        {
+            let cache = device_image_cache().lock().unwrap();
+            if let Some(hit) = cache.get(&key) {
+                return Some(hit.clone());
+            }
+        }
         let b64 = url.strip_prefix("data:image/png;base64,")?;
         use base64::Engine as _;
         let bytes = base64::engine::general_purpose::STANDARD.decode(b64).ok()?;
-        Some(std::sync::Arc::new(gpui::Image::from_bytes(
+        // CPU-downscale near display size (68px tile / 66px control header ×
+        // zoom 0.9 × ~2 DPI ≈ 120). DX samples bilinear without mips, so a
+        // large minification aliases (R60i speculars looked pixelated).
+        let bytes = downscale_png(bytes, 120);
+        let img = std::sync::Arc::new(gpui::Image::from_bytes(
             gpui::ImageFormat::Png,
             bytes,
-        )))
+        ));
+        device_image_cache()
+            .lock()
+            .unwrap()
+            .insert(key, img.clone());
+        Some(img)
     }
+}
+
+/// Keyed by the source data-URL; holds the downscaled `gpui::Image`.
+fn device_image_cache()
+-> &'static std::sync::Mutex<std::collections::HashMap<String, std::sync::Arc<gpui::Image>>> {
+    static CACHE: std::sync::OnceLock<
+        std::sync::Mutex<std::collections::HashMap<String, std::sync::Arc<gpui::Image>>>,
+    > = std::sync::OnceLock::new();
+    CACHE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
+
+/// Lanczos downscale a PNG; returns original bytes if already small or on error.
+fn downscale_png(bytes: Vec<u8>, max: u32) -> Vec<u8> {
+    use image::GenericImageView as _;
+    let Ok(img) = image::load_from_memory(&bytes) else {
+        return bytes;
+    };
+    let (w, h) = img.dimensions();
+    if w <= max && h <= max {
+        return bytes;
+    }
+    let img = img.resize(max, max, image::imageops::FilterType::Lanczos3);
+    let mut out = Vec::new();
+    let mut cursor = std::io::Cursor::new(&mut out);
+    if img
+        .write_to(&mut cursor, image::ImageFormat::Png)
+        .is_err()
+    {
+        return bytes;
+    }
+    out
 }
 
 impl Render for RootView {

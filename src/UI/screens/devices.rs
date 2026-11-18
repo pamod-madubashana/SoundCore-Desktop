@@ -3,7 +3,7 @@
 use gpui::{Context, IntoElement, ParentElement, Styled, Window, div, prelude::*, rgba};
 use crate::UI::scale::px;
 
-use super::common::{bluetooth_icon, plus_icon, refresh_icon, settings_dots_icon};
+use super::common::{settings_dots_icon, soundcore_glyph};
 use crate::UI::{RootView, data, theme};
 
 pub fn render(
@@ -36,21 +36,22 @@ pub fn render(
                 .flex()
                 .items_center()
                 .gap_3()
-                .px_4()
+                .pl(px(18.))
+                .pr_4()
                 .pt_4()
                 .pb_3()
                 .child(
                     div()
-                        .size(px(36.))
+                        .size(px(44.))
+                        .min_w_0()
+                        .min_h_0()
                         .flex_shrink_0()
-                        .rounded_xl()
-                        .bg(theme::brand_15())
-                        .border_1()
-                        .border_color(theme::brand_40())
+                        .rounded_2xl()
+                        .overflow_hidden()
                         .flex()
                         .items_center()
                         .justify_center()
-                        .child(bluetooth_icon(18.)),
+                        .child(soundcore_glyph(28.)),
                 )
                 .child(
                     div()
@@ -119,9 +120,10 @@ pub fn render(
                         .text_color(theme::muted())
                         .child("PAIRED"),
                 )
-                .children(devices.iter().map(|d| device_card(d)))
-                // Ghost "Add a new device" helper card
-                .child(add_device_ghost()),
+                .children(devices.iter().map(|d| {
+                    let image = root.load_device_image(d);
+                    device_card(d, image)
+                })),
         )
         // Update notice slot
         .child(
@@ -132,7 +134,7 @@ pub fn render(
                 .justify_center()
                 .child(super::update_notice(root, &view)),
         )
-        // Footer status pill + Refresh
+        // Footer status pill
         .child(
             div()
                 .px_4()
@@ -147,44 +149,19 @@ pub fn render(
                         .px_4()
                         .flex()
                         .items_center()
-                        .justify_between()
+                        .gap_1_5()
+                        .child(status_dot(off))
                         .child(
                             div()
-                                .flex()
-                                .items_center()
-                                .gap_1_5()
-                                .child(status_dot(off))
-                                .child(
-                                    div()
-                                        .text_size(px(11.5))
-                                        .text_color(if off {
-                                            theme::error_text()
-                                        } else {
-                                            theme::foreground()
-                                        })
-                                        .opacity(if off { 1.0 } else { 0.7 })
-                                        .child(status_text),
-                                ),
-                        )
-                        .child({
-                            let view = view.clone();
-                            div()
-                                .id("refresh-btn")
-                                .flex()
-                                .items_center()
-                                .gap_1()
-                                .cursor_pointer()
                                 .text_size(px(11.5))
-                                .font_weight(gpui::FontWeight::SEMIBOLD)
-                                .text_color(theme::brand_secondary())
-                                .hover(|s| s.text_color(theme::brand()))
-                                .on_click(move |_, _window, cx| {
-                                    let view = view.clone();
-                                    view.update(cx, |root, cx| root.refresh(cx));
+                                .text_color(if off {
+                                    theme::error_text()
+                                } else {
+                                    theme::foreground()
                                 })
-                                .child(refresh_icon(12., theme::brand_secondary()))
-                                .child("Refresh")
-                        }),
+                                .opacity(if off { 1.0 } else { 0.7 })
+                                .child(status_text),
+                        ),
                 ),
         )
 }
@@ -209,66 +186,12 @@ fn status_dot(off: bool) -> impl IntoElement {
     )
 }
 
-fn add_device_ghost() -> impl IntoElement {
-    div()
-        .id("add-device-ghost")
-        .w_full()
-        .h(px(64.))
-        .rounded(px(18.))
-        .border_1()
-        .border_dashed()
-        .border_color(rgba(0xffffff2e))
-        .flex()
-        .items_center()
-        .gap(px(12.))
-        .px(px(16.))
-        .cursor_pointer()
-        .hover(|s| s.bg(theme::hover_subtle()))
-        .on_click(move |_, _window, _cx| {
-            crate::open_url("ms-settings:bluetooth".into());
-        })
-        .child(
-            div()
-                .size(px(28.))
-                .rounded_full()
-                .bg(rgba(0xffffff14))
-                .flex()
-                .items_center()
-                .justify_center()
-                .flex_shrink_0()
-                .child(plus_icon(14., rgba(0xffffffcc).into())),
-        )
-        .child(
-            div()
-                .min_w_0()
-                .flex()
-                .flex_col()
-                .gap(px(2.))
-                .child(
-                    div()
-                        .text_size(px(12.5))
-                        .font_weight(gpui::FontWeight::SEMIBOLD)
-                        .text_color(rgba(0xffffffe6))
-                        .child("Add a new device"),
-                )
-                .child(
-                    div()
-                        .text_size(px(10.5))
-                        .text_color(theme::muted())
-                        .text_ellipsis()
-                        .whitespace_nowrap()
-                        .child("Put your device in pairing mode to find it"),
-                ),
-        )
-}
-
-fn device_card(d: &crate::DeviceStateDto) -> impl IntoElement {
-    let name = if d.name.trim().is_empty() {
-        d.model.clone()
-    } else {
-        d.name.clone()
-    };
-    let kind = data::device_kind_label(&name);
+fn device_card(
+    d: &crate::DeviceStateDto,
+    image: Option<std::sync::Arc<gpui::Image>>,
+) -> impl IntoElement {
+    // Strip "soundcore " prefix — every supported device is a Soundcore.
+    let name = data::display_device_name(d);
     let connected = d.connected;
     let mac = d.mac_address.clone();
 
@@ -315,8 +238,6 @@ fn device_card(d: &crate::DeviceStateDto) -> impl IntoElement {
         .w_full()
         .rounded(px(20.))
         .bg(theme::surface())
-        .border_1()
-        .border_color(theme::border_subtle())
         .p(px(13.))
         .flex()
         .items_center()
@@ -326,7 +247,7 @@ fn device_card(d: &crate::DeviceStateDto) -> impl IntoElement {
         .on_click(move |_, _window, _cx| {
             // React cards are display-only (connect happens via backend scan).
         })
-        .child(art_tile(d, name.clone()))
+        .child(art_tile(d, name.clone(), image))
         .child(
             div()
                 .min_w_0()
@@ -346,60 +267,20 @@ fn device_card(d: &crate::DeviceStateDto) -> impl IntoElement {
                         .whitespace_nowrap()
                         .child(name),
                 )
-                .child(
-                    div()
-                        .w_full()
-                        .text_size(px(11.))
-                        .mt(px(2.))
-                        .text_color(theme::muted())
-                        .text_ellipsis()
-                        .whitespace_nowrap()
-                        .child(kind),
-                )
                 .child(div().mt(px(6.)).child(status_pill)),
         )
-        // Connect button (gradient + glow) when not connected
-        .when(!connected, |el| {
-            el.child(
-                div()
-                    .id(gpui::SharedString::from(format!("connect-{mac}")))
-                    .h(px(30.))
-                    .px(px(14.))
-                    .rounded_full()
-                    .bg(gpui::linear_gradient(
-                        90.0,
-                        gpui::linear_color_stop(theme::brand(), 0.0),
-                        gpui::linear_color_stop(theme::brand_end(), 1.0),
-                    ))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .flex_shrink_0()
-                    .text_size(px(12.))
-                    .font_weight(gpui::FontWeight::BOLD)
-                    .text_color(theme::brand_foreground())
-                    .shadow(vec![gpui::BoxShadow {
-                        color: gpui::rgba(0x6d6cff8c).into(),
-                        offset: gpui::point(px(0.), px(4.)),
-                        blur_radius: px(6.),
-                        spread_radius: px(0.),
-                        inset: false,
-                    }])
-                    .cursor_pointer()
-                    .on_click(move |_, _window, _cx| {
-                        crate::open_url("ms-settings:bluetooth".into());
-                    })
-                    .child("Connect"),
-            )
-        })
-}
+    }
 
-fn art_tile(_d: &crate::DeviceStateDto, name: String) -> impl IntoElement {
-    // Target mock uses a fixed 56×56 line-art tile (iconBg gradient), not photos.
+fn art_tile(
+    _d: &crate::DeviceStateDto,
+    name: String,
+    image: Option<std::sync::Arc<gpui::Image>>,
+) -> impl IntoElement {
+    // Real product shot when available; else fixed 68×68 line-art tile (iconBg).
     // min_w_0/min_h_0: flex automatic minimum size would otherwise let the
-    // child expand the tile past size(56).
-    div()
-        .size(px(56.))
+    // child expand the tile past size(68).
+    let tile = div()
+        .size(px(68.))
         .min_w_0()
         .min_h_0()
         .flex_shrink_0()
@@ -407,15 +288,19 @@ fn art_tile(_d: &crate::DeviceStateDto, name: String) -> impl IntoElement {
         .items_center()
         .justify_center()
         .rounded_2xl()
-        .bg(gpui::linear_gradient(
-            135.0,
-            gpui::linear_color_stop(gpui::rgb(0x2a3354), 0.0),
-            gpui::linear_color_stop(gpui::rgb(0x1a2038), 1.0),
-        ))
-        .border_1()
-        .border_color(rgba(0xffffff26))
-        .overflow_hidden()
-        .child(device_art_placeholder(&name, gpui::rgb(0xc9d6ff).into()))
+        .overflow_hidden();
+
+    if let Some(img) = image {
+        tile.child(gpui::img(img).size_full().object_fit(gpui::ObjectFit::Cover))
+    } else {
+        tile
+            .bg(gpui::linear_gradient(
+                135.0,
+                gpui::linear_color_stop(gpui::rgb(0x2a3354), 0.0),
+                gpui::linear_color_stop(gpui::rgb(0x1a2038), 1.0),
+            ))
+            .child(device_art_placeholder(&name, gpui::rgb(0xc9d6ff).into()))
+    }
 }
 
 /// Simplified DeviceArt fallback (earbuds / speaker / over-ear blocks).
