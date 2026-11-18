@@ -5,18 +5,43 @@ use crate::UI::scale::px;
 
 use crate::UI::theme;
 
-/// Bluetooth glyph (simplified geometric mark).
+/// Bluetooth glyph — path stroke matching `devices_window.svg`.
 pub(crate) fn bluetooth_icon(size: f32) -> impl IntoElement {
-    let s = size;
-    div()
-        .size(px(s))
-        .flex()
-        .items_center()
-        .justify_center()
-        .text_color(theme::brand())
-        .text_size(px(s * 0.85))
-        .font_weight(gpui::FontWeight::BOLD)
-        .child("ᛒ")
+    // Design box 36×36; path from target: M12 12 L24 24 L18 30 L18 6 L24 12 L12 24
+    let k = size / 36.0;
+    let pts = [
+        (12.0, 12.0),
+        (24.0, 24.0),
+        (18.0, 30.0),
+        (18.0, 6.0),
+        (24.0, 12.0),
+        (12.0, 24.0),
+    ];
+    let stroke = (2.0 * k).max(1.2);
+    let color = theme::brand_secondary();
+
+    div().size(px(size)).child(gpui::canvas(
+        move |_bounds, _window, _cx| (),
+        move |bounds, _, window, _cx| {
+            let mut b = gpui::PathBuilder::stroke(px(stroke));
+            let mut first = true;
+            for (x, y) in pts {
+                let p = gpui::point(
+                    bounds.origin.x + px(x * k),
+                    bounds.origin.y + px(y * k),
+                );
+                if first {
+                    b.move_to(p);
+                    first = false;
+                } else {
+                    b.line_to(p);
+                }
+            }
+            if let Ok(path) = b.build() {
+                window.paint_path(path, color);
+            }
+        },
+    ))
 }
 
 /// Close (X) glyph.
@@ -145,4 +170,44 @@ pub(crate) fn spinner(tick: u8, color: Hsla) -> impl IntoElement {
             .bg(color)
             .opacity(opacity)
     }))
+}
+
+/// Horizontal three-dot settings glyph.
+pub(crate) fn settings_dots_icon() -> impl IntoElement {
+    div()
+        .flex()
+        .items_center()
+        .justify_center()
+        .gap(px(3.4))
+        .children((0..3).map(|_| {
+            div()
+                .size(px(3.6))
+                .rounded_full()
+                .bg(gpui::rgba(0xffffffcc))
+        }))
+}
+
+/// Plus glyph for the add-device ghost card.
+pub(crate) fn plus_icon(size: f32, color: Hsla) -> impl IntoElement {
+    div()
+        .size(px(size))
+        .flex()
+        .items_center()
+        .justify_center()
+        .text_color(color)
+        .text_size(px(size * 1.05))
+        .font_weight(gpui::FontWeight::BOLD)
+        .child("+")
+}
+
+/// Refresh glyph for the footer link.
+pub(crate) fn refresh_icon(size: f32, color: Hsla) -> impl IntoElement {
+    div()
+        .size(px(size))
+        .flex()
+        .items_center()
+        .justify_center()
+        .text_color(color)
+        .text_size(px(size * 0.95))
+        .child("↻")
 }

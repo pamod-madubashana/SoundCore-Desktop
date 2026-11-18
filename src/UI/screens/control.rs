@@ -13,7 +13,8 @@ pub fn render(
     cx: &mut Context<RootView>,
 ) -> impl IntoElement {
     let view = cx.entity();
-    let s = data::settings_map(d);
+    let s = root.cached_settings(&d.mac_address);
+    let d = d;
     let eq = root.eq_presets.clone();
     let current_effect = data::sound_effect_label(&s, &eq);
     let name = data::display_device_name(d);
@@ -104,7 +105,7 @@ pub fn render(
                                                 .child(
                                                     div()
                                                         .text_size(px(14.))
-                                                        .font_weight(gpui::FontWeight::MEDIUM)
+                                                        .font_weight(gpui::FontWeight::BOLD)
                                                         .text_color(theme::foreground())
                                                         .child("Sound Effects"),
                                                 )
@@ -217,7 +218,10 @@ fn header(
         .border_b_1()
         .border_color(theme::border_medium())
         .child(art)
-        .child(
+        .child({
+            // Close lives on the name row so the battery row gets full column
+            // width (target: L | R | Case on one line under the name).
+            let view_for_close = view.clone();
             div()
                 .min_w_0()
                 .flex_1()
@@ -230,14 +234,85 @@ fn header(
                         .gap_2()
                         .child(
                             div()
-                                .text_size(px(18.))
-                                .font_weight(gpui::FontWeight::BOLD)
-                                .text_color(theme::foreground())
-                                .text_ellipsis()
-                                .whitespace_nowrap()
-                                .child(name.to_string()),
+                                .min_w_0()
+                                .flex_1()
+                                .flex()
+                                .items_center()
+                                .gap_2()
+                                .child(
+                                    div()
+                                        .text_size(px(18.))
+                                        .font_weight(gpui::FontWeight::BOLD)
+                                        .text_color(theme::foreground())
+                                        .text_ellipsis()
+                                        .whitespace_nowrap()
+                                        .child(name.to_string()),
+                                )
+                                .child(status_dot(connected)),
                         )
-                        .child(status_dot(connected)),
+                        .child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap_1_5()
+                                .flex_shrink_0()
+                                .when(show_update_badge, |el| {
+                                    let view = view.clone();
+                                    el.child(
+                                        div()
+                                            .id("update-badge")
+                                            .p_1()
+                                            .rounded_md()
+                                            .text_color(theme::brand())
+                                            .hover(|st| st.bg(theme::hover_medium()))
+                                            .cursor_pointer()
+                                            .on_click(move |_, _window, cx| {
+                                                let _ = &latest;
+                                                view.update(cx, |root, cx| {
+                                                    root.start_update(cx);
+                                                });
+                                            })
+                                            .child(
+                                                div()
+                                                    .relative()
+                                                    .flex()
+                                                    .items_center()
+                                                    .justify_center()
+                                                    .child(download_icon(16., theme::brand()))
+                                                    .child(
+                                                        div()
+                                                            .absolute()
+                                                            .right(px(-2.))
+                                                            .top(px(-2.))
+                                                            .size(px(6.))
+                                                            .rounded_full()
+                                                            .bg(theme::brand()),
+                                                    ),
+                                            ),
+                                    )
+                                })
+                                .child({
+                                    let view = view_for_close.clone();
+                                    div()
+                                        .id("hide-btn")
+                                        .size(px(26.))
+                                        .rounded_full()
+                                        .bg(theme::hover_subtle())
+                                        .border_1()
+                                        .border_color(theme::border_subtle())
+                                        .flex()
+                                        .items_center()
+                                        .justify_center()
+                                        .text_color(theme::foreground())
+                                        .cursor_pointer()
+                                        .on_click(move |_, _window, cx| {
+                                            view.update(cx, |root, cx| {
+                                                root.hide(cx);
+                                            });
+                                        })
+                                        .child(close_icon(14., theme::foreground()))
+                                }),
+                        ),
                 )
                 .child(
                     div()
@@ -251,13 +326,13 @@ fn header(
                         }),
                 )
                 .when(!batteries.is_empty(), |el| {
+                    // One row (target): L | R | Case — no wrap.
                     el.child(
                         div()
                             .mt(px(8.))
                             .flex()
                             .items_center()
-                            .gap_1_5()
-                            .flex_wrap()
+                            .gap_1()
                             .children(batteries.iter().map(|(label, pct)| {
                                 battery_pill(*pct, if label.is_empty() { None } else { Some(label) })
                             })),
@@ -265,70 +340,8 @@ fn header(
                 })
                 .when(update_progress.is_some() || update_error.is_some(), |el| {
                     el.child(update_block(update_progress, update_error))
-                }),
-        )
-        .child(
-            div()
-                .flex()
-                .items_center()
-                .gap_1_5()
-                .when(show_update_badge, |el| {
-                    let view = view.clone();
-                    el.child(
-                        div()
-                            .id("update-badge")
-                            .p_1()
-                            .rounded_md()
-                            .text_color(theme::brand())
-                            .hover(|st| st.bg(theme::hover_medium()))
-                            .cursor_pointer()
-                            .on_click(move |_, _window, cx| {
-                                let _ = &latest;
-                                view.update(cx, |root, cx| {
-                                    root.start_update(cx);
-                                });
-                            })
-                            .child(
-                                div()
-                                    .relative()
-                                    .flex()
-                                    .items_center()
-                                    .justify_center()
-                                    .child(download_icon(16., theme::brand()))
-                                    .child(
-                                        div()
-                                            .absolute()
-                                            .right(px(-2.))
-                                            .top(px(-2.))
-                                            .size(px(6.))
-                                            .rounded_full()
-                                            .bg(theme::brand()),
-                                    ),
-                            ),
-                    )
                 })
-                .child({
-                    let view = view.clone();
-                    div()
-                        .id("hide-btn")
-                        .size(px(26.))
-                        .rounded_full()
-                        .bg(theme::hover_subtle())
-                        .border_1()
-                        .border_color(theme::border_subtle())
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .text_color(theme::foreground())
-                        .cursor_pointer()
-                        .on_click(move |_, _window, cx| {
-                            view.update(cx, |root, cx| {
-                                root.hide(cx);
-                            });
-                        })
-                        .child(close_icon(14., theme::foreground()))
-                }),
-        )
+        })
 }
 
 fn status_dot(connected: bool) -> impl IntoElement {
@@ -367,19 +380,18 @@ fn battery_pill(pct: i32, label: Option<&str>) -> impl IntoElement {
     let is_case = label == Some("Case");
     div()
         .h(px(20.))
-        .pl(px(6.))
-        .pr_2()
+        .px_1_5()
         .rounded_full()
         .bg(theme::surface())
         .border_1()
         .border_color(theme::border_subtle())
         .flex()
         .items_center()
-        .gap_1_5()
+        .gap_1()
         // Fixed label slot so bar + % align across pills.
         .child(
             div()
-                .w(if is_case { px(12.) } else { px(8.) })
+                .w(if is_case { px(11.) } else { px(7.) })
                 .flex_shrink_0()
                 .flex()
                 .items_center()
@@ -389,7 +401,7 @@ fn battery_pill(pct: i32, label: Option<&str>) -> impl IntoElement {
                         div()
                             .text_size(px(9.5))
                             .font_weight(gpui::FontWeight::BOLD)
-                            .text_color(gpui::rgb(0xffffff))
+                            .text_color(theme::brand_secondary())
                             .child(l.to_string())
                     }))
                 })
@@ -398,10 +410,10 @@ fn battery_pill(pct: i32, label: Option<&str>) -> impl IntoElement {
                     el.child(
                         div()
                             .relative()
-                            .w(px(10.))
+                            .w(px(9.))
                             .h(px(8.))
                             .border_1()
-                            .border_color(gpui::rgb(0xffffff))
+                            .border_color(theme::brand_secondary())
                             .rounded(px(2.))
                             .child(
                                 div()
@@ -411,7 +423,7 @@ fn battery_pill(pct: i32, label: Option<&str>) -> impl IntoElement {
                                     .w(px(4.))
                                     .h(px(3.))
                                     .border_1()
-                                    .border_color(gpui::rgb(0xffffff))
+                                    .border_color(theme::brand_secondary())
                                     .rounded_t(px(1.))
                                     .bg(theme::surface()),
                             ),
@@ -420,7 +432,7 @@ fn battery_pill(pct: i32, label: Option<&str>) -> impl IntoElement {
         )
         .child(
             div()
-                .w(px(22.))
+                .w(px(20.))
                 .h(px(9.))
                 .rounded(px(3.))
                 .bg(theme::toggle_off())
@@ -431,12 +443,12 @@ fn battery_pill(pct: i32, label: Option<&str>) -> impl IntoElement {
                         .h_full()
                         .rounded(px(3.))
                         .bg(fill)
-                        .w(px(22.0 * pct as f32 / 100.0)),
+                        .w(px(20.0 * pct as f32 / 100.0)),
                 ),
         )
         .child(
             div()
-                .w(px(28.))
+                .w(px(26.))
                 .text_size(px(10.5))
                 .font_weight(gpui::FontWeight::SEMIBOLD)
                 .text_color(theme::foreground())
@@ -587,6 +599,7 @@ fn sound_mode(
                                 offset: gpui::point(px(0.), px(3.)),
                                 blur_radius: px(5.),
                                 spread_radius: px(0.),
+                                inset: false,
                             }])
                         })
                         .when(!on, |el| {
@@ -638,6 +651,24 @@ fn sound_mode(
     if lower.contains("noise") {
         if let Some(entries) = select_sub(s, "noiseCancelingMode") {
             row = row.child(sub_row(entries, s, "noiseCancelingMode", view, d, root));
+        }
+        // Scene row (Transport / Outdoor / Indoor) when Multi-Scene NC is active.
+        let nc = s
+            .get("noiseCancelingMode")
+            .and_then(|v| v.get("value"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_lowercase();
+        let nc_local = root
+            .sub_local
+            .as_ref()
+            .filter(|(m, i, _)| m == &d.mac_address && i == "noiseCancelingMode")
+            .map(|(_, _, v)| v.to_lowercase());
+        let nc_eff = nc_local.as_deref().unwrap_or(&nc);
+        if nc_eff.contains("multi") || nc_eff.contains("scene") {
+            if let Some(scene) = select_sub(s, "multiSceneNoiseCanceling") {
+                row = row.child(sub_row(scene, s, "multiSceneNoiseCanceling", view, d, root));
+            }
         }
     }
     row
@@ -712,6 +743,7 @@ fn sub_row(
                         offset: gpui::point(px(0.), px(3.)),
                         blur_radius: px(5.),
                         spread_radius: px(0.),
+                        inset: false,
                     }])
                 })
                 .when(!on, |el| {
@@ -764,7 +796,7 @@ fn quick_toggles(
                 .items_center()
                 .gap_3()
                 .px_3()
-                .py(px(10.))
+                .py(px(9.))
                 .hover(|st| st.bg(theme::hover_subtle()))
                 .when(i > 0, |el| {
                     el.border_t_1().border_color(theme::border_subtle())

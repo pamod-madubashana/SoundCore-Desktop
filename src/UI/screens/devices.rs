@@ -3,7 +3,7 @@
 use gpui::{Context, IntoElement, ParentElement, Styled, Window, div, prelude::*, rgba};
 use crate::UI::scale::px;
 
-use super::common::bluetooth_icon;
+use super::common::{bluetooth_icon, plus_icon, refresh_icon, settings_dots_icon};
 use crate::UI::{RootView, data, theme};
 
 pub fn render(
@@ -55,6 +55,7 @@ pub fn render(
                 .child(
                     div()
                         .min_w_0()
+                        .flex_1()
                         .flex()
                         .flex_col()
                         .child(
@@ -71,10 +72,33 @@ pub fn render(
                                 .text_color(theme::muted())
                                 .child("Pick a device to connect and control"),
                         ),
+                )
+                .child(
+                    div()
+                        .id("settings-dots")
+                        .size(px(30.))
+                        .rounded_full()
+                        .bg(rgba(0xffffff14))
+                        .border_1()
+                        .border_color(rgba(0xffffff26))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .flex_shrink_0()
+                        .cursor_pointer()
+                        .hover(|s| s.bg(rgba(0xffffff24)))
+                        .on_click(move |_, _window, _cx| {
+                            crate::open_url("ms-settings:privacy".into());
+                        })
+                        .child(settings_dots_icon()),
                 ),
         )
-        // Divider
-        .child(div().h(px(1.)).bg(theme::border_subtle()).w_full())
+        // Divider (inset like target: x=30..381 on 411 panel)
+        .child(
+            div()
+                .px_4()
+                .child(div().h(px(1.)).bg(theme::border_subtle()).w_full()),
+        )
         // List
         .child(
             div()
@@ -90,12 +114,14 @@ pub fn render(
                 .gap(px(10.))
                 .child(
                     div()
-                        .text_size(px(10.))
+                        .text_size(px(10.5))
                         .font_weight(gpui::FontWeight::SEMIBOLD)
                         .text_color(theme::muted())
                         .child("PAIRED"),
                 )
-                .children(devices.iter().map(|d| device_card(d))),
+                .children(devices.iter().map(|d| device_card(d)))
+                // Ghost "Add a new device" helper card
+                .child(add_device_ghost()),
         )
         // Update notice slot
         .child(
@@ -106,11 +132,11 @@ pub fn render(
                 .justify_center()
                 .child(super::update_notice(root, &view)),
         )
-        // Footer status pill
+        // Footer status pill + Refresh
         .child(
             div()
-                .px(px(14.))
-                .pb(px(14.))
+                .px_4()
+                .pb_4()
                 .child(
                     div()
                         .h(px(42.))
@@ -121,19 +147,44 @@ pub fn render(
                         .px_4()
                         .flex()
                         .items_center()
-                        .gap_1_5()
-                        .child(status_dot(off))
+                        .justify_between()
                         .child(
                             div()
+                                .flex()
+                                .items_center()
+                                .gap_1_5()
+                                .child(status_dot(off))
+                                .child(
+                                    div()
+                                        .text_size(px(11.5))
+                                        .text_color(if off {
+                                            theme::error_text()
+                                        } else {
+                                            theme::foreground()
+                                        })
+                                        .opacity(if off { 1.0 } else { 0.7 })
+                                        .child(status_text),
+                                ),
+                        )
+                        .child({
+                            let view = view.clone();
+                            div()
+                                .id("refresh-btn")
+                                .flex()
+                                .items_center()
+                                .gap_1()
+                                .cursor_pointer()
                                 .text_size(px(11.5))
-                                .text_color(if off {
-                                    theme::error_text()
-                                } else {
-                                    theme::foreground()
+                                .font_weight(gpui::FontWeight::SEMIBOLD)
+                                .text_color(theme::brand_secondary())
+                                .hover(|s| s.text_color(theme::brand()))
+                                .on_click(move |_, _window, cx| {
+                                    let view = view.clone();
+                                    view.update(cx, |root, cx| root.refresh(cx));
                                 })
-                                .opacity(if off { 1.0 } else { 0.7 })
-                                .child(status_text),
-                        ),
+                                .child(refresh_icon(12., theme::brand_secondary()))
+                                .child("Refresh")
+                        }),
                 ),
         )
 }
@@ -156,6 +207,59 @@ fn status_dot(off: bool) -> impl IntoElement {
             .rounded_full()
             .bg(color),
     )
+}
+
+fn add_device_ghost() -> impl IntoElement {
+    div()
+        .id("add-device-ghost")
+        .w_full()
+        .h(px(64.))
+        .rounded(px(18.))
+        .border_1()
+        .border_dashed()
+        .border_color(rgba(0xffffff2e))
+        .flex()
+        .items_center()
+        .gap(px(12.))
+        .px(px(16.))
+        .cursor_pointer()
+        .hover(|s| s.bg(theme::hover_subtle()))
+        .on_click(move |_, _window, _cx| {
+            crate::open_url("ms-settings:bluetooth".into());
+        })
+        .child(
+            div()
+                .size(px(28.))
+                .rounded_full()
+                .bg(rgba(0xffffff14))
+                .flex()
+                .items_center()
+                .justify_center()
+                .flex_shrink_0()
+                .child(plus_icon(14., rgba(0xffffffcc).into())),
+        )
+        .child(
+            div()
+                .min_w_0()
+                .flex()
+                .flex_col()
+                .gap(px(2.))
+                .child(
+                    div()
+                        .text_size(px(12.5))
+                        .font_weight(gpui::FontWeight::SEMIBOLD)
+                        .text_color(rgba(0xffffffe6))
+                        .child("Add a new device"),
+                )
+                .child(
+                    div()
+                        .text_size(px(10.5))
+                        .text_color(theme::muted())
+                        .text_ellipsis()
+                        .whitespace_nowrap()
+                        .child("Put your device in pairing mode to find it"),
+                ),
+        )
 }
 
 fn device_card(d: &crate::DeviceStateDto) -> impl IntoElement {
@@ -186,6 +290,26 @@ fn device_card(d: &crate::DeviceStateDto) -> impl IntoElement {
         )
     };
 
+    // Status pill: direct child of items_start column so it hugs content.
+    let status_pill = div()
+        .h(px(20.))
+        .px(px(10.))
+        .rounded_full()
+        .bg(pill_bg)
+        .border_1()
+        .border_color(pill_ring)
+        .flex()
+        .items_center()
+        .gap(px(6.))
+        .child(div().size(px(6.)).rounded_full().bg(dot))
+        .child(
+            div()
+                .text_size(px(10.5))
+                .font_weight(gpui::FontWeight::SEMIBOLD)
+                .text_color(pill_text)
+                .child(status_label),
+        );
+
     div()
         .id(gpui::SharedString::from(format!("device-card-{mac}")))
         .w_full()
@@ -207,10 +331,14 @@ fn device_card(d: &crate::DeviceStateDto) -> impl IntoElement {
             div()
                 .min_w_0()
                 .flex_1()
+                .overflow_hidden()
                 .flex()
                 .flex_col()
+                // Children align left (hug) instead of stretch — pill must not fill.
+                .items_start()
                 .child(
                     div()
+                        .w_full()
                         .text_size(px(15.))
                         .font_weight(gpui::FontWeight::BOLD)
                         .text_color(theme::foreground())
@@ -220,6 +348,7 @@ fn device_card(d: &crate::DeviceStateDto) -> impl IntoElement {
                 )
                 .child(
                     div()
+                        .w_full()
                         .text_size(px(11.))
                         .mt(px(2.))
                         .text_color(theme::muted())
@@ -227,64 +356,66 @@ fn device_card(d: &crate::DeviceStateDto) -> impl IntoElement {
                         .whitespace_nowrap()
                         .child(kind),
                 )
-                .child(
-                    div()
-                        .mt(px(6.))
-                        .h(px(20.))
-                        .px(px(10.))
-                        .rounded_full()
-                        .bg(pill_bg)
-                        .border_1()
-                        .border_color(pill_ring)
-                        .flex()
-                        .items_center()
-                        .gap(px(6.))
-                        .child(div().size(px(6.)).rounded_full().bg(dot))
-                        .child(
-                            div()
-                                .text_size(px(10.5))
-                                .font_weight(gpui::FontWeight::SEMIBOLD)
-                                .text_color(pill_text)
-                                .child(status_label),
-                        ),
-                ),
+                .child(div().mt(px(6.)).child(status_pill)),
         )
+        // Connect button (gradient + glow) when not connected
+        .when(!connected, |el| {
+            el.child(
+                div()
+                    .id(gpui::SharedString::from(format!("connect-{mac}")))
+                    .h(px(30.))
+                    .px(px(14.))
+                    .rounded_full()
+                    .bg(gpui::linear_gradient(
+                        90.0,
+                        gpui::linear_color_stop(theme::brand(), 0.0),
+                        gpui::linear_color_stop(theme::brand_end(), 1.0),
+                    ))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .flex_shrink_0()
+                    .text_size(px(12.))
+                    .font_weight(gpui::FontWeight::BOLD)
+                    .text_color(theme::brand_foreground())
+                    .shadow(vec![gpui::BoxShadow {
+                        color: gpui::rgba(0x6d6cff8c).into(),
+                        offset: gpui::point(px(0.), px(4.)),
+                        blur_radius: px(6.),
+                        spread_radius: px(0.),
+                        inset: false,
+                    }])
+                    .cursor_pointer()
+                    .on_click(move |_, _window, _cx| {
+                        crate::open_url("ms-settings:bluetooth".into());
+                    })
+                    .child("Connect"),
+            )
+        })
 }
 
-fn art_tile(d: &crate::DeviceStateDto, name: String) -> impl IntoElement {
-    let image = root_image(d);
-    let tile = div()
+fn art_tile(_d: &crate::DeviceStateDto, name: String) -> impl IntoElement {
+    // Target mock uses a fixed 56×56 line-art tile (iconBg gradient), not photos.
+    // min_w_0/min_h_0: flex automatic minimum size would otherwise let the
+    // child expand the tile past size(56).
+    div()
         .size(px(56.))
+        .min_w_0()
+        .min_h_0()
         .flex_shrink_0()
+        .flex()
+        .items_center()
+        .justify_center()
         .rounded_2xl()
-        .bg(theme::surface_elevated())
+        .bg(gpui::linear_gradient(
+            135.0,
+            gpui::linear_color_stop(gpui::rgb(0x2a3354), 0.0),
+            gpui::linear_color_stop(gpui::rgb(0x1a2038), 1.0),
+        ))
         .border_1()
-        .border_color(theme::border_subtle())
+        .border_color(rgba(0xffffff26))
         .overflow_hidden()
-        .p_1_5();
-
-    if let Some(img) = image {
-        tile.child(gpui::img(img).size_full().object_fit(gpui::ObjectFit::Cover))
-    } else {
-        tile
-            .flex()
-            .items_center()
-            .justify_center()
-            .child(device_art_placeholder(&name, theme::brand()))
-    }
-}
-
-fn root_image(d: &crate::DeviceStateDto) -> Option<std::sync::Arc<gpui::Image>> {
-    let url = d.image.as_deref()?;
-    let b64 = url.strip_prefix("data:image/png;base64,")?;
-    use base64::Engine as _;
-    let bytes = base64::engine::general_purpose::STANDARD
-        .decode(b64)
-        .ok()?;
-    Some(std::sync::Arc::new(gpui::Image::from_bytes(
-        gpui::ImageFormat::Png,
-        bytes,
-    )))
+        .child(device_art_placeholder(&name, gpui::rgb(0xc9d6ff).into()))
 }
 
 /// Simplified DeviceArt fallback (earbuds / speaker / over-ear blocks).
@@ -352,29 +483,81 @@ pub(crate) fn device_art_placeholder(name: &str, brand: gpui::Hsla) -> impl Into
                     .rounded_md()
                     .bg(brand),
             ),
-        _ => div()
-            .relative()
-            .size(px(34.))
-            .child(
-                div()
-                    .absolute()
-                    .left(px(7.))
-                    .top(px(5.))
-                    .w(px(20.))
-                    .h(px(24.))
-                    .rounded_md()
-                    .bg(brand),
-            )
-            .child(
-                div()
-                    .absolute()
-                    .left(px(10.))
-                    .top(px(15.))
-                    .size(px(14.))
-                    .rounded_full()
-                    .bg(rgba(0xffffff1a))
-                    .border_1()
-                    .border_color(rgba(0xffffff33)),
-            ),
+        _ => {
+            // Earbuds: line-art bud + sound waves (devices_window.svg).
+            div()
+                .relative()
+                .size(px(34.))
+                .child(earbud_line_art(brand))
+        }
     }
+}
+
+/// Single earbud outline + waves, centered in a 34×34 box.
+fn earbud_line_art(stroke: gpui::Hsla) -> impl IntoElement {
+    // Design centered at (0,0), scaled into 34×34.
+    let k = 34.0 / 40.0;
+    let lw = 2.2 * k;
+    div().size(px(34.)).child(gpui::canvas(
+        move |_bounds, _window, _cx| (),
+        move |bounds, _, window, _cx| {
+            let cx = bounds.origin.x + px(17.);
+            let cy = bounds.origin.y + px(17.);
+            let map = |x: f32, y: f32| gpui::point(cx + px(x * k), cy + px(y * k));
+
+            // Bud body: M-7 -10 a7 7 0 1 1 7 7 v9 a3 3 0 0 1 -6 0
+            let mut body = gpui::PathBuilder::stroke(px(lw));
+            body.move_to(map(-7., -10.));
+            body.relative_arc_to(
+                gpui::point(px(7.), px(7.)),
+                px(0.),
+                true,
+                true,
+                gpui::point(px(7.), px(7.)),
+            );
+            body.line_to(map(0., 6.));
+            body.relative_arc_to(
+                gpui::point(px(3.), px(3.)),
+                px(0.),
+                false,
+                true,
+                gpui::point(px(-6.), px(0.)),
+            );
+            if let Ok(path) = body.build() {
+                window.paint_path(path, stroke);
+            }
+
+            // Waves: M10 -4 a5 5 0 0 1 0 8 / M14 -8 a10 10 0 0 1 0 16
+            for (rad, y0, y1, alpha) in [(5.0f32, -4.0f32, 4.0f32, 0.6f32), (10.0, -8.0, 8.0, 0.35)] {
+                let mut w = gpui::PathBuilder::stroke(px(lw));
+                w.move_to(map(10. + (rad - 5.), y0));
+                w.relative_arc_to(
+                    gpui::point(px(rad), px(rad)),
+                    px(0.),
+                    false,
+                    true,
+                    gpui::point(px(0.), px(y1 - y0)),
+                );
+                if let Ok(path) = w.build() {
+                    window.paint_path(path, stroke.opacity(alpha));
+                }
+            }
+
+            // Dot at bud tip: filled circle approx via short cross is wrong —
+            // use a tiny filled path (polygon diamond) for the r=1 marker.
+            let mut dot = gpui::PathBuilder::fill();
+            let d = 1.0 * k;
+            let c = map(-7., -10.);
+            let pts = [
+                gpui::point(c.x + px(d), c.y),
+                gpui::point(c.x, c.y + px(d)),
+                gpui::point(c.x - px(d), c.y),
+                gpui::point(c.x, c.y - px(d)),
+            ];
+            dot.add_polygon(&pts, true);
+            if let Ok(path) = dot.build() {
+                window.paint_path(path, stroke);
+            }
+        },
+    ))
 }
