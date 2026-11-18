@@ -15,8 +15,8 @@ pub const MARGIN_X: f32 = 20.0;
 /// Gap above the taskbar reserve (logical px).
 pub const MARGIN_Y: f32 = 8.0;
 
-/// Logical corner radius matching UI `rounded_3xl` (1.5rem × rem_base 13.05).
-pub const CORNER_RADIUS: f32 = 1.5 * 14.5 * 0.9;
+/// Logical corner radius — target window mockups use rx=28.
+pub const CORNER_RADIUS: f32 = 28.0;
 
 // ---- raw HWND helpers (Windows) ----
 
@@ -146,60 +146,9 @@ pub fn outer_pos(window: &Window) -> (i32, i32) {
     (0, 0)
 }
 
-/// Rounded corners: DWM preference + GDI region from the real client rect.
-/// DWM alone does not clip the acrylic composition, so unpainted corners
-/// show the transparent clear-color as white. Region must be applied before
-/// acrylic and use GetClientRect (not MAIN_W×scale) or edges tear.
-#[cfg(windows)]
-pub fn apply_rounded_corners(window: &Window) {
-    use windows::Win32::Foundation::RECT;
-    use windows::Win32::Graphics::Dwm::{
-        DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND, DwmSetWindowAttribute,
-    };
-    use windows::Win32::Graphics::Gdi::{CreateRoundRectRgn, SetWindowRgn};
-    use windows::Win32::UI::WindowsAndMessaging::GetClientRect;
-
-    let Some(hwnd) = hwnd_of(window) else { return };
-
-    unsafe {
-        let pref = DWMWCP_ROUND;
-        let _ = DwmSetWindowAttribute(
-            hwnd,
-            DWMWA_WINDOW_CORNER_PREFERENCE,
-            &pref as *const _ as *const _,
-            std::mem::size_of_val(&pref) as u32,
-        );
-
-        let mut rc = RECT::default();
-        if GetClientRect(hwnd, &mut rc).is_ok() {
-            let w = rc.right - rc.left;
-            let h = rc.bottom - rc.top;
-            if w > 0 && h > 0 {
-                let scale = window.scale_factor() as f64;
-                // Region radius ≥ paint radius so the clip ⊆ painted area
-                // (no clear-color gap). CreateRoundRectRgn ellipse = 2×r.
-                let r = ((CORNER_RADIUS as f64 * scale) as i32 + 2).max(2);
-                let region = CreateRoundRectRgn(0, 0, w + 1, h + 1, r * 2, r * 2);
-                let _ = SetWindowRgn(hwnd, Some(region), true);
-            }
-        }
-    }
-    tracing::debug!("rounded corners applied (dwm + client region)");
-}
-
-/// Dark acrylic tint matching the old window_effects::apply_backdrop.
-/// Call only while the window is visible — DWM ignores backdrop on hidden windows.
-#[cfg(windows)]
-pub fn apply_backdrop(window: &Window) {
-    if !is_visible(window) {
-        tracing::debug!("skip acrylic: window not visible yet");
-        return;
-    }
-    match window_vibrancy::apply_acrylic(window, Some((18, 18, 20, 140))) {
-        Ok(()) => tracing::debug!("acrylic backdrop applied"),
-        Err(err) => tracing::warn!("acrylic backdrop failed: {err}"),
-    }
-}
+/// Rounded shape is GPU-only: the HWND is a full transparent host and the
+/// baked PNG is masked to rx=28 (background::mask_rounded_rect). No
+/// SetWindowRgn / DWM corner preference — those would clip or round the host.
 
 #[cfg(windows)]
 pub fn apply_topmost(window: &Window) {
@@ -249,12 +198,6 @@ pub fn set_pos(_window: &Window, _x: i32, _y: i32) {}
 pub fn outer_pos(_window: &Window) -> (i32, i32) {
     (0, 0)
 }
-
-#[cfg(not(windows))]
-pub fn apply_rounded_corners(_window: &Window) {}
-
-#[cfg(not(windows))]
-pub fn apply_backdrop(_window: &Window) {}
 
 #[cfg(not(windows))]
 pub fn apply_topmost(_window: &Window) {}
@@ -355,12 +298,10 @@ pub fn animate(snap: Snap, mode: Anim) {
         });
 }
 
-/// Post-show polish on the main thread. Region first (clips clear-color),
-/// then acrylic, then topmost/position — each once, to avoid RefCell re-entry.
+/// Post-show polish on the main thread. Topmost/position once each —
+/// avoids RefCell re-entry via nested handle.update + activate_window.
 pub fn finish_show<V: gpui::Render + 'static>(handle: WindowHandle<V>, cx: &mut App) {
     let _ = handle.update(cx, |_, window, _| {
-        apply_rounded_corners(window);
-        apply_backdrop(window);
         apply_topmost(window);
         position_bottom_right(window);
     });
@@ -439,8 +380,8 @@ impl Snap {
         self.mon_h - (MAIN_H * self.scale) as i32 - 48
     }
 
-    /// Position below target, show, slide up. Backdrop is applied by
-    /// `finish_show` on the main thread after this returns.
+    /// Position below target, show, slide up. Topmost/position run on the
+    /// main thread in `finish_show` after this returns.
     fn show_blocking(self) {
         let target_y = self.target_y();
         let start_y = target_y + 80;

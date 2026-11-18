@@ -28,7 +28,7 @@ use std::{
 use base64::Engine;
 use config::Config;
 use gpui::{
-    App, Application, WindowBackgroundAppearance, WindowBounds, WindowKind, WindowOptions, point,
+    App, WindowBackgroundAppearance, WindowBounds, WindowKind, WindowOptions, point,
     prelude::*, px, size,
 };
 use macaddr::MacAddr6;
@@ -443,16 +443,16 @@ pub fn show_window_now(cx: &mut App) {
     let Some(h) = handle else { return };
 
     // Position off-screen below + show (one main-thread update).
-    // Backdrop/corners/topmost run once in finish_show after the show
-    // animation — doing them here too double-applies acrylic and re-enters
-    // GPUI's window RefCell via activate_window().
-    let prepared = h.update(cx, |view, window, _| {
+    // Topmost/bottom-right run once in finish_show after the show
+    // animation — doing them here too re-enters GPUI's window RefCell
+    // via activate_window().
+    let prepared = h.update(cx, |view, window, cx| {
         let (target_x, target_y) = shell::position_bottom_right(window)
             .unwrap_or_else(|| shell::outer_pos(window));
         let start_y = target_y + 80;
         shell::set_pos(window, target_x, start_y);
         shell::show(window);
-        view.focus_handle.focus(window);
+        view.focus_handle.focus(window, cx);
         // SW_SHOWNOACTIVATE skips WM_ACTIVATE; bring to foreground explicitly
         // so focus-loss auto-hide can fire. Deferred initial_placement is
         // flushed here; finish_show re-asserts bottom-right after.
@@ -760,7 +760,7 @@ fn open_main_window(cx: &mut App) -> gpui::Result<gpui::WindowHandle<UI::RootVie
             let view = cx.new(|cx| UI::RootView::new(cx));
             // Focus-loss auto-hide (matches Tauri Focused(false) + 100ms delay).
             let focus_handle = view.read(cx).focus_handle.clone();
-            focus_handle.focus(window);
+            focus_handle.focus(window, cx);
             let _ = window.on_focus_out(&focus_handle, cx, |_, window, cx| {
                 state().hide_cancel.store(false, Ordering::SeqCst);
                 // The window argument lets us skip a redundant hide when this
@@ -780,10 +780,9 @@ fn open_main_window(cx: &mut App) -> gpui::Result<gpui::WindowHandle<UI::RootVie
         },
     )?;
 
-    // Window exists but is still hidden. Region/DWM are safe early; acrylic
-    // waits until finish_show (DWM ignores backdrop on hidden windows).
+    // Window exists but is still hidden. Topmost is safe early;
+    // finish_show re-asserts it after the show animation.
     let _ = handle.update(cx, |_, window, _| {
-        shell::apply_rounded_corners(window);
         shell::apply_topmost(window);
     });
 
@@ -888,7 +887,7 @@ pub fn run() {
 
     updater::cleanup_old_exe();
 
-    Application::new().run(|cx: &mut App| {
+    gpui_platform::application().run(|cx: &mut App| {
         spawn_auto_detect(cx);
         setup_tray(cx);
         if let Err(err) = open_main_window(cx) {
