@@ -757,6 +757,8 @@ fn open_main_window(cx: &mut App) -> gpui::Result<gpui::WindowHandle<UI::RootVie
         |window, cx| {
             // Match React: html 14.5px rem root * popup zoom 0.9.
             window.set_rem_size(UI::scale::rem_base());
+            // No DWM border/shadow/corner — PNG mask owns the rounded shape.
+            shell::remove_dwm_border(window);
             let view = cx.new(|cx| UI::RootView::new(cx));
             // Focus-loss auto-hide (matches Tauri Focused(false) + 100ms delay).
             let focus_handle = view.read(cx).focus_handle.clone();

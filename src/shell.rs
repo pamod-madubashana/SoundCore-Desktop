@@ -148,7 +148,47 @@ pub fn outer_pos(window: &Window) -> (i32, i32) {
 
 /// Rounded shape is GPU-only: the HWND is a full transparent host and the
 /// baked PNG is masked to rx=28 (background::mask_rounded_rect). No
-/// SetWindowRgn / DWM corner preference — those would clip or round the host.
+/// SetWindowRgn — the PNG alpha owns the shape.
+
+/// Kill DWM's 1px border, non-client frame, and shadow around the rectangular
+/// host so they don't outline the GPU-masked rounded paint. Also force
+/// DWMWCP_DONOTROUND so DWM never re-rounds the host independently.
+#[cfg(windows)]
+pub fn remove_dwm_border(window: &Window) {
+    use std::ffi::c_void;
+    use windows::Win32::Graphics::Dwm::{
+        DWMNCRENDERINGPOLICY, DWMNCRP_DISABLED, DWMWA_BORDER_COLOR, DWMWA_NCRENDERING_POLICY,
+        DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND, DWM_WINDOW_CORNER_PREFERENCE,
+        DwmSetWindowAttribute,
+    };
+
+    let Some(hwnd) = hwnd_of(window) else { return };
+    unsafe {
+        // Win11 DWMWA_COLOR_NONE — no border color at all.
+        let none: u32 = 0xFFFF_FFFE;
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_BORDER_COLOR,
+            &none as *const _ as *const c_void,
+            size_of::<u32>() as u32,
+        );
+        let pref: DWM_WINDOW_CORNER_PREFERENCE = DWMWCP_DONOTROUND;
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_WINDOW_CORNER_PREFERENCE,
+            &pref as *const _ as *const c_void,
+            size_of::<DWM_WINDOW_CORNER_PREFERENCE>() as u32,
+        );
+        let policy: DWMNCRENDERINGPOLICY = DWMNCRP_DISABLED;
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_NCRENDERING_POLICY,
+            &policy as *const _ as *const c_void,
+            size_of::<DWMNCRENDERINGPOLICY>() as u32,
+        );
+    }
+    tracing::debug!("dwm border/shadow/corner disabled");
+}
 
 #[cfg(windows)]
 pub fn apply_topmost(window: &Window) {
@@ -198,6 +238,9 @@ pub fn set_pos(_window: &Window, _x: i32, _y: i32) {}
 pub fn outer_pos(_window: &Window) -> (i32, i32) {
     (0, 0)
 }
+
+#[cfg(not(windows))]
+pub fn remove_dwm_border(_window: &Window) {}
 
 #[cfg(not(windows))]
 pub fn apply_topmost(_window: &Window) {}
