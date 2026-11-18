@@ -41,4 +41,16 @@ fn main() {
 
     fs::write(&dest, code).expect("failed to write embedded_devices.rs");
     println!("cargo:rerun-if-changed=assets/devices");
+
+    // Windows exe/window icon: PE resource ID 1 (gpui `load_icon` reads this).
+    #[cfg(windows)]
+    {
+        let icons_dir = Path::new(&manifest_dir).join("assets/icons");
+        let rc = icons_dir.join("app.rc");
+        if rc.is_file() {
+            println!("cargo:rerun-if-changed={}", rc.display());
+            println!("cargo:rerun-if-changed={}", icons_dir.join("icon.ico").display());
+            let _ = embed_resource::compile(&rc, embed_resource::ParamsIncludeDirs([icons_dir]));
+        }
+    }
 }
