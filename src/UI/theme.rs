@@ -1,5 +1,5 @@
 //! Color tokens (Fluent dark palette).
-//! The popup sits on acrylic; surfaces are white overlays, not solid fills.
+//! The popup sits on a baked gradient; surfaces are white overlays, not solid fills.
 
 use gpui::{Hsla, rgb, rgba};
 
@@ -114,7 +114,7 @@ pub fn warning() -> Hsla {
     rgb(0xfbbf24).into()
 }
 
-/// Surface — white 10% (cards over acrylic)
+/// Surface — white 10% (cards over the baked gradient)
 pub fn surface() -> Hsla {
     rgba(0xffffff1a).into()
 }
@@ -164,7 +164,7 @@ pub fn overlay_bg() -> Hsla {
     rgba(0x00000073).into()
 }
 
-/// Popup chrome fill (window is acrylic; keep near-transparent solid)
+/// Popup chrome fill (near-transparent solid over the baked gradient)
 pub fn popup_bg() -> Hsla {
     rgba(0x121214e6).into()
 }

@@ -3,6 +3,7 @@
 //! Screen routing:
 //!   connected device → Control; devices known → MyDevices; else Searching.
 
+pub mod background;
 pub mod data;
 pub mod scale;
 pub mod screens;
@@ -107,7 +108,7 @@ impl RootView {
             let info = std::thread::spawn(|| match crate::check_update(state()) {
                 Ok(info) => Some(Ok(info)),
                 Err(e) => {
-                    if e.contains("up to date") {
+                    if e.contains("up to date") || e.contains("No update available") {
                         None
                     } else {
                         Some(Err(e))
@@ -422,6 +423,41 @@ impl RootView {
         hide_window_now(cx);
     }
 
+    /// Force a state + Bluetooth refresh (footer Refresh button).
+    pub fn refresh(&mut self, cx: &mut Context<Self>) {
+        let next = get_states(state());
+        self.apply_states(next, cx);
+        cx.spawn(async move |this, cx| {
+            let (bt, scan) = std::thread::spawn(|| {
+                let st = state();
+                let bt = crate::get_bluetooth_status(st);
+                let scan = get_scan(st);
+                (bt, scan)
+            })
+            .join()
+            .unwrap_or((
+                true,
+                ScanDto {
+                    scanning: false,
+                    results: vec![],
+                },
+            ));
+            this.update(&mut *cx, |view, cx| {
+                view.bt_on = Some(bt);
+                view.scanning = scan.scanning;
+                if !scan.scanning
+                    && let Some(model) = view.devices.first().map(|d| d.model.clone())
+                {
+                    let _ = crate::scan(state(), model);
+                }
+                cx.notify();
+            })
+            .ok();
+        })
+        .detach();
+        cx.notify();
+    }
+
     pub fn send_setting(&self, mac: &str, id: &str, raw: &str) {
         let _ = crate::set_setting(state(), mac.to_string(), id.to_string(), raw.to_string());
     }
@@ -459,8 +495,8 @@ impl Render for RootView {
         let active = self.active_device().cloned();
         let show_se = self.show_sound_effects;
 
-        // Root IS the glass: full client rect paint (no rounded clip here —
-        // OS region shapes the window). Clear-color never shows at corners.
+        // Root IS the glass: baked PNG (gradient+glows+sheen+stroke) masked
+        // to rx=28. HWND stays a full transparent host; alpha defines shape.
         div()
             .track_focus(&self.focus_handle)
             .size_full()
@@ -468,18 +504,11 @@ impl Render for RootView {
             .flex()
             .flex_col()
             .overflow_hidden()
-            .bg(gpui::Hsla {
-                h: 0.63,
-                s: 0.28,
-                l: 0.07,
-                a: 0.78,
-            })
-            .border_1()
-            .border_color(gpui::rgba(0xffffff3d))
             .text_color(theme::foreground())
             .text_size(px(14.))
             .font_family("Segoe UI")
-            // White glass sheen on top of the dark translucent fill.
+            // Dark diagonal base + orange/blue radial glows + panel sheen,
+            // transparent outside rx=28 (matches *_window.svg).
             .child(
                 div()
                     .absolute()
@@ -487,27 +516,11 @@ impl Render for RootView {
                     .top(px(0.))
                     .right(px(0.))
                     .bottom(px(0.))
-                    .bg(gpui::linear_gradient(
-                        180.0,
-                        gpui::linear_color_stop(
-                            gpui::Hsla {
-                                h: 0.0,
-                                s: 0.0,
-                                l: 1.0,
-                                a: 0.10,
-                            },
-                            0.0,
-                        ),
-                        gpui::linear_color_stop(
-                            gpui::Hsla {
-                                h: 0.0,
-                                s: 0.0,
-                                l: 1.0,
-                                a: 0.04,
-                            },
-                            1.0,
-                        ),
-                    )),
+                    .child(
+                        gpui::img(background::image().clone())
+                            .size_full()
+                            .object_fit(gpui::ObjectFit::Fill),
+                    ),
             )
             .child(
                 div()

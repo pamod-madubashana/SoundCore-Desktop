@@ -84,6 +84,10 @@ pub fn derive_active_section(s: &SettingsMap) -> &'static str {
 
 /// Fallback when localizedOptions is missing: "BassBooster" -> "Bass Booster".
 pub fn pretty_preset_id(id: &str) -> String {
+    // Device reports the factory EQ as id "default" — brand name, not "default".
+    if id == "default" {
+        return "Soundcore Signature".into();
+    }
     let mut out = String::with_capacity(id.len() + 4);
     let bytes: Vec<char> = id.chars().collect();
     for (i, &c) in bytes.iter().enumerate() {
@@ -379,8 +383,18 @@ pub fn display_device_name(d: &DeviceStateDto) -> String {
     }
 }
 
-/// Toggle settings for the quick-toggles list, game-mode first (App.tsx).
+/// Toggle settings for the quick-toggles list.
+/// Game mode first, then the design-target order, then alphabetical (App.tsx).
 pub fn quick_toggles(s: &SettingsMap) -> Vec<(String, bool)> {
+    // UI-Target/controls_ui_redesign.svg row order.
+    const PREFERRED: &[&str] = &[
+        "windNoiseSuppression",
+        "realTimeAdaptiveNoiseCanceling",
+        "limitHighVolume",
+        "dualConnections",
+        "ldac",
+        "touchTone",
+    ];
     let mut toggles: Vec<(String, bool)> = s
         .iter()
         .filter(|(_, v)| v.get("type").and_then(Value::as_str) == Some("toggle"))
@@ -390,12 +404,19 @@ pub fn quick_toggles(s: &SettingsMap) -> Vec<(String, bool)> {
             (id.clone(), on)
         })
         .collect();
-    // Game mode first, then alphabetical by id — HashMap iteration order is
-    // unstable across runs, so a single-key sort leaves the rest shuffling.
+    // HashMap iteration order is unstable — pin preferred ids, then alpha.
     toggles.sort_by(|a, b| {
-        let a_game = a.0.to_lowercase().contains("gam");
-        let b_game = b.0.to_lowercase().contains("gam");
-        b_game.cmp(&a_game).then_with(|| a.0.cmp(&b.0))
+        let rank = |id: &str| {
+            if id.to_lowercase().contains("gam") {
+                return -1;
+            }
+            PREFERRED
+                .iter()
+                .position(|p| *p == id)
+                .map(|i| i as i32)
+                .unwrap_or(i32::MAX)
+        };
+        rank(&a.0).cmp(&rank(&b.0)).then_with(|| a.0.cmp(&b.0))
     });
     toggles
 }
