@@ -134,27 +134,11 @@ pub fn render(
         )
         .child(
             div()
-                .px_3()
+                .px_4()
                 .py_2()
-                .flex()
-                .items_center()
-                .justify_between()
                 .text_size(px(10.))
                 .text_color(theme::muted_dim())
-                .child(format!("v{version}"))
-                .child(
-                    div()
-                        .id("github-link")
-                        .cursor_pointer()
-                        .hover(|st| st.text_color(theme::muted()))
-                        .on_click(|_, _window, _cx| {
-                            crate::open_url(
-                                "https://github.com/pamod-madubashana/SoundCore-Desktop"
-                                    .into(),
-                            );
-                        })
-                        .child("GitHub"),
-                ),
+                .child(format!("v{version}")),
         )
 }
 
@@ -326,7 +310,7 @@ fn header(
                         }),
                 )
                 .when(!batteries.is_empty(), |el| {
-                    // One row (target): L | R | Case — no wrap.
+                    // One row (target): L | R | Case — hug content, no wrap.
                     el.child(
                         div()
                             .mt(px(8.))
@@ -379,8 +363,8 @@ fn battery_pill(pct: i32, label: Option<&str>) -> impl IntoElement {
     };
     let is_case = label == Some("Case");
     div()
-        .h(px(20.))
-        .px_1_5()
+        .h(px(18.))
+        .px_1()
         .rounded_full()
         .bg(theme::surface())
         .border_1()
@@ -432,24 +416,23 @@ fn battery_pill(pct: i32, label: Option<&str>) -> impl IntoElement {
         )
         .child(
             div()
-                .w(px(20.))
-                .h(px(9.))
-                .rounded(px(3.))
+                .w(px(16.))
+                .h(px(8.))
+                .rounded(px(2.))
                 .bg(theme::toggle_off())
                 .overflow_hidden()
                 .flex_shrink_0()
                 .child(
                     div()
                         .h_full()
-                        .rounded(px(3.))
+                        .rounded(px(2.))
                         .bg(fill)
-                        .w(px(20.0 * pct as f32 / 100.0)),
+                        .w(gpui::relative(pct as f32 / 100.0)),
                 ),
         )
         .child(
             div()
-                .w(px(26.))
-                .text_size(px(10.5))
+                .text_size(px(10.))
                 .font_weight(gpui::FontWeight::SEMIBOLD)
                 .text_color(theme::foreground())
                 .child(format!("{pct}%")),
@@ -534,22 +517,32 @@ fn sound_mode(
         .map(|(_, v)| v.clone());
     let active = local.unwrap_or(polled);
 
-    let modes: Vec<(String, &'static str, &'static str)> = opts
-        .iter()
-        .filter_map(|(id, _)| {
-            let lower = id.to_lowercase();
-            let (kw, label) = if lower.contains("noise") {
-                ("noise", "Noise Cancel")
-            } else if lower.contains("normal") {
-                ("normal", "Normal")
-            } else if lower.contains("transparen") {
-                ("transparen", "Transparency")
-            } else {
-                return None;
-            };
-            Some((id.clone(), label, kw))
-        })
-        .collect();
+    let modes: Vec<(String, &'static str, &'static str)> = {
+        let mut mapped: Vec<(String, &'static str, &'static str)> = opts
+            .iter()
+            .filter_map(|(id, _)| {
+                let lower = id.to_lowercase();
+                let (kw, label) = if lower.contains("noise") {
+                    ("noise", "Noise Cancel")
+                } else if lower.contains("normal") {
+                    ("normal", "Normal")
+                } else if lower.contains("transparen") {
+                    ("transparen", "Transparency")
+                } else {
+                    return None;
+                };
+                Some((id.clone(), label, kw))
+            })
+            .collect();
+        // Fixed order: Noise Cancel → Normal → Transparency.
+        let rank = |kw: &str| match kw {
+            "noise" => 0,
+            "normal" => 1,
+            _ => 2,
+        };
+        mapped.sort_by_key(|(_, _, kw)| rank(kw));
+        mapped
+    };
 
     let mut row = div()
         .rounded_2xl()

@@ -359,8 +359,11 @@ pub fn header_batteries(d: &DeviceStateDto) -> Vec<(String, i32)> {
     if let Some(v) = d.battery_right {
         out.push(("R".into(), v.clamp(0, 100)));
     }
-    if let Some(v) = d.battery_combined {
-        out.push((String::new(), v.clamp(0, 100)));
+    // Combined is redundant when both buds report individually.
+    if d.battery_left.is_none() || d.battery_right.is_none() {
+        if let Some(v) = d.battery_combined {
+            out.push((String::new(), v.clamp(0, 100)));
+        }
     }
     if let Some(v) = d.battery_case {
         out.push(("Case".into(), v.clamp(0, 100)));
