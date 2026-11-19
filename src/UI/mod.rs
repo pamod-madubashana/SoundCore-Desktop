@@ -37,11 +37,9 @@ pub struct RootView {
     pub show_sound_effects: bool,
     /// Second-level Custom EQ editor (React `showEqualizer`).
     pub(crate) show_equalizer: bool,
-    /// Header 3-dots dropdown (Settings / About).
-    pub header_menu: bool,
-    /// App Settings screen (from the header dropdown).
+    /// App Settings screen (header gear button).
     pub show_settings: bool,
-    /// About screen (from the header dropdown).
+    /// About screen (header info button).
     pub show_about: bool,
     /// 0..11 frame for the searching spinner
     pub(crate) spinner_tick: u8,
@@ -183,7 +181,6 @@ impl RootView {
             eq_presets: Vec::new(),
         show_sound_effects: false,
         show_equalizer: false,
-        header_menu: false,
         show_settings: false,
         show_about: false,
         spinner_tick: 0,
@@ -555,22 +552,11 @@ impl Render for RootView {
         let show_se =
             self.show_sound_effects && active.is_some() && !show_settings && !show_about;
         let overlay = show_se || show_settings || show_about;
-        let view = cx.entity();
 
         // Root IS the glass: baked PNG (gradient+glows+sheen+stroke) masked
         // to rx=28. HWND stays a full transparent host; alpha defines shape.
         div()
             .id("app-root")
-            .on_click(move |_, _window, cx| {
-                // Any click outside the header dropdown closes it (the dots
-                // button and menu items stop propagation, so they survive).
-                view.update(cx, |root, cx| {
-                    if root.header_menu {
-                        root.header_menu = false;
-                        cx.notify();
-                    }
-                });
-            })
             .track_focus(&self.focus_handle)
             .size_full()
             .relative()

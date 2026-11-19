@@ -73,7 +73,7 @@ pub fn render(
             div()
                 .id("se-body")
                 .absolute()
-                .top(px(44.))
+                .top(px(49.))
                 .left(px(0.))
                 .right(px(0.))
                 .bottom(px(0.))
@@ -188,9 +188,8 @@ fn spatial_section(
         if expanded {
             Some(
                 div()
-                    .grid()
-                    .grid_cols(3)
-                    .gap_1_5()
+                    .flex()
+                    .gap(px(6.))
                     .px_3()
                     .pt_1()
                     .pb_3()
@@ -216,6 +215,8 @@ fn spatial_section(
                         let id = id.clone();
                         div()
                             .id(gpui::SharedString::from(format!("spatial-mode-{id}")))
+                            .flex_1()
+                            .min_w_0()
                             .flex()
                             .flex_col()
                             .items_center()
@@ -524,7 +525,7 @@ fn equalizer_screen(
                 .px_3()
                 .flex()
                 .items_center()
-                .gap_2_5()
+                .gap(px(10.))
                 .border_b_1()
                 .border_color(theme::border_medium())
                 .child(header_btn(view, "eq-back", cx, |root, cx| {
@@ -544,7 +545,7 @@ fn equalizer_screen(
             div()
                 .id("eq-body")
                 .absolute()
-                .top(px(44.))
+                .top(px(49.))
                 .left(px(0.))
                 .right(px(0.))
                 .bottom(px(0.))

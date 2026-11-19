@@ -51,7 +51,7 @@ pub fn render(
             div()
                 .id("about-body")
                 .absolute()
-                .top(px(44.))
+                .top(px(49.))
                 .left(px(0.))
                 .right(px(0.))
                 .bottom(px(0.))

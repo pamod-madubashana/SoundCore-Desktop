@@ -1,9 +1,9 @@
-//! MyDevices screen (saved devices list).
+//! MyDevices screen (saved devices list). Header: About + Settings nav.
 
 use gpui::{Context, IntoElement, ParentElement, Styled, Window, div, prelude::*, rgba};
 use crate::UI::scale::px;
 
-use super::common::{settings_dots_icon, soundcore_glyph};
+use super::common::{gear_icon, info_icon, soundcore_glyph};
 use crate::UI::{RootView, data, theme};
 
 pub fn render(
@@ -76,22 +76,60 @@ pub fn render(
                 )
                 .child(
                     div()
-                        .id("settings-dots")
-                        .size(px(30.))
-                        .rounded_full()
-                        .bg(rgba(0xffffff14))
-                        .border_1()
-                        .border_color(rgba(0xffffff26))
                         .flex()
                         .items_center()
-                        .justify_center()
+                        .gap(px(6.))
                         .flex_shrink_0()
-                        .cursor_pointer()
-                        .hover(|s| s.bg(rgba(0xffffff24)))
-                        .on_click(move |_, _window, _cx| {
-                            crate::open_url("ms-settings:privacy".into());
+                        .child({
+                            let view = view.clone();
+                            div()
+                                .id("devices-about")
+                                .size(px(30.))
+                                .rounded_full()
+                                .bg(theme::hover_subtle())
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .text_color(theme::foreground())
+                                .flex_shrink_0()
+                                .cursor_pointer()
+                                .hover(|s| s.bg(theme::hover_medium()))
+                                .on_click(move |_, _window, cx| {
+                                    view.update(cx, |root, cx| {
+                                        root.show_about = true;
+                                        root.show_settings = false;
+                                        root.show_sound_effects = false;
+                                        root.show_equalizer = false;
+                                        cx.notify();
+                                    });
+                                })
+                                .child(info_icon(16., theme::foreground()))
                         })
-                        .child(settings_dots_icon()),
+                        .child({
+                            let view = view.clone();
+                            div()
+                                .id("devices-settings")
+                                .size(px(30.))
+                                .rounded_full()
+                                .bg(theme::hover_subtle())
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .text_color(theme::foreground())
+                                .flex_shrink_0()
+                                .cursor_pointer()
+                                .hover(|s| s.bg(theme::hover_medium()))
+                                .on_click(move |_, _window, cx| {
+                                    view.update(cx, |root, cx| {
+                                        root.show_settings = true;
+                                        root.show_about = false;
+                                        root.show_sound_effects = false;
+                                        root.show_equalizer = false;
+                                        cx.notify();
+                                    });
+                                })
+                                .child(gear_icon(16., theme::foreground()))
+                        }),
                 ),
         )
         // Divider (inset like target: x=30..381 on 411 panel)

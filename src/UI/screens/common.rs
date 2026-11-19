@@ -130,17 +130,26 @@ pub(crate) fn spinner(tick: u8, color: Hsla) -> impl IntoElement {
     }))
 }
 
-/// Horizontal three-dot settings glyph.
-pub(crate) fn settings_dots_icon() -> impl IntoElement {
+/// Gear glyph (Settings nav). VS15 keeps U+2699 monochrome, not emoji.
+pub(crate) fn gear_icon(size: f32, color: Hsla) -> impl IntoElement {
     div()
+        .size(px(size))
         .flex()
         .items_center()
         .justify_center()
-        .gap(px(3.4))
-        .children((0..3).map(|_| {
-            div()
-                .size(px(3.6))
-                .rounded_full()
-                .bg(gpui::rgba(0xffffffcc))
-        }))
+        .text_color(color)
+        .text_size(px(size))
+        .child("⚙︎")
+}
+
+/// Circled-i glyph (About nav).
+pub(crate) fn info_icon(size: f32, color: Hsla) -> impl IntoElement {
+    div()
+        .size(px(size))
+        .flex()
+        .items_center()
+        .justify_center()
+        .text_color(color)
+        .text_size(px(size))
+        .child("ⓘ")
 }

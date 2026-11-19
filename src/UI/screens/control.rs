@@ -3,7 +3,7 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, prelude::*};
 use crate::UI::scale::px;
 
-use super::common::{chevron_right, download_icon, settings_dots_icon, sliders_icon};
+use super::common::{chevron_right, download_icon, gear_icon, info_icon, sliders_icon};
 use crate::UI::{RootView, data, theme};
 
 pub fn render(
@@ -142,64 +142,6 @@ pub fn render(
                 .text_color(theme::muted_dim())
                 .child(format!("v{version}")),
         )
-        // Header 3-dots dropdown — painted last so it sits above the body.
-        .when(root.header_menu, |el| el.child(header_menu(&view)))
-}
-
-/// Dropdown under the header 3-dots: Settings / About.
-fn header_menu(view: &Entity<RootView>) -> impl IntoElement {
-    div()
-        .id("header-menu")
-        .absolute()
-        .top(px(46.))
-        .right(px(12.))
-        .w(px(150.))
-        .rounded_xl()
-        .bg(theme::surface_elevated())
-        .border_1()
-        .border_color(theme::border_medium())
-        .shadow(vec![gpui::BoxShadow {
-            color: gpui::rgba(0x00000066).into(),
-            offset: gpui::point(px(0.), px(6.)),
-            blur_radius: px(16.),
-            spread_radius: px(0.),
-            inset: false,
-        }])
-        .py_1()
-        .flex()
-        .flex_col()
-        .children(["Settings", "About"].map(|item| {
-            let view = view.clone();
-            let item = item.to_string();
-            let target = item.clone();
-            div()
-                .id(gpui::SharedString::from(format!("menu-{item}")))
-                .w_full()
-                .px_3()
-                .py(px(8.))
-                .flex()
-                .items_center()
-                .gap_2()
-                .text_size(px(12.5))
-                .font_weight(gpui::FontWeight::MEDIUM)
-                .text_color(theme::foreground())
-                .hover(|st| st.bg(theme::hover_subtle()))
-                .cursor_pointer()
-                .on_click(move |_, _window, cx| {
-                    view.update(cx, |root, cx| {
-                        root.header_menu = false;
-                        root.show_settings = target == "Settings";
-                        root.show_about = target == "About";
-                        // Overlays are exclusive — don't stack SE under Settings/About.
-                        if root.show_settings || root.show_about {
-                            root.show_sound_effects = false;
-                            root.show_equalizer = false;
-                        }
-                        cx.notify();
-                    });
-                })
-                .child(item)
-        }))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -298,7 +240,7 @@ fn header(
                             div()
                                 .flex()
                                 .items_center()
-                                .gap_1_5()
+                                .gap(px(6.))
                                 .flex_shrink_0()
                                 .when(show_update_badge, |el| {
                                     let view = view.clone();
@@ -337,18 +279,11 @@ fn header(
                                 })
                                 .child({
                                     let view = view_for_close.clone();
-                                    let open = root.header_menu;
                                     div()
-                                        .id("header-dots")
-                                        .size(px(26.))
+                                        .id("header-about")
+                                        .size(px(30.))
                                         .rounded_full()
-                                        .bg(if open {
-                                            theme::hover_medium()
-                                        } else {
-                                            theme::hover_subtle()
-                                        })
-                                        .border_1()
-                                        .border_color(theme::border_subtle())
+                                        .bg(theme::hover_subtle())
                                         .flex()
                                         .items_center()
                                         .justify_center()
@@ -357,14 +292,38 @@ fn header(
                                         .hover(|st| st.bg(theme::hover_medium()))
                                         .on_click(move |_, _window, cx| {
                                             view.update(cx, |root, cx| {
-                                                root.header_menu = !root.header_menu;
+                                                root.show_about = true;
+                                                root.show_settings = false;
+                                                root.show_sound_effects = false;
+                                                root.show_equalizer = false;
                                                 cx.notify();
                                             });
-                                            // Keep the root click-closer from
-                                            // immediately closing what we opened.
-                                            cx.stop_propagation();
                                         })
-                                        .child(settings_dots_icon())
+                                        .child(info_icon(16., theme::foreground()))
+                                })
+                                .child({
+                                    let view = view_for_close;
+                                    div()
+                                        .id("header-settings")
+                                        .size(px(30.))
+                                        .rounded_full()
+                                        .bg(theme::hover_subtle())
+                                        .flex()
+                                        .items_center()
+                                        .justify_center()
+                                        .text_color(theme::foreground())
+                                        .cursor_pointer()
+                                        .hover(|st| st.bg(theme::hover_medium()))
+                                        .on_click(move |_, _window, cx| {
+                                            view.update(cx, |root, cx| {
+                                                root.show_settings = true;
+                                                root.show_about = false;
+                                                root.show_sound_effects = false;
+                                                root.show_equalizer = false;
+                                                cx.notify();
+                                            });
+                                        })
+                                        .child(gear_icon(16., theme::foreground()))
                                 }),
                         ),
                 )
@@ -642,7 +601,7 @@ fn sound_mode(
                         .flex()
                         .items_center()
                         .justify_center()
-                        .gap_1_5()
+                        .gap(px(6.))
                         .rounded_xl()
                         .text_size(px(11.5))
                         .font_weight(if on {
@@ -651,11 +610,7 @@ fn sound_mode(
                             gpui::FontWeight::SEMIBOLD
                         })
                         .when(on, |el| {
-                            el.bg(gpui::linear_gradient(
-                                90.0,
-                                gpui::linear_color_stop(theme::brand(), 0.0),
-                                gpui::linear_color_stop(theme::brand_end(), 1.0),
-                            ))
+                            el.bg(theme::brand())
                             .text_color(theme::brand_foreground())
                             .shadow(vec![gpui::BoxShadow {
                                 color: gpui::rgba(0x6d6cff99).into(),
@@ -783,7 +738,7 @@ fn sub_row(
                 .flex()
                 .items_center()
                 .justify_center()
-                .gap_1_5()
+                .gap(px(6.))
                 .rounded_xl()
                 .text_size(px(11.5))
                 .font_weight(if on {
@@ -792,11 +747,7 @@ fn sub_row(
                     gpui::FontWeight::SEMIBOLD
                 })
                 .when(on, |el| {
-                    el.bg(gpui::linear_gradient(
-                        90.0,
-                        gpui::linear_color_stop(theme::brand(), 0.0),
-                        gpui::linear_color_stop(theme::brand_end(), 1.0),
-                    ))
+                    el.bg(theme::brand())
                     .text_color(theme::brand_foreground())
                     .shadow(vec![gpui::BoxShadow {
                         color: gpui::rgba(0x6d6cff99).into(),
