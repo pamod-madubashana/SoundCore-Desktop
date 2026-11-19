@@ -37,6 +37,12 @@ pub struct RootView {
     pub show_sound_effects: bool,
     /// Second-level Custom EQ editor (React `showEqualizer`).
     pub(crate) show_equalizer: bool,
+    /// Header 3-dots dropdown (Settings / About).
+    pub header_menu: bool,
+    /// App Settings screen (from the header dropdown).
+    pub show_settings: bool,
+    /// About screen (from the header dropdown).
+    pub show_about: bool,
     /// 0..11 frame for the searching spinner
     pub(crate) spinner_tick: u8,
     /// Optimistic overrides so taps survive the 900ms poll.
@@ -177,6 +183,9 @@ impl RootView {
             eq_presets: Vec::new(),
         show_sound_effects: false,
         show_equalizer: false,
+        header_menu: false,
+        show_settings: false,
+        show_about: false,
         spinner_tick: 0,
         ambient_local: None,
         sub_local: None,
@@ -193,8 +202,12 @@ impl RootView {
 
     fn apply_states(&mut self, next: Vec<DeviceStateDto>, cx: &mut Context<Self>) {
         if let Some(prev) = &self.prev_connected {
+            let notify = crate::get_config(crate::state()).notify_connect;
             for d in &next {
                 let was = prev.contains(&d.mac_address);
+                if !notify {
+                    continue;
+                }
                 let name = data::display_device_name(d);
                 if d.connected && !was {
                     let _ = show_notification(
@@ -536,11 +549,28 @@ impl Render for RootView {
         }
 
         let active = self.active_device().cloned();
-        let show_se = self.show_sound_effects;
+        // Render-time exclusivity: About > Settings > Sound Effects.
+        let show_about = self.show_about;
+        let show_settings = self.show_settings && !show_about;
+        let show_se =
+            self.show_sound_effects && active.is_some() && !show_settings && !show_about;
+        let overlay = show_se || show_settings || show_about;
+        let view = cx.entity();
 
         // Root IS the glass: baked PNG (gradient+glows+sheen+stroke) masked
         // to rx=28. HWND stays a full transparent host; alpha defines shape.
         div()
+            .id("app-root")
+            .on_click(move |_, _window, cx| {
+                // Any click outside the header dropdown closes it (the dots
+                // button and menu items stop propagation, so they survive).
+                view.update(cx, |root, cx| {
+                    if root.header_menu {
+                        root.header_menu = false;
+                        cx.notify();
+                    }
+                });
+            })
             .track_focus(&self.focus_handle)
             .size_full()
             .relative()
@@ -572,7 +602,7 @@ impl Render for RootView {
                     .flex()
                     .flex_col()
                     .overflow_hidden()
-                    .when(active.is_some() && !show_se, |el| {
+                    .when(active.is_some() && !overlay, |el| {
                         el.child(screens::control::render(
                             self,
                             active.as_ref().unwrap(),
@@ -580,19 +610,27 @@ impl Render for RootView {
                             cx,
                         ))
                     })
-                    .when(active.is_none() && !self.devices.is_empty(), |el| {
-                        el.child(screens::devices::render(self, window, cx))
-                    })
-                    .when(active.is_none() && self.devices.is_empty(), |el| {
-                        el.child(screens::searching::render(self, window, cx))
-                    })
-                    .when(active.is_some() && show_se, |el| {
+                    .when(
+                        active.is_none() && !overlay && !self.devices.is_empty(),
+                        |el| el.child(screens::devices::render(self, window, cx)),
+                    )
+                    .when(
+                        active.is_none() && !overlay && self.devices.is_empty(),
+                        |el| el.child(screens::searching::render(self, window, cx)),
+                    )
+                    .when(show_se, |el| {
                         el.child(screens::sound_effects::render(
                             self,
                             active.as_ref().unwrap(),
                             window,
                             cx,
                         ))
+                    })
+                    .when(show_settings, |el| {
+                        el.child(screens::settings::render(self, window, cx))
+                    })
+                    .when(show_about, |el| {
+                        el.child(screens::about::render(self, window, cx))
                     }),
             )
     }

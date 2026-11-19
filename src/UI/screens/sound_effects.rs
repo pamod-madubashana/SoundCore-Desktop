@@ -28,13 +28,17 @@ pub fn render(
 
     div()
         .size_full()
-        .flex()
-        .flex_col()
-        // Header: back + title | close
+        .relative()
+        .overflow_hidden()
+        // Header pinned to top
         .child(
             div()
+                .absolute()
+                .top(px(0.))
+                .left(px(0.))
+                .right(px(0.))
+                .h(px(44.))
                 .px_3()
-                .py_2_5()
                 .flex()
                 .items_center()
                 .justify_between()
@@ -64,12 +68,15 @@ pub fn render(
                     cx.notify();
                 }, close_icon(14., theme::muted()))),
         )
-        // Body — radio group: only one section expanded
+        // Body fills below header
         .child(
             div()
                 .id("se-body")
-                .flex_1()
-                .min_h_0()
+                .absolute()
+                .top(px(44.))
+                .left(px(0.))
+                .right(px(0.))
+                .bottom(px(0.))
                 .overflow_y_scroll()
                 .p_3()
                 .flex()
@@ -420,6 +427,8 @@ fn section_shell(
     div()
         .id(gpui::SharedString::from(format!("se-card-{key}")))
         .w_full()
+        .flex()
+        .flex_col()
         .rounded_2xl()
         .bg(theme::surface())
         .border_1()
@@ -429,8 +438,8 @@ fn section_shell(
             div()
                 .id(gpui::SharedString::from(format!("se-head-{key}")))
                 .w_full()
+                .h(px(48.))
                 .px_3()
-                .py_2_5()
                 .flex()
                 .items_center()
                 .justify_between()
@@ -502,12 +511,17 @@ fn equalizer_screen(
     let _ = d;
     div()
         .size_full()
-        .flex()
-        .flex_col()
+        .relative()
+        .overflow_hidden()
+        // Header pinned to top
         .child(
             div()
+                .absolute()
+                .top(px(0.))
+                .left(px(0.))
+                .right(px(0.))
+                .h(px(44.))
                 .px_3()
-                .py_2_5()
                 .flex()
                 .items_center()
                 .gap_2_5()
@@ -525,11 +539,15 @@ fn equalizer_screen(
                         .child("Custom EQ"),
                 ),
         )
+        // Body fills below header
         .child(
             div()
                 .id("eq-body")
-                .flex_1()
-                .min_h_0()
+                .absolute()
+                .top(px(44.))
+                .left(px(0.))
+                .right(px(0.))
+                .bottom(px(0.))
                 .overflow_y_scroll()
                 .p_4()
                 .child(equalizer(view, s)),

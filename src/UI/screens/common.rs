@@ -104,23 +104,6 @@ pub(crate) fn sliders_icon(size: f32, color: Hsla) -> impl IntoElement {
         .child("≡")
 }
 
-/// Ear / volume-mode glyphs for the segmented sound-mode control.
-pub(crate) fn mode_icon(kind: &str, size: f32, color: Hsla) -> impl IntoElement {
-    let glyph = match kind {
-        "noise" => "◉",
-        "transparen" => "◎",
-        _ => "○",
-    };
-    div()
-        .size(px(size))
-        .flex()
-        .items_center()
-        .justify_center()
-        .text_color(color)
-        .text_size(px(size * 0.95))
-        .child(glyph)
-}
-
 /// 12-dot spinner; `tick` selects which dots are bright.
 pub(crate) fn spinner(tick: u8, color: Hsla) -> impl IntoElement {
     let frame = tick % 12;

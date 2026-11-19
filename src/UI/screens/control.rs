@@ -3,7 +3,7 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, prelude::*};
 use crate::UI::scale::px;
 
-use super::common::{chevron_right, close_icon, download_icon, sliders_icon};
+use super::common::{chevron_right, download_icon, settings_dots_icon, sliders_icon};
 use crate::UI::{RootView, data, theme};
 
 pub fn render(
@@ -26,6 +26,7 @@ pub fn render(
 
     div()
         .size_full()
+        .relative()
         .flex()
         .flex_col()
         .child(header(
@@ -134,12 +135,71 @@ pub fn render(
         )
         .child(
             div()
-                .px_4()
+                .pl(px(30.))
+                .pr_4()
                 .py_2()
                 .text_size(px(10.))
                 .text_color(theme::muted_dim())
                 .child(format!("v{version}")),
         )
+        // Header 3-dots dropdown — painted last so it sits above the body.
+        .when(root.header_menu, |el| el.child(header_menu(&view)))
+}
+
+/// Dropdown under the header 3-dots: Settings / About.
+fn header_menu(view: &Entity<RootView>) -> impl IntoElement {
+    div()
+        .id("header-menu")
+        .absolute()
+        .top(px(46.))
+        .right(px(12.))
+        .w(px(150.))
+        .rounded_xl()
+        .bg(theme::surface_elevated())
+        .border_1()
+        .border_color(theme::border_medium())
+        .shadow(vec![gpui::BoxShadow {
+            color: gpui::rgba(0x00000066).into(),
+            offset: gpui::point(px(0.), px(6.)),
+            blur_radius: px(16.),
+            spread_radius: px(0.),
+            inset: false,
+        }])
+        .py_1()
+        .flex()
+        .flex_col()
+        .children(["Settings", "About"].map(|item| {
+            let view = view.clone();
+            let item = item.to_string();
+            let target = item.clone();
+            div()
+                .id(gpui::SharedString::from(format!("menu-{item}")))
+                .w_full()
+                .px_3()
+                .py(px(8.))
+                .flex()
+                .items_center()
+                .gap_2()
+                .text_size(px(12.5))
+                .font_weight(gpui::FontWeight::MEDIUM)
+                .text_color(theme::foreground())
+                .hover(|st| st.bg(theme::hover_subtle()))
+                .cursor_pointer()
+                .on_click(move |_, _window, cx| {
+                    view.update(cx, |root, cx| {
+                        root.header_menu = false;
+                        root.show_settings = target == "Settings";
+                        root.show_about = target == "About";
+                        // Overlays are exclusive — don't stack SE under Settings/About.
+                        if root.show_settings || root.show_about {
+                            root.show_sound_effects = false;
+                            root.show_equalizer = false;
+                        }
+                        cx.notify();
+                    });
+                })
+                .child(item)
+        }))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -277,11 +337,16 @@ fn header(
                                 })
                                 .child({
                                     let view = view_for_close.clone();
+                                    let open = root.header_menu;
                                     div()
-                                        .id("hide-btn")
+                                        .id("header-dots")
                                         .size(px(26.))
                                         .rounded_full()
-                                        .bg(theme::hover_subtle())
+                                        .bg(if open {
+                                            theme::hover_medium()
+                                        } else {
+                                            theme::hover_subtle()
+                                        })
                                         .border_1()
                                         .border_color(theme::border_subtle())
                                         .flex()
@@ -289,12 +354,17 @@ fn header(
                                         .justify_center()
                                         .text_color(theme::foreground())
                                         .cursor_pointer()
+                                        .hover(|st| st.bg(theme::hover_medium()))
                                         .on_click(move |_, _window, cx| {
                                             view.update(cx, |root, cx| {
-                                                root.hide(cx);
+                                                root.header_menu = !root.header_menu;
+                                                cx.notify();
                                             });
+                                            // Keep the root click-closer from
+                                            // immediately closing what we opened.
+                                            cx.stop_propagation();
                                         })
-                                        .child(close_icon(14., theme::foreground()))
+                                        .child(settings_dots_icon())
                                 }),
                         ),
                 )
@@ -560,7 +630,7 @@ fn sound_mode(
                 .rounded_xl()
                 .bg(gpui::rgba(0x00000047))
                 .flex()
-                .children(modes.into_iter().map(|(id, label, kw)| {
+                .children(modes.into_iter().map(|(id, label, _kw)| {
                     let on = id == active;
                     let view = view.clone();
                     let mac = mac.clone();
@@ -628,9 +698,6 @@ fn sound_mode(
                                 cx.notify();
                             });
                         })
-                        .children((!on).then(|| {
-                            super::common::mode_icon(kw, 13., gpui::rgba(0xffffff8c).into())
-                        }))
                         .child(label.to_string())
                 })),
         );

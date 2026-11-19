@@ -389,19 +389,15 @@ pub fn display_device_name(d: &DeviceStateDto) -> String {
 /// Toggle settings for the quick-toggles list.
 /// Game mode first, then the design-target order, then alphabetical (App.tsx).
 pub fn quick_toggles(s: &SettingsMap) -> Vec<(String, bool)> {
+    // Dropped by request: windNoiseSuppression, realTimeAdaptiveNoiseCanceling.
+    const HIDDEN: &[&str] = &["windNoiseSuppression", "realTimeAdaptiveNoiseCanceling"];
     // UI-Target/controls_ui_redesign.svg row order.
-    const PREFERRED: &[&str] = &[
-        "windNoiseSuppression",
-        "realTimeAdaptiveNoiseCanceling",
-        "limitHighVolume",
-        "dualConnections",
-        "ldac",
-        "touchTone",
-    ];
+    const PREFERRED: &[&str] = &["limitHighVolume", "dualConnections", "ldac", "touchTone"];
     let mut toggles: Vec<(String, bool)> = s
         .iter()
         .filter(|(_, v)| v.get("type").and_then(Value::as_str) == Some("toggle"))
         .filter(|(id, _)| id.as_str() != "spatialAudio")
+        .filter(|(id, _)| !HIDDEN.contains(&id.as_str()))
         .map(|(id, v)| {
             let on = v.get("value").and_then(Value::as_bool).unwrap_or(false);
             (id.clone(), on)

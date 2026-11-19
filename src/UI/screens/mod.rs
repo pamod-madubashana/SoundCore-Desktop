@@ -1,9 +1,11 @@
 //! Shared chrome for screens + update prompt (App.tsx `UpdateNotice`).
 
+pub mod about;
 pub mod common;
 pub mod control;
 pub mod devices;
 pub mod searching;
+pub mod settings;
 pub mod sound_effects;
 
 use gpui::{Entity, IntoElement, ParentElement, Styled, div, prelude::*};
