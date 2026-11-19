@@ -1,7 +1,7 @@
 ; SoundCore-Desktop NSIS installer
 ; Run from repo root:
 ;   makensis -DVERSION=x.y.z packaging/windows/installer.nsi
-; Paths below are relative to the repo root (makensis cwd).
+; NSIS resolves relative paths against the script directory (packaging/windows/).
 !ifndef VERSION
   !error "VERSION define required: makensis -DVERSION=x.y.z packaging/windows/installer.nsi"
 !endif
@@ -13,15 +13,15 @@
 !define PRODUCT_UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME_NO_SPACE}"
 
 Name "${PRODUCT_NAME}"
-OutFile "packaging\windows\SoundCore-Desktop-x64-setup.exe"
+OutFile "SoundCore-Desktop-x64-setup.exe"
 InstallDir "$PROGRAMFILES64\${PRODUCT_NAME_NO_SPACE}"
 InstallDirRegKey HKLM "Software\${PRODUCT_NAME_NO_SPACE}" "InstallDir"
 RequestExecutionLevel admin
 Unicode True
 
 !define MUI_ABORTWARNING
-!define MUI_ICON "assets\icons\icon.ico"
-!define MUI_UNICON "assets\icons\icon.ico"
+!define MUI_ICON "..\..\assets\icons\icon.ico"
+!define MUI_UNICON "..\..\assets\icons\icon.ico"
 
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
@@ -35,8 +35,8 @@ Unicode True
 
 Section "Install"
   SetOutPath "$INSTDIR"
-  File "target\release\soundcore-desktop.exe"
-  File "assets\icons\icon.ico"
+  File "..\..\target\release\soundcore-desktop.exe"
+  File "..\..\assets\icons\icon.ico"
 
   WriteRegStr HKLM "Software\${PRODUCT_NAME_NO_SPACE}" "InstallDir" "$INSTDIR"
   WriteRegStr HKLM "${PRODUCT_UNINSTALL_KEY}" "DisplayName" "${PRODUCT_NAME}"
