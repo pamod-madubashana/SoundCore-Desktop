@@ -5,7 +5,7 @@
 <p>SoundCore-Desktop is a lightweight cross-platform tray app that keeps your Soundcore device settings at hand: it reads your device's current profile the moment it connects (never overwriting it), and puts live controls — gaming mode, ANC, and EQ — in the tray, no phone app needed.</p>
 
 
-  <a href="https://github.com/pamod-madubashana/SoundCore-Desktop"><img src="https://img.shields.io/badge/version-0.1.0-blue" alt="Version"></a>
+  <a href="https://github.com/pamod-madubashana/SoundCore-Desktop"><img src="https://img.shields.io/badge/version-1.8.0-blue" alt="Version"></a>
   <a href="https://github.com/pamod-madubashana/SoundCore-Desktop"><img src="https://img.shields.io/badge/Windows-supported-46A75A?logo=windows&logoColor=white" alt="Windows"></a>
   <a href="https://github.com/pamod-madubashana/SoundCore-Desktop"><img src="https://img.shields.io/badge/Linux-supported-46A75A?logo=linux&logoColor=white" alt="Linux"></a>
   <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/Built%20with-Rust-DEA584?logo=rust&logoColor=white" alt="Built with Rust"></a>
@@ -30,10 +30,10 @@
 ## Screenshots
 
 <div align="center">
-  <img src="assets/screenshots/control.png" width="200" alt="Control">
   <img src="assets/screenshots/devices.png" width="200" alt="Devices">
-  <img src="assets/screenshots/settings.png" width="200" alt="Settings">
+  <img src="assets/screenshots/control.png" width="200" alt="Control">
   <img src="assets/screenshots/about.png" width="200" alt="About">
+  <img src="assets/screenshots/settings.png" width="200" alt="Settings">
 </div>
 
 ## Tech Stack
