@@ -43,14 +43,20 @@ fn main() {
     println!("cargo:rerun-if-changed=assets/devices");
 
     // Windows exe/window icon: PE resource ID 1 (gpui `load_icon` reads this).
+    // Under `dx serve` the CLI injects its own winres .lib; linking both emits
+    // duplicate RT_ICON entries and fails rust-lld, so yield to dx there
+    // (Dioxus.toml [bundle] icon keeps our icon in dx builds).
     #[cfg(windows)]
     {
-        let icons_dir = Path::new(&manifest_dir).join("assets/icons");
-        let rc = icons_dir.join("app.rc");
-        if rc.is_file() {
-            println!("cargo:rerun-if-changed={}", rc.display());
-            println!("cargo:rerun-if-changed={}", icons_dir.join("icon.ico").display());
-            let _ = embed_resource::compile(&rc, embed_resource::ParamsIncludeDirs([icons_dir]));
+        println!("cargo:rerun-if-env-changed=DX_RUSTC");
+        if std::env::var_os("DX_RUSTC").is_none() {
+            let icons_dir = Path::new(&manifest_dir).join("assets/icons");
+            let rc = icons_dir.join("app.rc");
+            if rc.is_file() {
+                println!("cargo:rerun-if-changed={}", rc.display());
+                println!("cargo:rerun-if-changed={}", icons_dir.join("icon.ico").display());
+                let _ = embed_resource::compile(&rc, embed_resource::ParamsIncludeDirs([icons_dir]));
+            }
         }
     }
 }
