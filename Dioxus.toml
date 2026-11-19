@@ -1,0 +1,3 @@
+# Used by `dx serve --hot-patch` (GPUI live hot-reload). Normal cargo builds ignore this.
+[bundle]
+icon = ["assets/icons/icon.ico"]

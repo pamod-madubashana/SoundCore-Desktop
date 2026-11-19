@@ -1,7 +1,7 @@
 <div align='center'>
 <h1>SoundCore-Desktop</h1>
 
-<img src='src-tauri/icons/icon.png' width=200>
+<img src='assets/icon-1024.png' width=200>
 <p>SoundCore-Desktop is a lightweight cross-platform tray app that keeps your Soundcore device settings at hand: it reads your device's current profile the moment it connects (never overwriting it), and puts live controls — gaming mode, ANC, and EQ — in the tray, no phone app needed.</p>
 
 
@@ -31,10 +31,10 @@
 
 ## Tech Stack
 
-- Frontend: React + Vite
-- Styling: Tailwind CSS
-- Desktop runtime: Tauri (Rust)
-- Packaging: npm + Cargo
+- UI: GPUI (Rust)
+- Desktop runtime: Rust tray app
+- Device protocol: OpenSCQ30
+- Packaging: Cargo
 
 ## Why This Project Exists
 
@@ -47,43 +47,27 @@
 ```
 .
 ├── README.md
-├── package.json
 ├── config.toml
 ├── assets/
-│   └── ...
-├── soundcore-graphify/
-│   ├── GRAPH_REPORT.md
-│   ├── graph.html
-│   ├── graph.json
-│   ├── manifest.json
-│   └── cache/
-│       └── ...
-├── src-tauri/
-│   ├── Cargo.toml
-│   ├── config.toml
-│   ├── build.rs
-│   ├── tauri.conf.json
-│   ├── capabilities/
-│   │   └── default.json
-│   ├── gen/
-│   │   └── schemas/
-│   │       └── ...
-│   ├── icons/
+│   ├── devices/
 │   │   └── ...
-│   └── src/
-│       ├── autostart.rs
-│       ├── config.rs
-│       ├── lib.rs
-│       ├── main.rs
-│       └── worker.rs
-└── ui/
-    ├── index.html
-    ├── package.json
-    ├── vite.config.js
-    └── src/
-        ├── App.jsx
-        ├── index.css
-        └── main.jsx
+│   └── ...
+├── src/
+│   ├── main.rs
+│   ├── lib.rs
+│   ├── shell.rs
+│   ├── worker.rs
+│   ├── config.rs
+│   ├── autostart.rs
+│   └── UI/
+│       ├── mod.rs
+│       ├── theme.rs
+│       ├── data.rs
+│       └── screens/
+│           ├── control.rs
+│           ├── devices.rs
+│           └── ...
+└── OpenSCQ30/          # git submodule (Rust library)
 ```
 
 ## Key Features
@@ -98,32 +82,28 @@
 
 ### Prerequisites
 
-- Node.js 18+
 - Rust (latest stable)
 - Windows 10/11 or Linux
+- Git submodules (`--recurse-submodules`)
 
 ### Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/pamod-madubashana/SoundCore-Desktop.git
+git clone --recurse-submodules https://github.com/pamod-madubashana/SoundCore-Desktop.git
 
 # Navigate to project directory
 cd SoundCore-Desktop
 
-# Install root and UI dependencies
-npm install
-npm --prefix ui install
-
 # Run in development mode
-npm run tauri dev
+cargo run
 ```
 
 ### Building
 
 ```bash
-# Build production bundles
-npm run tauri build
+# Build production bundle
+cargo build --release
 ```
 
 ## Usage

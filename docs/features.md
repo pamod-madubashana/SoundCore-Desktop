@@ -26,8 +26,7 @@ When your Soundcore device reconnects, the app automatically applies your prefer
 
 ## Cross-platform architecture
 
-- Built with Tauri for native desktop packaging
-- React + Vite frontend for the tray UI
+- Built with GPUI for a native desktop tray UI
 - Rust backend for device handling and system integration
 
 ## OpenSCQ30-powered device support
