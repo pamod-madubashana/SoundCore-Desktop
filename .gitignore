@@ -19,8 +19,6 @@ UI-Target/
 # Local helper scripts
 tools/
 
-# Local prefs (device list, toggles) — never push
 config.toml
 
-# Agent tool config — never push
 opencode.json
