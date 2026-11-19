@@ -16,8 +16,6 @@
 <br>
 <div align="center">
 
-- Docs: [https://pamod.is-a.dev/SoundCore-Desktop](https://pamod.is-a.dev/SoundCore-Desktop)
-
 ## Downloads
 
 | Platform | Download Link |
@@ -27,6 +25,16 @@
 | Linux (DEB) | [SoundCore-Desktop-amd64.deb](https://github.com/pamod-madubashana/SoundCore-Desktop/releases/latest/download/SoundCore-Desktop-amd64.deb) |
 | Linux (RPM) | [SoundCore-Desktop-x86_64.rpm](https://github.com/pamod-madubashana/SoundCore-Desktop/releases/latest/download/SoundCore-Desktop-x86_64.rpm) |
 
+</div>
+
+## Screenshots
+
+<div align="center">
+  <img src="assets/screenshots/control.png" width="200" alt="Control">
+  <img src="assets/screenshots/devices.png" width="200" alt="Devices">
+  <img src="assets/screenshots/settings.png" width="200" alt="Settings">
+  <img src="assets/screenshots/about.png" width="200" alt="About">
+  <img src="assets/screenshots/sound-effects.png" width="200" alt="Sound Effects">
 </div>
 
 ## Tech Stack
