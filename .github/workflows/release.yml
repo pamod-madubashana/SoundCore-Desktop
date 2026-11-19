@@ -37,7 +37,8 @@ jobs:
             libwayland-dev \
             libasound2-dev \
             libxcb1-dev \
-            libx11-dev
+            libx11-dev \
+            rpm
 
       - name: Verify version consistency
         shell: bash
@@ -58,17 +59,138 @@ jobs:
       - name: Build release binary
         run: cargo build --release
 
-      - name: Prepare release assets
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          cargo_ver="$(sed -n -E 's/^version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' Cargo.toml | head -n1)"
+          echo "version=${cargo_ver#v}" >> "$GITHUB_OUTPUT"
+
+      # ---- Windows: portable exe + NSIS setup ----
+      - name: Prepare Windows assets
+        if: runner.os == 'Windows'
         shell: bash
         run: |
           set -e
           mkdir -p release-assets
-          if [ "${{ runner.os }}" = "Linux" ]; then
-            cp target/release/soundcore-desktop release-assets/SoundCore-Desktop-linux-x86_64
-          else
-            cp target/release/soundcore-desktop.exe release-assets/SoundCore-Desktop.exe
-          fi
+          cp target/release/soundcore-desktop.exe release-assets/SoundCore-Desktop.exe
+
+      - name: Install NSIS
+        if: runner.os == 'Windows'
+        shell: bash
+        run: choco install nsis -y --no-progress
+
+      - name: Build NSIS installer
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -e
+          export PATH="/c/Program Files (x86)/NSIS:$PATH"
+          command -v makensis
+          makensis -DVERSION=${{ steps.ver.outputs.version }} packaging/windows/installer.nsi
+          cp packaging/windows/SoundCore-Desktop-x64-setup.exe release-assets/SoundCore-Desktop-x64-setup.exe
           ls -lh release-assets/
+
+      # ---- Linux: deb + rpm ----
+      - name: Prepare Linux packages
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -e
+          VERSION="${{ steps.ver.outputs.version }}"
+          BIN=target/release/soundcore-desktop
+          STAGE=release-assets
+          mkdir -p "$STAGE"
+          chmod +x "$BIN"
+
+          # Shared package payload
+          PKGROOT=pkgroot
+          rm -rf "$PKGROOT"
+          mkdir -p \
+            "$PKGROOT/usr/bin" \
+            "$PKGROOT/usr/share/applications" \
+            "$PKGROOT/usr/share/icons/hicolor/256x256/apps" \
+            "$PKGROOT/usr/share/icons/hicolor/scalable/apps" \
+            "$PKGROOT/usr/share/doc/soundcore-desktop"
+
+          cp "$BIN" "$PKGROOT/usr/bin/soundcore-desktop"
+          cp packaging/linux/soundcore-desktop.desktop "$PKGROOT/usr/share/applications/"
+          cp assets/icons/icon.png "$PKGROOT/usr/share/icons/hicolor/256x256/apps/soundcore-desktop.png"
+          if [ -f assets/icon.svg ]; then
+            cp assets/icon.svg "$PKGROOT/usr/share/icons/hicolor/scalable/apps/soundcore-desktop.svg"
+          fi
+          cp README.md "$PKGROOT/usr/share/doc/soundcore-desktop/README.md"
+
+          # ---- DEB ----
+          DEBROOT=debroot
+          rm -rf "$DEBROOT"
+          mkdir -p "$DEBROOT/DEBIAN"
+          cp -a "$PKGROOT/." "$DEBROOT/"
+          printf '%s\n' \
+            "Package: soundcore-desktop" \
+            "Version: $VERSION" \
+            "Section: utils" \
+            "Priority: optional" \
+            "Architecture: amd64" \
+            "Maintainer: pamod-madubashana <contact@pamod.is-a.dev>" \
+            "Description: Soundcore device tray controller" \
+            " Native desktop tray app that mirrors Soundcore earbud settings" \
+            " (gaming mode, ANC, EQ) — fetch-only on connect, live controls" \
+            " from the tray." \
+            "Depends: libgtk-3-0, libasound2t64 | libasound2, libxcb1, libx11-6, libxkbcommon0, libwayland-client0" \
+            > "$DEBROOT/DEBIAN/control"
+          find "$DEBROOT" -type f -exec chmod 644 {} +
+          chmod 755 "$DEBROOT/usr/bin/soundcore-desktop"
+          dpkg-deb --build --root-owner-group "$DEBROOT" "$STAGE/SoundCore-Desktop-amd64.deb"
+
+          # ---- RPM ----
+          RPMBUILD=rpmbuild
+          rm -rf "$RPMBUILD"
+          mkdir -p "$RPMBUILD"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          SPEC="$RPMBUILD/SPECS/soundcore-desktop.spec"
+          {
+            echo "Name:           soundcore-desktop"
+            echo "Version:        $VERSION"
+            echo "Release:        1%{?dist}"
+            echo "Summary:        Soundcore device tray controller"
+            echo "License:        MIT"
+            echo "URL:            https://github.com/pamod-madubashana/SoundCore-Desktop"
+            echo "Source0:        %{name}-%{version}.tar.gz"
+            echo "BuildArch:      x86_64"
+            echo "Requires:       gtk3 alsa-lib libxcb libxkbcommon"
+            echo
+            echo "%description"
+            echo "Native desktop tray app that mirrors Soundcore earbud settings"
+            echo "(gaming mode, ANC, EQ) — fetch-only on connect, live controls"
+            echo "from the tray."
+            echo
+            echo "%prep"
+            echo "%setup -c -n %{name}-%{version}"
+            echo
+            echo "%build"
+            echo
+            echo "%install"
+            echo "mkdir -p %{buildroot}"
+            echo "cp -a pkgroot/. %{buildroot}/"
+            echo
+            echo "%files"
+            echo "/usr/bin/soundcore-desktop"
+            echo "/usr/share/applications/soundcore-desktop.desktop"
+            echo "/usr/share/icons/hicolor/256x256/apps/soundcore-desktop.png"
+            echo "/usr/share/doc/soundcore-desktop/README.md"
+            echo
+            echo "%changelog"
+            echo "* $(date '+%a %b %d %Y') pamod-madubashana <contact@pamod.is-a.dev> - $VERSION-1"
+            echo "- Release $VERSION"
+          } > "$SPEC"
+
+          tar -C . -czf "$RPMBUILD/SOURCES/soundcore-desktop-$VERSION.tar.gz" pkgroot
+          rpmbuild -bb \
+            --define "_topdir $PWD/$RPMBUILD" \
+            --define "_build_name_fmt %%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm" \
+            "$SPEC"
+          find "$RPMBUILD/RPMS" -name '*.rpm' -exec cp {} "$STAGE/SoundCore-Desktop-x86_64.rpm" \;
+          ls -lh "$STAGE/"
 
       - name: Upload bundle artifact
         uses: actions/upload-artifact@v4
@@ -113,14 +235,23 @@ jobs:
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
+      - name: Flatten artifacts
+        shell: bash
+        run: |
+          set -e
+          mkdir -p flat
+          find release-assets -type f -exec cp -v {} flat/ \;
+          ls -lh flat/
+
       - name: Create release and upload assets
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ steps.tag.outputs.tag }}
           name: Release ${{ steps.tag.outputs.tag }}
-          artifacts: "release-assets/**/*"
+          artifacts: "flat/*"
           generateReleaseNotes: true
           allowUpdates: true
+          omitBodyDuringUpdate: true
           draft: false
           prerelease: false
           token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=SoundCore Desktop
+GenericName=Soundcore Device Manager
+Comment=Control Soundcore earbuds from the desktop tray
+Exec=soundcore-desktop
+Icon=soundcore-desktop
+Terminal=false
+Categories=Utility;Settings;Audio;HardwareSettings;
+Keywords=soundcore;earbuds;headphones;bluetooth;anc;eq;
+StartupNotify=false
