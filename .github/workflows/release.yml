@@ -38,7 +38,8 @@ jobs:
             libasound2-dev \
             libxcb1-dev \
             libx11-dev \
-            rpm
+            rpm \
+            elfutils
 
       - name: Verify version consistency
         shell: bash
@@ -177,6 +178,7 @@ jobs:
             echo "/usr/bin/soundcore-desktop"
             echo "/usr/share/applications/soundcore-desktop.desktop"
             echo "/usr/share/icons/hicolor/256x256/apps/soundcore-desktop.png"
+            echo "/usr/share/icons/hicolor/scalable/apps/soundcore-desktop.svg"
             echo "/usr/share/doc/soundcore-desktop/README.md"
             echo
             echo "%changelog"
@@ -187,6 +189,7 @@ jobs:
           tar -C . -czf "$RPMBUILD/SOURCES/soundcore-desktop-$VERSION.tar.gz" pkgroot
           rpmbuild -bb \
             --define "_topdir $PWD/$RPMBUILD" \
+            --define "debug_package %{nil}" \
             --define "_build_name_fmt %%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm" \
             "$SPEC"
           find "$RPMBUILD/RPMS" -name '*.rpm' -exec cp {} "$STAGE/SoundCore-Desktop-x86_64.rpm" \;
