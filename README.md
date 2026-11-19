@@ -34,7 +34,6 @@
   <img src="assets/screenshots/devices.png" width="200" alt="Devices">
   <img src="assets/screenshots/settings.png" width="200" alt="Settings">
   <img src="assets/screenshots/about.png" width="200" alt="About">
-  <img src="assets/screenshots/sound-effects.png" width="200" alt="Sound Effects">
 </div>
 
 ## Tech Stack
