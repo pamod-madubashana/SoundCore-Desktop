@@ -21,11 +21,20 @@ pub struct Config {
     /// Custom equalizer presets (global + per-device).
     #[serde(default)]
     pub eq_presets: Vec<EqPresetEntry>,
+    /// Windows toast notifications on device connect/disconnect.
+    #[serde(default = "default_true")]
+    pub notify_connect: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Self { autostart: true, devices: Vec::new(), update_restart: false, eq_presets: Vec::new() }
+        Self {
+            autostart: true,
+            devices: Vec::new(),
+            update_restart: false,
+            eq_presets: Vec::new(),
+            notify_connect: true,
+        }
     }
 }
 
