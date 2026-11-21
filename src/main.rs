@@ -46,6 +46,90 @@ use tray_icon::{
 };
 use services::worker::{Command, WorkerHandle};
 
+#[cfg(windows)]
+fn fix_redirect_thunks() {
+    use std::ffi::c_void;
+
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn VirtualProtect(
+            lpaddress: *mut c_void,
+            dwsize: usize,
+            flnewprotect: u32,
+            lpfloldprotect: *mut u32,
+        ) -> i32;
+        fn GetModuleHandleW(lpmodulename: *const u16) -> *mut c_void;
+        fn GetModuleHandleExW(
+            dwflags: u32,
+            lpmodulename: *const c_void,
+            phmodule: *mut *mut c_void,
+        ) -> i32;
+    }
+
+    const PAGE_EXECUTE_READWRITE: u32 = 0x40;
+    const FROM_ADDRESS: u32 = 0x4;
+    const UNCHANGED_REFCOUNT: u32 = 0x2;
+
+    unsafe fn image_size(base: *const c_void) -> u64 {
+        unsafe {
+            let b = base as *const u8;
+            if std::ptr::read_unaligned(b) != b'M' || std::ptr::read_unaligned(b.add(1)) != b'Z' {
+                return 0;
+            }
+            let e_lfanew = std::ptr::read_unaligned(b.add(0x3c).cast::<u32>()) as usize;
+            let opt = b.add(e_lfanew + 4 + 20);
+            std::ptr::read_unaligned(opt.add(56).cast::<u32>()) as u64
+        }
+    }
+
+    let jt = match unsafe { gpui::subsecond::get_jump_table() } {
+        Some(jt) => jt,
+        None => return,
+    };
+    let dll_addr = jt.map.values().next().copied().unwrap_or(0) as *const c_void;
+    let mut dll_mod = std::ptr::null_mut();
+    let exe_mod = unsafe { GetModuleHandleW(std::ptr::null()) };
+    let ok = unsafe { GetModuleHandleExW(FROM_ADDRESS | UNCHANGED_REFCOUNT, dll_addr, &mut dll_mod) } != 0;
+    if !ok || dll_mod.is_null() || exe_mod.is_null() {
+        tracing::warn!("hotreload: could not resolve patch DLL / EXE modules");
+        return;
+    }
+
+    let dll_lo = dll_mod as u64;
+    let dll_hi = dll_lo.wrapping_add(unsafe { image_size(dll_mod) });
+    let exe_lo = exe_mod as u64;
+    let exe_hi = exe_lo.wrapping_add(unsafe { image_size(exe_mod) });
+
+    let mut fixed = 0usize;
+    let mut p = dll_lo;
+    while p + 12 <= dll_hi {
+        let bytes = unsafe { std::slice::from_raw_parts(p as *const u8, 12) };
+        // mov rax, imm64 (48 b8 ..) ; jmp rax (ff e0)
+        if bytes[0] == 0x48 && bytes[1] == 0xb8 && bytes[10] == 0xff && bytes[11] == 0xe0 {
+            let target = u64::from_le_bytes(bytes[2..10].try_into().unwrap());
+            if (exe_lo..exe_hi).contains(&target) {
+                let mut old_prot = 0u32;
+                if unsafe { VirtualProtect(p as *mut c_void, 14, PAGE_EXECUTE_READWRITE, &mut old_prot) } != 0 {
+                    let t = target.to_le_bytes();
+                    // mov r11, imm64 ; jmp r11  (+NOP)
+                    let patch: [u8; 14] = [
+                        0x49, 0xbb, t[0], t[1], t[2], t[3], t[4], t[5], t[6], t[7], 0x41, 0xff,
+                        0xe3, 0x90,
+                    ];
+                    unsafe {
+                        std::ptr::copy_nonoverlapping(patch.as_ptr(), p as *mut u8, patch.len());
+                        let mut tmp = 0u32;
+                        VirtualProtect(p as *mut c_void, 14, old_prot, &mut tmp);
+                    }
+                    fixed += 1;
+                }
+            }
+        }
+        p += 1;
+    }
+    tracing::info!("hotreload: fixed {fixed} redirect thunks");
+}
+
 // ---- shared app state ----
 
 pub struct AppState {
@@ -447,7 +531,7 @@ pub fn show_window_now(cx: &mut App) {
 
     // Position off-screen below + show (one main-thread update).
     // Topmost/bottom-right run once in finish_show after the show
-    // animation Ã¢â‚¬â€ doing them here too re-enters GPUI's window RefCell
+    // animation â€” doing them here too re-enters GPUI's window RefCell
     // via activate_window().
     let prepared = h.update(cx, |view, window, cx| {
         let (target_x, target_y) = shell::position_bottom_right(window)
@@ -760,7 +844,7 @@ fn open_main_window(cx: &mut App) -> gpui::Result<gpui::WindowHandle<ui::RootVie
         |window, cx| {
             // Match React: html 14.5px rem root * popup zoom 0.9.
             window.set_rem_size(ui::scale::rem_base());
-            // No DWM border/shadow/corner Ã¢â‚¬â€ PNG mask owns the rounded shape.
+            // No DWM border/shadow/corner â€” PNG mask owns the rounded shape.
             shell::remove_dwm_border(window);
             let view = cx.new(|cx| ui::RootView::new(cx));
             // Focus-loss auto-hide (matches Tauri Focused(false) + 100ms delay).
@@ -867,6 +951,17 @@ fn spawn_auto_detect(cx: &App) {
 
 pub fn run() {
     init_logging();
+
+    // Fix a subsecond/dx bug on Windows x64 that crashes the app on every hot patch.
+    // The patch DLL's redirect thunks for unchanged functions are `mov rax, <addr>; jmp rax`.
+    // Clobbering RAX breaks `_chkstk`, which takes the stack-probe size in RAX, so patched
+    // code with a large stack frame probes far past the guard page and overflows the stack.
+    // Rewrite each such thunk to `mov r11, <addr>; jmp r11` (R11 is volatile and preserved by
+    // `_chkstk` itself), leaving RAX intact.
+    gpui::subsecond::register_handler(std::sync::Arc::new(|| {
+        #[cfg(windows)]
+        fix_redirect_thunks();
+    }));
 
     let config_path = config::resolve_path(None);
     let config = Config::load(&config_path).unwrap_or_else(|err| {
