@@ -1,10 +1,11 @@
 //! App Settings screen — general preferences (header 3-dots → Settings).
 
-use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, prelude::*};
 use crate::ui::scale::px;
+use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, prelude::*};
 
 use super::common::{chevron_left, chevron_right};
 use crate::config::Config;
+use crate::ui::animation::toggle_switch;
 use crate::ui::{RootView, theme};
 
 pub fn render(
@@ -17,7 +18,9 @@ pub fn render(
     let cfg = crate::get_config(crate::state());
 
     let general = vec![
-        toggle_row(&view, "Start at login", cfg.autostart, |c, v| c.autostart = v),
+        toggle_row(&view, "Start at login", cfg.autostart, |c, v| {
+            c.autostart = v
+        }),
         toggle_row(
             &view,
             "Connection notifications",
@@ -95,10 +98,7 @@ fn header_btn(
         .flex()
         .items_center()
         .justify_center()
-        .hover(|st| {
-            st.text_color(theme::foreground())
-                .bg(theme::hover_medium())
-        })
+        .hover(|st| st.text_color(theme::foreground()).bg(theme::hover_medium()))
         .cursor_pointer()
         .on_click(move |_, _window, cx| {
             view.update(cx, |root, cx| on(root, cx));
@@ -141,6 +141,7 @@ fn toggle_row(
     set: fn(&mut Config, bool),
 ) -> impl IntoElement + Styled {
     let label = label.to_string();
+    let spring_key = format!("settings-{label}");
     let view = view.clone();
     div()
         .id(gpui::SharedString::from(format!("toggle-{label}")))
@@ -171,7 +172,7 @@ fn toggle_row(
                 .text_color(theme::foreground())
                 .child(label),
         )
-        .child(switch(on))
+        .child(toggle_switch(on, spring_key))
 }
 
 fn action_row(label: &str, target: &str) -> impl IntoElement + Styled {
@@ -200,23 +201,4 @@ fn action_row(label: &str, target: &str) -> impl IntoElement + Styled {
                 .child(label.to_string()),
         )
         .child(chevron_right(16., theme::muted()))
-}
-
-fn switch(on: bool) -> gpui::Div {
-    div()
-        .w(px(32.))
-        .h(px(18.))
-        .rounded_full()
-        .bg(if on { theme::brand() } else { theme::toggle_off() })
-        .flex_shrink_0()
-        .relative()
-        .child(
-            div()
-                .absolute()
-                .top(px(2.))
-                .left(if on { px(16.) } else { px(2.) })
-                .size(px(14.))
-                .rounded_full()
-                .bg(theme::toggle_thumb()),
-        )
 }

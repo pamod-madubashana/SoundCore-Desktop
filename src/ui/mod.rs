@@ -3,6 +3,7 @@
 //! Screen routing:
 //!   connected device → Control; devices known → MyDevices; else Searching.
 
+pub mod animation;
 pub mod background;
 pub mod data;
 pub mod scale;
@@ -12,10 +13,10 @@ pub mod theme;
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
+use self::scale::px;
 use gpui::{
     App, Context, IntoElement, ParentElement, Render, Styled, Task, Window, div, prelude::*,
 };
-use self::scale::px;
 
 use crate::{
     DeviceStateDto, EqPresetDto, ScanDto, UpdateInfo, UpdateProgress, get_scan, get_states,
@@ -54,6 +55,11 @@ pub struct RootView {
     pub(crate) spatial_local: Option<(String, String, std::time::Instant)>,
     /// Last built-in preset id seen, so re-selecting Default restores it.
     pub(crate) last_preset_id: Option<String>,
+    /// Screen-switch transition: current screen key and spring state (0..1 phase).
+    nav_screen: &'static str,
+    nav_phase: f32,
+    nav_velocity: f32,
+    nav_id: u64,
     _states_task: Task<()>,
     _bt_task: Task<()>,
     _update_task: Task<()>,
@@ -179,18 +185,22 @@ impl RootView {
             scanning: false,
             version,
             eq_presets: Vec::new(),
-        show_sound_effects: false,
-        show_equalizer: false,
-        show_settings: false,
-        show_about: false,
-        spinner_tick: 0,
-        ambient_local: None,
-        sub_local: None,
-        sub_local_at: None,
-        toggle_local: HashMap::new(),
-        se_local: None,
-        spatial_local: None,
-        last_preset_id: None,
+            show_sound_effects: false,
+            show_equalizer: false,
+            show_settings: false,
+            show_about: false,
+            spinner_tick: 0,
+            ambient_local: None,
+            sub_local: None,
+            sub_local_at: None,
+            toggle_local: HashMap::new(),
+            se_local: None,
+            spatial_local: None,
+            last_preset_id: None,
+            nav_screen: "",
+            nav_phase: 1.0,
+            nav_velocity: 0.0,
+            nav_id: 0,
             _states_task: states_task,
             _bt_task: bt_task,
             _update_task: update_task,
@@ -274,9 +284,7 @@ impl RootView {
                 .active_device()
                 .map(|d| data::derive_active_section(&data::settings_map(d)))
                 .unwrap_or_default();
-            if device_section == section
-                || at.elapsed() >= std::time::Duration::from_millis(2000)
-            {
+            if device_section == section || at.elapsed() >= std::time::Duration::from_millis(2000) {
                 self.se_local = None;
             }
         }
@@ -333,10 +341,12 @@ impl RootView {
             self.send_setting(&mac, "spatialAudio", "true");
         } else if section == data::SECTION_DEFAULT {
             let s = self.settings_for(&mac);
-            let id = self
-                .last_preset_id
-                .clone()
-                .or_else(|| data::preset_options(&s).into_iter().next().map(|(id, _)| id));
+            let id = self.last_preset_id.clone().or_else(|| {
+                data::preset_options(&s)
+                    .into_iter()
+                    .next()
+                    .map(|(id, _)| id)
+            });
             let Some(id) = id else { return };
             self.send_setting(&mac, "presetEqualizerProfile", &id);
         } else if section == data::SECTION_CUSTOM {
@@ -484,10 +494,7 @@ impl RootView {
         // zoom 0.9 × ~2 DPI ≈ 120). DX samples bilinear without mips, so a
         // large minification aliases (R60i speculars looked pixelated).
         let bytes = downscale_png(bytes, 120);
-        let img = std::sync::Arc::new(gpui::Image::from_bytes(
-            gpui::ImageFormat::Png,
-            bytes,
-        ));
+        let img = std::sync::Arc::new(gpui::Image::from_bytes(gpui::ImageFormat::Png, bytes));
         device_image_cache()
             .lock()
             .unwrap()
@@ -518,13 +525,52 @@ fn downscale_png(bytes: Vec<u8>, max: u32) -> Vec<u8> {
     let img = img.resize(max, max, image::imageops::FilterType::Lanczos3);
     let mut out = Vec::new();
     let mut cursor = std::io::Cursor::new(&mut out);
-    if img
-        .write_to(&mut cursor, image::ImageFormat::Png)
-        .is_err()
-    {
+    if img.write_to(&mut cursor, image::ImageFormat::Png).is_err() {
         return bytes;
     }
     out
+}
+
+impl RootView {
+    /// Detect a screen change and drive a spring phase 0 -> 1 for a fade+slide entrance.
+    fn update_nav_animation(&mut self, key: &'static str, cx: &mut Context<Self>) {
+        const NAV_SPRING: gpui::SpringConfig = gpui::SpringConfig::new(210.0, 26.0, 1.0);
+        if self.nav_screen == key {
+            return;
+        }
+        self.nav_screen = key;
+        self.nav_phase = 0.0;
+        self.nav_velocity = 0.0;
+        self.nav_id = self.nav_id.wrapping_add(1);
+        let nav_id = self.nav_id;
+        cx.spawn(async move |this, cx| {
+            loop {
+                cx.background_executor()
+                    .timer(Duration::from_millis(16))
+                    .await;
+                let done = this
+                    .update(&mut *cx, |view, cx| {
+                        if view.nav_id != nav_id {
+                            return true;
+                        }
+                        let state = gpui::SpringState {
+                            position: view.nav_phase,
+                            velocity: view.nav_velocity,
+                        };
+                        let next = NAV_SPRING.step(state, 1.0, 1.0 / 60.0);
+                        view.nav_phase = next.position;
+                        view.nav_velocity = next.velocity;
+                        cx.notify();
+                        NAV_SPRING.is_settled(next, 1.0, 0.001)
+                    })
+                    .unwrap_or(true);
+                if done {
+                    break;
+                }
+            }
+        })
+        .detach();
+    }
 }
 
 impl Render for RootView {
@@ -533,7 +579,9 @@ impl Render for RootView {
         if self.devices.is_empty() {
             let tick = self.spinner_tick;
             let spinner_task: Task<()> = cx.spawn(async move |this, cx| {
-                cx.background_executor().timer(Duration::from_millis(80)).await;
+                cx.background_executor()
+                    .timer(Duration::from_millis(80))
+                    .await;
                 this.update(&mut *cx, |view, cx| {
                     if view.devices.is_empty() {
                         view.spinner_tick = tick.wrapping_add(1);
@@ -549,9 +597,24 @@ impl Render for RootView {
         // Render-time exclusivity: About > Settings > Sound Effects.
         let show_about = self.show_about;
         let show_settings = self.show_settings && !show_about;
-        let show_se =
-            self.show_sound_effects && active.is_some() && !show_settings && !show_about;
+        let show_se = self.show_sound_effects && active.is_some() && !show_settings && !show_about;
         let overlay = show_se || show_settings || show_about;
+
+        let nav_key = if show_about {
+            "about"
+        } else if show_settings {
+            "settings"
+        } else if show_se {
+            "sound-effects"
+        } else if active.is_some() {
+            "control"
+        } else if self.devices.is_empty() {
+            "searching"
+        } else {
+            "devices"
+        };
+        self.update_nav_animation(nav_key, cx);
+        let nav_phase = self.nav_phase.clamp(0.0, 1.0);
 
         // Root IS the glass: baked PNG (gradient+glows+sheen+stroke) masked
         // to rx=28. HWND stays a full transparent host; alpha defines shape.
@@ -588,6 +651,8 @@ impl Render for RootView {
                     .flex()
                     .flex_col()
                     .overflow_hidden()
+                    .opacity(nav_phase)
+                    .left(px((1.0 - nav_phase) * 12.0))
                     .when(active.is_some() && !overlay, |el| {
                         el.child(screens::control::render(
                             self,
