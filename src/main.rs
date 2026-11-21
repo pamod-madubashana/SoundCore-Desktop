@@ -599,10 +599,13 @@ pub fn quit_app(cx: &mut App) {
 // ---- updater ----
 
 pub fn check_update(state: &AppState) -> Result<updater::UpdateInfo, String> {
+    if cfg!(not(windows)) {
+        return Err("No update available".to_string());
+    }
     state.runtime.block_on(updater::check_for_update())
 }
 
-pub fn start_update(state: &AppState) -> Result<(), String> {
+pub fn start_update(state: &std::sync::Arc<AppState>) -> Result<(), String> {
     let info = state.runtime.block_on(updater::check_for_update())?;
     let current = semver::Version::parse(
         info.current_version
@@ -624,13 +627,24 @@ pub fn start_update(state: &AppState) -> Result<(), String> {
         ));
     }
 
-    // Progress is written into AppState so the UI can poll it.
-    // SAFETY: `state` outlives this synchronous call (process-lifetime STATE
-    // or a caller-held Arc).
-    let st = state as *const AppState;
+    let st = state.clone();
     let on_progress = move |p: updater::UpdateProgress| {
-        *unsafe { &*st }.update_progress.lock().unwrap() = Some(p);
+        *st.update_progress.lock().unwrap() = Some(p);
     };
+
+    if updater::needs_elevated_installer() {
+        let installer_path = state
+            .runtime
+            .block_on(updater::download_installer(&info, &on_progress))?;
+        on_progress(updater::UpdateProgress {
+            phase: "restarting".to_string(),
+            percent: 100.0,
+            message: "Launching installer...".to_string(),
+        });
+        updater::launch_installer_elevated(&installer_path)?;
+        std::process::exit(0);
+    }
+
     let download_path = state
         .runtime
         .block_on(updater::download_update(&info, &on_progress))?;
@@ -642,7 +656,9 @@ pub fn is_update_restart(_state: &AppState) -> bool {
     let mut cfg = config::load();
     if cfg.update_restart {
         cfg.update_restart = false;
-        let _ = config::save(&cfg);
+        if let Err(err) = config::save(&cfg) {
+            tracing::warn!("failed to clear update_restart flag: {err}");
+        }
         true
     } else {
         false
@@ -1020,6 +1036,9 @@ pub fn run() {
         runtime,
     });
     let _ = STATE.set(state);
+    if is_update_restart(crate::state()) {
+        tracing::info!("update applied successfully");
+    }
 
     updater::cleanup_old_exe();
 

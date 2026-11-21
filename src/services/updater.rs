@@ -2,10 +2,14 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-
+use std::time::Duration;
 
 const REPO: &str = "pamod-madubashana/SoundCore-Desktop";
 const ASSET_NAME: &str = "SoundCore-Desktop.exe";
+const INSTALLER_ASSET_NAME: &str = "SoundCore-Desktop-x64-setup.exe";
+const API_URL_ENV: &str = "SOUNDCORE_UPDATE_API_URL";
+const CLIENT_TIMEOUT: Duration = Duration::from_secs(30);
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Clone, serde::Serialize)]
 pub struct UpdateInfo {
@@ -14,6 +18,9 @@ pub struct UpdateInfo {
     pub download_url: String,
     pub digest: String,
     pub size: u64,
+    pub installer_url: String,
+    pub installer_digest: String,
+    pub installer_size: u64,
 }
 
 #[derive(Clone, PartialEq, serde::Serialize)]
@@ -49,26 +56,51 @@ fn ensure_newer(current_str: &str, latest_str: &str) -> Result<(), String> {
 }
 
 fn get_updates_dir() -> Result<PathBuf, String> {
-    let local_app_data = std::env::var("LOCALAPPDATA").map_err(|e| e.to_string())?;
-    let dir = PathBuf::from(local_app_data)
-        .join("SoundCore-Desktop")
-        .join("updates");
+    let base = dirs::data_local_dir().unwrap_or_else(std::env::temp_dir);
+    let dir = base.join("SoundCore-Desktop").join("updates");
     fs::create_dir_all(&dir).map_err(|e| format!("Failed to create updates dir: {e}"))?;
     Ok(dir)
 }
 
-fn get_exe_dir() -> Result<PathBuf, String> {
-    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-    Ok(exe.parent().unwrap_or(Path::new(".")).to_path_buf())
+fn exe_paths(current_exe: &Path) -> (PathBuf, PathBuf) {
+    let name = current_exe
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "soundcore-desktop.exe".to_string());
+    (
+        current_exe.with_file_name(format!("{name}.old")),
+        current_exe.with_file_name(format!("{name}.update")),
+    )
+}
+
+fn exe_dir_is_writable(dir: &Path) -> bool {
+    let probe = dir.join(format!(".soundcore-write-{}", std::process::id()));
+    let _ = fs::remove_file(&probe);
+    match fs::OpenOptions::new().write(true).create_new(true).open(&probe) {
+        Ok(file) => {
+            drop(file);
+            let _ = fs::remove_file(&probe);
+            true
+        }
+        Err(_) => false,
+    }
+}
+
+pub fn needs_elevated_installer() -> bool {
+    match std::env::current_exe() {
+        Ok(exe) => exe
+            .parent()
+            .map(|dir| !exe_dir_is_writable(dir))
+            .unwrap_or(true),
+        Err(_) => true,
+    }
 }
 
 pub fn cleanup_old_exe() {
     if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            let old = dir.join(format!("{ASSET_NAME}.old"));
-            if old.exists() {
-                let _ = fs::remove_file(&old);
-            }
+        let (old_exe, _) = exe_paths(&exe);
+        if old_exe.exists() {
+            let _ = fs::remove_file(&old_exe);
         }
     }
 }
@@ -79,8 +111,18 @@ fn build_client() -> Result<reqwest::Client, String> {
         .no_gzip()
         .no_brotli()
         .no_deflate()
+        .timeout(CLIENT_TIMEOUT)
+        .connect_timeout(CONNECT_TIMEOUT)
         .build()
         .map_err(|e| e.to_string())
+}
+
+fn asset_fields(assets: &[serde_json::Value], name: &str) -> Option<(String, String, u64)> {
+    let asset = assets.iter().find(|a| a["name"].as_str() == Some(name))?;
+    let url = asset["browser_download_url"].as_str()?.to_string();
+    let digest = asset["digest"].as_str().unwrap_or("").to_string();
+    let size = asset["size"].as_u64().unwrap_or(0);
+    Some((url, digest, size))
 }
 
 pub async fn check_for_update() -> Result<UpdateInfo, String> {
@@ -88,7 +130,8 @@ pub async fn check_for_update() -> Result<UpdateInfo, String> {
     let current_version = parse_version(&current_version_str)
         .ok_or_else(|| format!("Invalid current version: {current_version_str}"))?;
 
-    let url = format!("https://api.github.com/repos/{REPO}/releases/latest");
+    let url = std::env::var(API_URL_ENV)
+        .unwrap_or_else(|_| format!("https://api.github.com/repos/{REPO}/releases/latest"));
     let client = build_client()?;
 
     let response = client
@@ -118,22 +161,10 @@ pub async fn check_for_update() -> Result<UpdateInfo, String> {
         .as_array()
         .ok_or("Missing assets in release")?;
 
-    let asset = assets
-        .iter()
-        .find(|a| a["name"].as_str() == Some(ASSET_NAME))
+    let (download_url, digest, size) = asset_fields(assets, ASSET_NAME)
         .ok_or_else(|| format!("{ASSET_NAME} not found in release assets"))?;
-
-    let download_url = asset["browser_download_url"]
-        .as_str()
-        .ok_or("Missing download URL")?
-        .to_string();
-
-    let digest = asset["digest"]
-        .as_str()
-        .unwrap_or("")
-        .to_string();
-
-    let size = asset["size"].as_u64().unwrap_or(0);
+    let (installer_url, installer_digest, installer_size) = asset_fields(assets, INSTALLER_ASSET_NAME)
+        .ok_or_else(|| format!("{INSTALLER_ASSET_NAME} not found in release assets"))?;
 
     Ok(UpdateInfo {
         current_version: current_version_str,
@@ -141,12 +172,15 @@ pub async fn check_for_update() -> Result<UpdateInfo, String> {
         download_url,
         digest,
         size,
+        installer_url,
+        installer_digest,
+        installer_size,
     })
 }
 
-fn verify_sha256(file_path: &Path, expected_digest: &str) -> Result<bool, String> {
+fn verify_sha256(file_path: &Path, expected_digest: &str) -> Result<(), String> {
     if expected_digest.is_empty() {
-        return Ok(true);
+        return Ok(());
     }
 
     let expected = expected_digest
@@ -156,8 +190,7 @@ fn verify_sha256(file_path: &Path, expected_digest: &str) -> Result<bool, String
     let bytes = fs::read(file_path).map_err(|e| e.to_string())?;
     let mut hasher = Sha256::new();
     hasher.update(&bytes);
-    let result = hasher.finalize();
-    let actual = format!("{:x}", result);
+    let actual = format!("{:x}", hasher.finalize());
 
     if !actual.eq_ignore_ascii_case(expected) {
         return Err(format!(
@@ -166,86 +199,129 @@ fn verify_sha256(file_path: &Path, expected_digest: &str) -> Result<bool, String
         ));
     }
 
-    Ok(true)
+    Ok(())
 }
 
-pub async fn download_update(info: &UpdateInfo, progress: &dyn Fn(UpdateProgress)) -> Result<PathBuf, String> {
+async fn download_asset(
+    url: &str,
+    digest: &str,
+    size: u64,
+    file_name: &str,
+    label: &str,
+    progress: &dyn Fn(UpdateProgress),
+) -> Result<PathBuf, String> {
     let updates_dir = get_updates_dir()?;
-    let download_path = updates_dir.join(format!("{ASSET_NAME}.download"));
+    let download_path = updates_dir.join(format!("{file_name}.download"));
 
     if download_path.exists() {
         fs::remove_file(&download_path).map_err(|e| e.to_string())?;
     }
 
     progress(UpdateProgress {
-            phase: "downloading".to_string(),
-            percent: 0.0,
-            message: "Starting download...".to_string(),
-        },
-    );
+        phase: "downloading".to_string(),
+        percent: 0.0,
+        message: format!("Starting {label} download..."),
+    });
 
     let client = build_client()?;
-
     let response = client
-        .get(&info.download_url)
+        .get(url)
         .header("Accept", "application/octet-stream")
         .send()
         .await
-        .map_err(|e| format!("Failed to start download: {e}"))?;
+        .map_err(|e| format!("Failed to start {label} download: {e}"))?;
 
     if !response.status().is_success() {
-        return Err(format!("Download failed with status: {}", response.status()));
+        return Err(format!("{label} download failed with status: {}", response.status()));
     }
 
-    let total_size = info.size;
     let mut downloaded: u64 = 0;
     let mut file = fs::File::create(&download_path).map_err(|e| e.to_string())?;
-
-    use std::io::Write;
     let mut stream = response;
     let mut last_emit = std::time::Instant::now();
 
+    use std::io::Write;
     while let Some(chunk) = stream.chunk().await.map_err(|e| format!("Download error: {e}"))? {
         file.write_all(&chunk).map_err(|e| e.to_string())?;
         downloaded += chunk.len() as u64;
 
-        if total_size > 0 && last_emit.elapsed().as_millis() > 200 {
-            let percent = (downloaded as f64 / total_size as f64) * 100.0;
+        if size > 0 && last_emit.elapsed().as_millis() > 200 {
+            let percent = (downloaded as f64 / size as f64) * 100.0;
             progress(UpdateProgress {
-                    phase: "downloading".to_string(),
-                    percent,
-                    message: format!("Downloading... {percent:.0}%"),
-                },
-            );
+                phase: "downloading".to_string(),
+                percent,
+                message: format!("Downloading {label}... {percent:.0}%"),
+            });
             last_emit = std::time::Instant::now();
         }
     }
 
     file.flush().map_err(|e| e.to_string())?;
+    file.sync_all().map_err(|e| e.to_string())?;
     drop(file);
 
     progress(UpdateProgress {
-            phase: "verifying".to_string(),
-            percent: 100.0,
-            message: "Verifying download...".to_string(),
-        },
-    );
+        phase: "verifying".to_string(),
+        percent: 100.0,
+        message: format!("Verifying {label}..."),
+    });
 
-    if !verify_sha256(&download_path, &info.digest)? {
-        let _ = fs::remove_file(&download_path);
-        return Err("SHA-256 verification failed".to_string());
-    }
-
+    verify_sha256(&download_path, digest)?;
     Ok(download_path)
 }
 
+pub async fn download_update(
+    info: &UpdateInfo,
+    progress: &dyn Fn(UpdateProgress),
+) -> Result<PathBuf, String> {
+    download_asset(
+        &info.download_url,
+        &info.digest,
+        info.size,
+        ASSET_NAME,
+        "update",
+        progress,
+    )
+    .await
+}
+
+pub async fn download_installer(
+    info: &UpdateInfo,
+    progress: &dyn Fn(UpdateProgress),
+) -> Result<PathBuf, String> {
+    download_asset(
+        &info.installer_url,
+        &info.installer_digest,
+        info.installer_size,
+        INSTALLER_ASSET_NAME,
+        "installer",
+        progress,
+    )
+    .await
+}
+
+pub fn launch_installer_elevated(installer_path: &Path) -> Result<(), String> {
+    let status = Command::new("powershell.exe")
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "Start-Process -FilePath $env:SOC_INSTALLER -Verb RunAs",
+        ])
+        .env("SOC_INSTALLER", installer_path)
+        .status()
+        .map_err(|e| format!("Failed to launch elevated installer: {e}"))?;
+    if !status.success() {
+        return Err("Elevated installer launch was cancelled or failed".to_string());
+    }
+    Ok(())
+}
+
 pub fn install_update(
-    download_path: &PathBuf,
+    download_path: &Path,
     expected_version: &str,
     progress: &dyn Fn(UpdateProgress),
 ) -> Result<(), String> {
-    // Re-verify freshness at install time: check_for_update ran earlier, so a
-    // stale/mismatched payload must fail here instead of "succeeding" into a loop.
     ensure_newer(&get_current_version(), expected_version)?;
 
     let staged_len = fs::metadata(download_path)
@@ -255,30 +331,30 @@ pub fn install_update(
         return Err("Staged update is empty; aborting install".to_string());
     }
 
-    let exe_dir = get_exe_dir()?;
     let current_exe = std::env::current_exe().map_err(|e| e.to_string())?;
-    // Location guard: the portable exe must replace the running binary. If the
-    // user renamed the running file, writing a sibling copy would leave the old
-    // version in place and re-offer the same update forever.
-    let current_name = current_exe
+    let target_exe = current_exe.clone();
+    let exe_dir = target_exe
+        .parent()
+        .ok_or_else(|| "Could not resolve executable directory".to_string())?;
+    let current_name = target_exe
         .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("");
-    if current_name != ASSET_NAME {
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let (old_exe, temp_exe) = exe_paths(&current_exe);
+    let wrong_exe = exe_dir.join(format!("{current_name}.wrong"));
+
+    if !exe_dir_is_writable(exe_dir) {
         return Err(format!(
-            "Running exe is '{current_name}', expected '{ASSET_NAME}'; replace it manually to avoid a version loop"
+            "Executable directory '{}' is not writable; installer must be used",
+            exe_dir.display()
         ));
     }
-    let old_exe = exe_dir.join(format!("{ASSET_NAME}.old"));
-    let target_exe = exe_dir.join(ASSET_NAME);
-    let temp_exe = exe_dir.join(format!("{ASSET_NAME}.update"));
 
     progress(UpdateProgress {
-            phase: "installing".to_string(),
-            percent: 0.0,
-            message: "Preparing update...".to_string(),
-        },
-    );
+        phase: "installing".to_string(),
+        percent: 0.0,
+        message: "Preparing update...".to_string(),
+    });
 
     if old_exe.exists() {
         fs::remove_file(&old_exe).map_err(|e| format!("Failed to remove old backup: {e}"))?;
@@ -286,53 +362,183 @@ pub fn install_update(
     if temp_exe.exists() {
         fs::remove_file(&temp_exe).map_err(|e| format!("Failed to remove old temp: {e}"))?;
     }
+    if wrong_exe.exists() {
+        fs::remove_file(&wrong_exe).map_err(|e| format!("Failed to remove old failed update: {e}"))?;
+    }
 
-    // Copy download to temp file first (avoids locking issues on Windows)
     fs::copy(download_path, &temp_exe)
         .map_err(|e| format!("Failed to prepare new exe: {e}"))?;
 
-    // Rename current exe to .old (Windows allows renaming a running exe)
     fs::rename(&current_exe, &old_exe).map_err(|e| {
         let _ = fs::remove_file(&temp_exe);
         format!("Failed to backup current exe: {e}")
     })?;
 
-    // Rename temp to target (atomic on same volume)
     fs::rename(&temp_exe, &target_exe).map_err(|e| {
         let _ = fs::rename(&old_exe, &current_exe);
+        let _ = fs::remove_file(&temp_exe);
         format!("Failed to replace exe: {e}")
     })?;
 
-    // Verify the replacement actually landed: a missing/empty target would
-    // restart into the old version and re-offer the same update forever.
     let target_len = fs::metadata(&target_exe)
         .map_err(|e| format!("Update vanished after replace: {e}"))?
         .len();
     if target_len == 0 || target_len != staged_len {
-        let _ = fs::rename(&old_exe, &current_exe);
-        let _ = fs::remove_file(&target_exe);
-        return Err(format!(
-            "Installed exe looks wrong (expected {staged_len} bytes, got {target_len}); rolled back"
-        ));
+        fs::rename(&target_exe, &wrong_exe).map_err(|e| {
+            format!("Installed exe is invalid and could not be isolated: {e}; original remains at {}", old_exe.display())
+        })?;
+        return match fs::rename(&old_exe, &current_exe) {
+            Ok(()) => {
+                let _ = fs::remove_file(&wrong_exe);
+                Err(format!(
+                    "Installed exe looks wrong (expected {staged_len} bytes, got {target_len}); rolled back"
+                ))
+            }
+            Err(err) => Err(format!(
+                "Installed exe looks wrong (expected {staged_len} bytes, got {target_len}); rollback failed: {err}; original remains at {}",
+                old_exe.display()
+            )),
+        };
     }
 
     let _ = fs::remove_file(download_path);
 
     progress(UpdateProgress {
-            phase: "restarting".to_string(),
-            percent: 100.0,
-            message: "Restarting...".to_string(),
-        },
-    );
+        phase: "restarting".to_string(),
+        percent: 100.0,
+        message: "Restarting...".to_string(),
+    });
 
-    // Mark config that we're restarting for an update
     let mut cfg = crate::config::load();
     cfg.update_restart = true;
-    let _ = crate::config::save(&cfg);
+    if let Err(err) = crate::config::save(&cfg) {
+        tracing::warn!("failed to persist update_restart flag: {err}");
+    }
 
     Command::new(&target_exe)
         .spawn()
         .map_err(|e| format!("Failed to launch new version: {e}"))?;
 
     std::process::exit(0);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sha2::{Digest, Sha256};
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+
+    fn temp_dir(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("soundcore-updater-{tag}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn parses_release_assets() {
+        let assets = serde_json::json!([
+            {
+                "name": ASSET_NAME,
+                "browser_download_url": "https://example.test/update.exe",
+                "digest": "sha256:abc",
+                "size": 123
+            },
+            {
+                "name": INSTALLER_ASSET_NAME,
+                "browser_download_url": "https://example.test/installer.exe",
+                "digest": "sha256:def",
+                "size": 456
+            }
+        ]);
+        let assets = assets.as_array().unwrap();
+
+        let (url, digest, size) = asset_fields(assets, ASSET_NAME).unwrap();
+        assert_eq!(url, "https://example.test/update.exe");
+        assert_eq!(digest, "sha256:abc");
+        assert_eq!(size, 123);
+
+        let (url, digest, size) = asset_fields(assets, INSTALLER_ASSET_NAME).unwrap();
+        assert_eq!(url, "https://example.test/installer.exe");
+        assert_eq!(digest, "sha256:def");
+        assert_eq!(size, 456);
+
+        assert!(asset_fields(assets, "missing.exe").is_none());
+    }
+
+    #[test]
+    fn derives_exe_paths_from_current_name() {
+        let exe = PathBuf::from(r"C:\Apps\soundcore-desktop.exe");
+        let (old_exe, temp_exe) = exe_paths(&exe);
+        assert_eq!(old_exe, PathBuf::from(r"C:\Apps\soundcore-desktop.exe.old"));
+        assert_eq!(
+            temp_exe,
+            PathBuf::from(r"C:\Apps\soundcore-desktop.exe.update")
+        );
+    }
+
+    #[test]
+    fn verifies_sha256_digest() {
+        let dir = temp_dir("sha");
+        let file = dir.join("payload.bin");
+        fs::write(&file, b"update payload").unwrap();
+
+        let mut hasher = Sha256::new();
+        hasher.update(b"update payload");
+        let digest = format!("sha256:{:x}", hasher.finalize());
+
+        verify_sha256(&file, &digest).unwrap();
+        assert!(verify_sha256(&file, "sha256:00").is_err());
+        verify_sha256(&file, "").unwrap();
+    }
+
+    #[tokio::test]
+    async fn reads_newer_release_from_api_override() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let body = serde_json::json!({
+            "tag_name": "v1.9.0",
+            "assets": [
+                {
+                    "name": ASSET_NAME,
+                    "browser_download_url": format!("http://{addr}/update.exe"),
+                    "digest": "sha256:abc",
+                    "size": 123
+                },
+                {
+                    "name": INSTALLER_ASSET_NAME,
+                    "browser_download_url": format!("http://{addr}/installer.exe"),
+                    "digest": "sha256:def",
+                    "size": 456
+                }
+            ]
+        })
+        .to_string();
+
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = [0u8; 2048];
+            let _ = stream.read(&mut request);
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            stream.write_all(response.as_bytes()).unwrap();
+        });
+
+        unsafe {
+            std::env::set_var(API_URL_ENV, format!("http://{addr}/release.json"));
+        }
+        let info = check_for_update().await.unwrap();
+        unsafe {
+            std::env::remove_var(API_URL_ENV);
+        }
+        server.join().unwrap();
+
+        assert_eq!(info.latest_version, "1.9.0");
+        assert_eq!(info.download_url, format!("http://{addr}/update.exe"));
+        assert_eq!(info.installer_url, format!("http://{addr}/installer.exe"));
+    }
 }

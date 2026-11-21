@@ -425,14 +425,21 @@ impl RootView {
 
     pub fn start_update(&mut self, cx: &mut Context<Self>) {
         self.update_error = None;
-        let result = std::thread::spawn(|| crate::start_update(state()))
-            .join()
-            .unwrap_or_else(|_| Err("update thread panicked".into()));
-        if let Err(e) = result {
-            self.update_error = Some(e.chars().take(80).collect());
-            self.update_progress = None;
-            cx.notify();
-        }
+        cx.notify();
+        cx.spawn(async move |this, cx| {
+            let result = std::thread::spawn(|| crate::start_update(state()))
+                .join()
+                .unwrap_or_else(|_| Err("update thread panicked".into()));
+            this.update(&mut *cx, |view, cx| {
+                if let Err(e) = result {
+                    view.update_error = Some(e);
+                }
+                view.update_progress = None;
+                cx.notify();
+            })
+            .ok();
+        })
+        .detach();
     }
 
     pub fn hide(&self, cx: &mut App) {
