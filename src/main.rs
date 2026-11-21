@@ -22,7 +22,7 @@ use std::{
     str::FromStr,
     sync::{
         Arc,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Mutex, OnceLock,
     },
     time::Duration,
@@ -45,6 +45,8 @@ use tray_icon::{
     menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem},
 };
 use services::worker::{Command, WorkerHandle};
+
+const AUTO_HIDE_ARM_DELAY: Duration = Duration::from_millis(750);
 
 #[cfg(windows)]
 fn fix_redirect_thunks() {
@@ -137,7 +139,8 @@ pub struct AppState {
     pub config: Mutex<Config>,
     pub config_path: PathBuf,
     pub pending_notification: Mutex<Option<PendingNotification>>,
-    pub hide_cancel: AtomicBool,
+    pub show_epoch: AtomicU64,
+    pub auto_hide_armed: AtomicBool,
     /// Latest update progress for the UI to poll (set by `start_update`).
     pub update_progress: Mutex<Option<updater::UpdateProgress>>,
     /// Runtime for async commands (bluetooth status, update check/download).
@@ -158,6 +161,12 @@ static MAIN_WINDOW: OnceLock<Mutex<Option<gpui::WindowHandle<ui::RootView>>>> = 
 
 fn main_window() -> &'static Mutex<Option<gpui::WindowHandle<ui::RootView>>> {
     MAIN_WINDOW.get_or_init(|| Mutex::new(None))
+}
+
+fn cancel_pending_hide() {
+    let st = state();
+    st.show_epoch.fetch_add(1, Ordering::SeqCst);
+    st.auto_hide_armed.store(false, Ordering::SeqCst);
 }
 
 #[derive(Clone, Serialize)]
@@ -514,7 +523,7 @@ pub fn open_url(url: String) {
 
 /// Hide the main window with the slide animation. Must run on the GPUI main thread.
 pub fn hide_window_now(cx: &mut App) {
-    state().hide_cancel.store(true, Ordering::SeqCst);
+    cancel_pending_hide();
     let handle = *main_window().lock().unwrap();
     if let Some(h) = handle
         && let Some(snap) = shell::snapshot(h, cx)
@@ -525,7 +534,8 @@ pub fn hide_window_now(cx: &mut App) {
 
 /// Show the main window with the slide animation. Must run on the GPUI main thread.
 pub fn show_window_now(cx: &mut App) {
-    state().hide_cancel.store(true, Ordering::SeqCst);
+    cancel_pending_hide();
+    let epoch = state().show_epoch.load(Ordering::SeqCst);
     let handle = *main_window().lock().unwrap();
     let Some(h) = handle else { return };
 
@@ -549,6 +559,16 @@ pub fn show_window_now(cx: &mut App) {
     if prepared.is_err() {
         return;
     }
+
+    cx.spawn(async move |cx| {
+        cx.background_executor().timer(AUTO_HIDE_ARM_DELAY).await;
+        let _ = cx.update(|_| {
+            if epoch == state().show_epoch.load(Ordering::SeqCst) {
+                state().auto_hide_armed.store(true, Ordering::SeqCst);
+            }
+        });
+    })
+    .detach();
 
     // Snapshot for the animation worker (second main-thread hop).
     if let Some(mut snap) = shell::snapshot(h, cx) {
@@ -709,8 +729,6 @@ fn load_tray_icon() -> Option<Icon> {
 }
 
 fn toggle_window(cx: &mut App) {
-    // Cancel any pending focus-loss hide.
-    state().hide_cancel.store(true, Ordering::SeqCst);
     let handle = *main_window().lock().unwrap();
     let Some(h) = handle else { return };
     // Visibility, not focus: SW_SHOWNOACTIVATE leaves the window inactive
@@ -853,17 +871,28 @@ fn open_main_window(cx: &mut App) -> gpui::Result<gpui::WindowHandle<ui::RootVie
             // detach(): keep the listener until the window/focus emitter dies.
             // Dropping the Subscription (e.g. `let _ =`) unsubscribes at once.
             window
-                .on_focus_out(&focus_handle, cx, |_, window, cx| {
-                    state().hide_cancel.store(false, Ordering::SeqCst);
-                    // The window argument lets us skip a redundant hide when this
-                    // focus-out was itself caused by hiding (tray-toggle path).
-                    let visible = shell::is_visible(window);
+                .on_focus_out(&focus_handle, cx, |_, _, cx| {
+                    let st = state();
+                    if !st.auto_hide_armed.load(Ordering::SeqCst) {
+                        return;
+                    }
+                    st.auto_hide_armed.store(false, Ordering::SeqCst);
+                    let epoch = st.show_epoch.load(Ordering::SeqCst);
+                    let handle = *main_window().lock().unwrap();
                     cx.spawn(async move |cx| {
                         cx.background_executor()
                             .timer(Duration::from_millis(100))
                             .await;
                         let _ = cx.update(|cx| {
-                            if visible && !state().hide_cancel.load(Ordering::SeqCst) {
+                            if epoch != state().show_epoch.load(Ordering::SeqCst) {
+                                return;
+                            }
+                            let visible = handle
+                                .and_then(|h| {
+                                    h.update(cx, |_, window, _| shell::is_visible(window)).ok()
+                                })
+                                .unwrap_or(false);
+                            if visible {
                                 hide_window_now(cx);
                             }
                         });
@@ -985,7 +1014,8 @@ pub fn run() {
         config: Mutex::new(config),
         config_path,
         pending_notification: Mutex::new(None),
-        hide_cancel: AtomicBool::new(false),
+        show_epoch: AtomicU64::new(0),
+        auto_hide_armed: AtomicBool::new(false),
         update_progress: Mutex::new(None),
         runtime,
     });
@@ -1007,7 +1037,6 @@ pub fn run() {
                     .timer(Duration::from_millis(300))
                     .await;
                 let _ = cx.update(|cx| {
-                    crate::state().hide_cancel.store(true, Ordering::SeqCst);
                     show_window_now(cx);
                 });
             })
