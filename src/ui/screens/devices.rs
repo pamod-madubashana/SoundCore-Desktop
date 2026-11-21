@@ -1,6 +1,9 @@
 //! MyDevices screen (saved devices list). Header: About + Settings nav.
 
-use gpui::{Context, IntoElement, ParentElement, Styled, Window, div, prelude::*, rgba};
+use gpui::{
+    div, prelude::*, rgba, AnimationExt as _, AnimationPhase, Context, IntoElement, ParentElement,
+    SharedString, SpringAnimation, SpringConfig, Styled, Window,
+};
 use crate::ui::scale::px;
 
 use super::common::{gear_icon, info_icon, soundcore_glyph};
@@ -158,9 +161,9 @@ pub fn render(
                         .text_color(theme::muted())
                         .child("PAIRED"),
                 )
-                .children(devices.iter().map(|d| {
+                .children(devices.iter().enumerate().map(|(index, d)| {
                     let image = root.load_device_image(d);
-                    device_card(d, image)
+                    device_card_entry(d, image, index, root.device_entry_id)
                 })),
         )
         // Update notice slot
@@ -177,57 +180,114 @@ pub fn render(
             div()
                 .px_4()
                 .pb_4()
+                .child(status_pill_entry(off, status_text, root.device_entry_id)),
+        )
+}
+
+fn status_pill_entry(off: bool, status_text: String, entry_id: u64) -> impl IntoElement {
+    let key = SharedString::from(format!("device-footer-entry-{entry_id}"));
+
+    div().w_full().self_center().with_spring(
+        key,
+        SpringAnimation::new(DEVICE_ENTRY_SPRING)
+            .to(AnimationPhase(1.0))
+            .from(AnimationPhase(-0.9)),
+        move |this, phase| {
+            let p = phase.clamp(0.0..=1.0);
+            let alpha = ((phase.0 - 0.05) / 0.35).clamp(0.0, 1.0);
+            this.mt(p.interpolate(px(48.0), px(0.0)))
+                .w(gpui::relative(p.interpolate(0.78, 1.0)))
+                .opacity(alpha)
                 .child(
                     div()
-                        .h(px(42.))
+                        .h(px(p.interpolate(26.0, 42.0)))
                         .rounded_full()
                         .bg(theme::surface())
                         .border_1()
                         .border_color(theme::border_subtle())
-                        .px_4()
+                        .px(px(p.interpolate(10.0, 16.0)))
                         .flex()
                         .items_center()
                         .justify_center()
-                        .gap(px(6.))
-                        .child(status_dot(off))
+                        .gap(px(p.interpolate(4.0, 6.0)))
+                        .child(status_dot(off, p))
                         .child(
                             div()
-                                .text_size(px(11.5))
+                                .text_size(px(p.interpolate(9.0, 11.5)))
                                 .text_color(if off {
                                     theme::error_text()
                                 } else {
                                     theme::foreground()
                                 })
                                 .opacity(if off { 1.0 } else { 0.7 })
-                                .child(status_text),
+                                .child(status_text.clone()),
                         ),
-                ),
+                )
+        },
+    )
+}
+
+fn status_dot(off: bool, p: AnimationPhase) -> impl IntoElement {
+    let color = if off { theme::error() } else { theme::success() };
+    let size = p.interpolate(7.0, 10.0);
+    let inset = p.interpolate(0.5, 1.0);
+    div()
+        .relative()
+        .size(px(size))
+        .child(
+            div()
+                .absolute()
+                .size(px(size))
+                .rounded_full()
+                .bg(color)
+                .opacity(0.25),
+        )
+        .child(
+            div()
+                .absolute()
+                .left(px(inset))
+                .top(px(inset))
+                .size(px(p.interpolate(5.5, 8.0)))
+                .rounded_full()
+                .bg(color),
         )
 }
 
-fn status_dot(off: bool) -> impl IntoElement {
-    let color = if off { theme::error() } else { theme::success() };
-    div().relative().size(px(10.)).child(
-        div()
-            .absolute()
-            .size(px(10.))
-            .rounded_full()
-            .bg(color)
-            .opacity(0.25),
-    ).child(
-        div()
-            .absolute()
-            .left(px(1.))
-            .top(px(1.))
-            .size(px(8.))
-            .rounded_full()
-            .bg(color),
+const DEVICE_ENTRY_SPRING: SpringConfig = SpringConfig::new(110.0, 17.0, 1.0);
+
+/// Entrance spring for a saved device card. The negative initial phase staggers
+/// later cards without timers: each card stays below the list and clamped at its
+/// small pose until its phase crosses zero, then rises and grows into its slot.
+fn device_card_entry(
+    d: &crate::DeviceStateDto,
+    image: Option<std::sync::Arc<gpui::Image>>,
+    index: usize,
+    entry_id: u64,
+) -> impl IntoElement {
+    let d = d.clone();
+    let key = SharedString::from(format!("device-entry-{entry_id}-{}", d.mac_address));
+    let stagger = (index.min(5) as f32) * 0.55;
+
+    div().w_full().self_center().with_spring(
+        key,
+        SpringAnimation::new(DEVICE_ENTRY_SPRING)
+            .to(AnimationPhase(1.0))
+            .from(AnimationPhase(-stagger)),
+        move |this, phase| {
+            let p = phase.clamp(0.0..=1.0);
+            let alpha = ((phase.0 - 0.05) / 0.35).clamp(0.0, 1.0);
+            this.mt(p.interpolate(px(110.0), px(0.0)))
+                .w(gpui::relative(p.interpolate(0.58, 1.0)))
+                .opacity(alpha)
+                .child(device_card(&d, image.clone(), p))
+        },
     )
 }
 
 fn device_card(
     d: &crate::DeviceStateDto,
     image: Option<std::sync::Arc<gpui::Image>>,
+    p: AnimationPhase,
 ) -> impl IntoElement {
     // Strip "soundcore " prefix — every supported device is a Soundcore.
     let name = data::display_device_name(d);
@@ -254,19 +314,24 @@ fn device_card(
 
     // Status pill: direct child of items_start column so it hugs content.
     let status_pill = div()
-        .h(px(20.))
-        .px(px(10.))
+        .h(px(p.interpolate(12.0, 20.0)))
+        .px(px(p.interpolate(4.0, 10.0)))
         .rounded_full()
         .bg(pill_bg)
         .border_1()
         .border_color(pill_ring)
         .flex()
         .items_center()
-        .gap(px(6.))
-        .child(div().size(px(6.)).rounded_full().bg(dot))
+        .gap(px(p.interpolate(2.0, 6.0)))
         .child(
             div()
-                .text_size(px(10.5))
+                .size(px(p.interpolate(3.0, 6.0)))
+                .rounded_full()
+                .bg(dot),
+        )
+        .child(
+            div()
+                .text_size(px(p.interpolate(7.0, 10.5)))
                 .font_weight(gpui::FontWeight::SEMIBOLD)
                 .text_color(pill_text)
                 .child(status_label),
@@ -275,18 +340,19 @@ fn device_card(
     div()
         .id(gpui::SharedString::from(format!("device-card-{mac}")))
         .w_full()
-        .rounded(px(20.))
+        .rounded(px(p.interpolate(8.0, 20.0)))
         .bg(theme::surface())
-        .p(px(13.))
+        .p(px(p.interpolate(3.0, 13.0)))
         .flex()
         .items_center()
-        .gap(px(13.))
+        .gap(px(p.interpolate(4.0, 13.0)))
+        .overflow_hidden()
         .hover(|s| s.bg(theme::hover_subtle()))
         .cursor_pointer()
         .on_click(move |_, _window, _cx| {
             // React cards are display-only (connect happens via backend scan).
         })
-        .child(art_tile(d, name.clone(), image))
+        .child(art_tile(d, name.clone(), image, p))
         .child(
             div()
                 .min_w_0()
@@ -299,14 +365,14 @@ fn device_card(
                 .child(
                     div()
                         .w_full()
-                        .text_size(px(15.))
+                        .text_size(px(p.interpolate(9.0, 15.0)))
                         .font_weight(gpui::FontWeight::BOLD)
                         .text_color(theme::foreground())
                         .text_ellipsis()
                         .whitespace_nowrap()
                         .child(name),
                 )
-                .child(div().mt(px(6.)).child(status_pill)),
+                .child(div().mt(px(p.interpolate(0.0, 6.0))).child(status_pill)),
         )
     }
 
@@ -314,12 +380,13 @@ fn art_tile(
     _d: &crate::DeviceStateDto,
     name: String,
     image: Option<std::sync::Arc<gpui::Image>>,
+    p: AnimationPhase,
 ) -> impl IntoElement {
-    // Real product shot when available; else fixed 68×68 line-art tile (iconBg).
-    // min_w_0/min_h_0: flex automatic minimum size would otherwise let the
-    // child expand the tile past size(68).
+    // Real product shot when available; else a line-art tile that grows with the
+    // entrance spring. min_w_0/min_h_0: flex automatic minimum size would
+    // otherwise let the child expand the tile past its animated size.
     let tile = div()
-        .size(px(68.))
+        .size(px(p.interpolate(22.0, 68.0)))
         .min_w_0()
         .min_h_0()
         .flex_shrink_0()
