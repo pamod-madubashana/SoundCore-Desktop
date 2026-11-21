@@ -1,10 +1,10 @@
 //! MyDevices screen (saved devices list). Header: About + Settings nav.
 
 use gpui::{Context, IntoElement, ParentElement, Styled, Window, div, prelude::*, rgba};
-use crate::UI::scale::px;
+use crate::ui::scale::px;
 
 use super::common::{gear_icon, info_icon, soundcore_glyph};
-use crate::UI::{RootView, data, theme};
+use crate::ui::{RootView, data, theme};
 
 pub fn render(
     root: &mut RootView,
@@ -344,7 +344,7 @@ fn art_tile(
 
 /// Simplified DeviceArt fallback (earbuds / speaker / over-ear blocks).
 pub(crate) fn device_art_placeholder(name: &str, brand: gpui::Hsla) -> impl IntoElement {
-    let kind = crate::UI::data::device_art_category(name);
+    let kind = crate::ui::data::device_art_category(name);
 
     match kind {
         "speaker" => div()

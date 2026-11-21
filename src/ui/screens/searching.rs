@@ -1,10 +1,10 @@
 //! Searching screen (device discovery).
 
 use gpui::{Context, IntoElement, ParentElement, Styled, Window, div};
-use crate::UI::scale::px;
+use crate::ui::scale::px;
 
 use super::common::spinner;
-use crate::UI::{RootView, theme};
+use crate::ui::{RootView, theme};
 
 pub fn render(
     root: &mut RootView,

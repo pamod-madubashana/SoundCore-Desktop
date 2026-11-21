@@ -9,9 +9,9 @@ pub mod settings;
 pub mod sound_effects;
 
 use gpui::{Entity, IntoElement, ParentElement, Styled, div, prelude::*};
-use crate::UI::scale::px;
+use crate::ui::scale::px;
 
-use crate::UI::{RootView, theme};
+use crate::ui::{RootView, theme};
 
 pub(crate) fn update_notice(
     root: &RootView,

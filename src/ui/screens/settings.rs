@@ -1,11 +1,11 @@
 //! App Settings screen — general preferences (header 3-dots → Settings).
 
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, prelude::*};
-use crate::UI::scale::px;
+use crate::ui::scale::px;
 
 use super::common::{chevron_left, chevron_right};
 use crate::config::Config;
-use crate::UI::{RootView, theme};
+use crate::ui::{RootView, theme};
 
 pub fn render(
     root: &mut RootView,

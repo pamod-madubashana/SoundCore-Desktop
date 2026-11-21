@@ -5,7 +5,7 @@
 
 use std::sync::OnceLock;
 
-use crate::shell::CORNER_RADIUS;
+use crate::platform::shell::CORNER_RADIUS;
 
 /// Logical window size (matches shell::MAIN_W/H).
 const W: usize = 400;

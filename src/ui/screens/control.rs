@@ -1,10 +1,10 @@
 //! Control screen (connected device + header).
 
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, prelude::*};
-use crate::UI::scale::px;
+use crate::ui::scale::px;
 
 use super::common::{chevron_right, download_icon, gear_icon, info_icon, sliders_icon};
-use crate::UI::{RootView, data, theme};
+use crate::ui::{RootView, data, theme};
 
 pub fn render(
     root: &mut RootView,

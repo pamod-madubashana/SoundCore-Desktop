@@ -1,10 +1,10 @@
 //! About screen (header 3-dots → About).
 
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, prelude::*};
-use crate::UI::scale::px;
+use crate::ui::scale::px;
 
 use super::common::chevron_left;
-use crate::UI::{RootView, theme};
+use crate::ui::{RootView, theme};
 
 const REPO: &str = "https://github.com/pamod-madubashana/SoundCore-Desktop";
 

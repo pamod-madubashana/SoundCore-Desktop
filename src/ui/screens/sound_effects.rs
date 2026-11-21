@@ -2,10 +2,10 @@
 //! Sound effects screen (radio-group sections).
 
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, prelude::*};
-use crate::UI::scale::px;
+use crate::ui::scale::px;
 
 use super::common::{chevron_left, close_icon, radio_circle, sliders_icon};
-use crate::UI::{RootView, data, theme};
+use crate::ui::{RootView, data, theme};
 
 pub fn render(
     root: &mut RootView,
