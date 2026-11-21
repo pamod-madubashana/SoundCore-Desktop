@@ -1,9 +1,10 @@
 //! Control screen (connected device + header).
 
-use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, prelude::*};
 use crate::ui::scale::px;
+use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, prelude::*};
 
 use super::common::{chevron_right, download_icon, gear_icon, info_icon, sliders_icon};
+use crate::ui::animation::{morphing_pill, segment_text, toggle_switch};
 use crate::ui::{RootView, data, theme};
 
 pub fn render(
@@ -170,7 +171,11 @@ fn header(
             .items_center()
             .justify_center()
             .text_color(theme::brand())
-            .child(gpui::img(img).size_full().object_fit(gpui::ObjectFit::Cover))
+            .child(
+                gpui::img(img)
+                    .size_full()
+                    .object_fit(gpui::ObjectFit::Cover),
+            )
     } else {
         div()
             .relative()
@@ -340,16 +345,11 @@ fn header(
                 )
                 .when(!batteries.is_empty(), |el| {
                     // One row (target): L | R | Case — hug content, no wrap.
-                    el.child(
-                        div()
-                            .mt(px(8.))
-                            .flex()
-                            .items_center()
-                            .gap_1()
-                            .children(batteries.iter().map(|(label, pct)| {
-                                battery_pill(*pct, if label.is_empty() { None } else { Some(label) })
-                            })),
-                    )
+                    el.child(div().mt(px(8.)).flex().items_center().gap_1().children(
+                        batteries.iter().map(|(label, pct)| {
+                            battery_pill(*pct, if label.is_empty() { None } else { Some(label) })
+                        }),
+                    ))
                 })
                 .when(update_progress.is_some() || update_error.is_some(), |el| {
                     el.child(update_block(update_progress, update_error))
@@ -363,22 +363,20 @@ fn status_dot(connected: bool) -> impl IntoElement {
     } else {
         theme::toggle_off()
     };
-    div().relative().size(px(8.)).child(
-        div()
-            .absolute()
-            .left(px(-3.))
-            .top(px(-3.))
-            .size(px(14.))
-            .rounded_full()
-            .bg(theme::success_25())
-            .when(!connected, |el| el.opacity(0.0)),
-    ).child(
-        div()
-            .absolute()
-            .size(px(8.))
-            .rounded_full()
-            .bg(color),
-    )
+    div()
+        .relative()
+        .size(px(8.))
+        .child(
+            div()
+                .absolute()
+                .left(px(-3.))
+                .top(px(-3.))
+                .size(px(14.))
+                .rounded_full()
+                .bg(theme::success_25())
+                .when(!connected, |el| el.opacity(0.0)),
+        )
+        .child(div().absolute().size(px(8.)).rounded_full().bg(color))
 }
 
 fn battery_pill(pct: i32, label: Option<&str>) -> impl IntoElement {
@@ -468,10 +466,7 @@ fn battery_pill(pct: i32, label: Option<&str>) -> impl IntoElement {
         )
 }
 
-fn update_block(
-    progress: Option<&crate::UpdateProgress>,
-    error: Option<&str>,
-) -> impl IntoElement {
+fn update_block(progress: Option<&crate::UpdateProgress>, error: Option<&str>) -> impl IntoElement {
     if let Some(p) = progress {
         if p.phase == "downloading" {
             return div()
@@ -573,6 +568,12 @@ fn sound_mode(
         mapped
     };
 
+    let anc_count = modes.len();
+    let anc_active_index = modes
+        .iter()
+        .position(|(id, _, _)| id == &active)
+        .unwrap_or(0);
+
     let mut row = div()
         .rounded_2xl()
         .bg(gpui::rgba(0xffffff0f))
@@ -589,71 +590,62 @@ fn sound_mode(
                 .rounded_xl()
                 .bg(gpui::rgba(0x00000047))
                 .flex()
+                .relative()
+                .child(morphing_pill(anc_active_index, anc_count, "anc"))
                 .children(modes.into_iter().map(|(id, label, _kw)| {
                     let on = id == active;
+                    let seg_key = format!("seg-mode-{id}");
                     let view = view.clone();
                     let mac = mac.clone();
                     let id_for_click = id.clone();
-                    div()
-                        .id(gpui::SharedString::from(format!("mode-{id}")))
-                        .flex_1()
-                        .h_full()
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .gap(px(6.))
-                        .rounded_xl()
-                        .text_size(px(11.5))
-                        .font_weight(if on {
-                            gpui::FontWeight::BOLD
-                        } else {
-                            gpui::FontWeight::SEMIBOLD
-                        })
-                        .when(on, |el| {
-                            el.bg(theme::brand())
-                            .text_color(theme::brand_foreground())
-                            .shadow(vec![gpui::BoxShadow {
-                                color: gpui::rgba(0x6d6cff99).into(),
-                                offset: gpui::point(px(0.), px(3.)),
-                                blur_radius: px(5.),
-                                spread_radius: px(0.),
-                                inset: false,
-                            }])
-                        })
-                        .when(!on, |el| {
-                            el.text_color(gpui::rgba(0xffffff8c))
-                                .hover(|st| {
-                                    st.text_color(theme::foreground()).bg(gpui::rgba(0xffffff14))
-                                })
-                        })
-                        .cursor_pointer()
-                        .on_click(move |_, _window, cx| {
-                            let view = view.clone();
-                            let mac = mac.clone();
-                            let id = id_for_click.clone();
-                            view.update(cx, |root, cx| {
-                                root.ambient_local = Some((mac.clone(), id.clone()));
-                                root.send_setting(&mac, "ambientSoundMode", &id);
-                                let mac2 = mac.clone();
-                                cx.spawn(async move |this, cx| {
-                                    cx.background_executor()
-                                        .timer(std::time::Duration::from_millis(2000))
-                                        .await;
-                                    this.update(&mut *cx, |view, cx| {
-                                        if view.ambient_local.as_ref().map(|(m, _)| *m == mac2)
-                                            == Some(true)
-                                        {
-                                            view.ambient_local = None;
-                                            cx.notify();
-                                        }
+                    segment_text(
+                        div()
+                            .id(gpui::SharedString::from(format!("mode-{id}")))
+                            .flex_1()
+                            .h_full()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .gap(px(6.))
+                            .rounded_xl()
+                            .text_size(px(11.5))
+                            .font_weight(if on {
+                                gpui::FontWeight::BOLD
+                            } else {
+                                gpui::FontWeight::SEMIBOLD
+                            })
+                            .when(!on, |el| el.hover(|st| st.bg(gpui::rgba(0xffffff14))))
+                            .cursor_pointer()
+                            .on_click(move |_, _window, cx| {
+                                let view = view.clone();
+                                let mac = mac.clone();
+                                let id = id_for_click.clone();
+                                view.update(cx, |root, cx| {
+                                    root.ambient_local = Some((mac.clone(), id.clone()));
+                                    root.send_setting(&mac, "ambientSoundMode", &id);
+                                    let mac2 = mac.clone();
+                                    cx.spawn(async move |this, cx| {
+                                        cx.background_executor()
+                                            .timer(std::time::Duration::from_millis(2000))
+                                            .await;
+                                        this.update(&mut *cx, |view, cx| {
+                                            if view.ambient_local.as_ref().map(|(m, _)| *m == mac2)
+                                                == Some(true)
+                                            {
+                                                view.ambient_local = None;
+                                                cx.notify();
+                                            }
+                                        })
+                                        .ok();
                                     })
-                                    .ok();
-                                })
-                                .detach();
-                                cx.notify();
-                            });
-                        })
-                        .child(label.to_string())
+                                    .detach();
+                                    cx.notify();
+                                });
+                            })
+                            .child(label.to_string()),
+                        on,
+                        seg_key,
+                    )
                 })),
         );
 
@@ -719,62 +711,62 @@ fn sub_row(
         .filter(|(m, i, _)| m == &mac && i == id)
         .map(|(_, _, v)| v.clone());
     let active = local.unwrap_or(current);
+    let sub_count = entries.len();
+    let sub_active_index = entries.iter().position(|(eid, _)| eid == &active).unwrap_or(0);
+    let pill_key: &'static str = if id == "transparencyMode" {
+        "sub-transparency"
+    } else {
+        "sub-nc"
+    };
 
     div()
         .h(px(36.))
         .rounded_xl()
         .bg(gpui::rgba(0x00000047))
         .flex()
+        .relative()
+        .child(morphing_pill(sub_active_index, sub_count, pill_key))
         .children(entries.into_iter().map(|(eid, label)| {
             let on = eid == active;
+            let seg_key = format!("seg-sub-{id}-{eid}");
             let view = view.clone();
             let mac = mac.clone();
             let sid = id.to_string();
             let eid2 = eid.clone();
-            div()
-                .id(gpui::SharedString::from(format!("sub-{id}-{eid}")))
-                .flex_1()
-                .h_full()
-                .flex()
-                .items_center()
-                .justify_center()
-                .gap(px(6.))
-                .rounded_xl()
-                .text_size(px(11.5))
-                .font_weight(if on {
-                    gpui::FontWeight::BOLD
-                } else {
-                    gpui::FontWeight::SEMIBOLD
-                })
-                .when(on, |el| {
-                    el.bg(theme::brand())
-                    .text_color(theme::brand_foreground())
-                    .shadow(vec![gpui::BoxShadow {
-                        color: gpui::rgba(0x6d6cff99).into(),
-                        offset: gpui::point(px(0.), px(3.)),
-                        blur_radius: px(5.),
-                        spread_radius: px(0.),
-                        inset: false,
-                    }])
-                })
-                .when(!on, |el| {
-                    el.text_color(gpui::rgba(0xffffff8c))
-                        .hover(|st| st.text_color(theme::foreground()).bg(gpui::rgba(0xffffff14)))
-                })
-                .cursor_pointer()
-                .on_click(move |_, _window, cx| {
-                    let view = view.clone();
-                    let mac = mac.clone();
-                    let sid = sid.clone();
-                    let eid = eid2.clone();
-                    view.update(cx, |root, cx| {
-                        root.sub_local = Some((mac.clone(), sid.clone(), eid.clone()));
-                        root.sub_local_at = Some(std::time::Instant::now());
-                        root.send_setting(&mac, &sid, &eid);
-                        cx.notify();
-                    });
-                })
-                .child(label)
+            segment_text(
+                div()
+                    .id(gpui::SharedString::from(format!("sub-{id}-{eid}")))
+                    .flex_1()
+                    .h_full()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .gap(px(6.))
+                    .rounded_xl()
+                    .text_size(px(11.5))
+                    .font_weight(if on {
+                        gpui::FontWeight::BOLD
+                    } else {
+                        gpui::FontWeight::SEMIBOLD
+                    })
+                    .when(!on, |el| el.hover(|st| st.bg(gpui::rgba(0xffffff14))))
+                    .cursor_pointer()
+                    .on_click(move |_, _window, cx| {
+                        let view = view.clone();
+                        let mac = mac.clone();
+                        let sid = sid.clone();
+                        let eid = eid2.clone();
+                        view.update(cx, |root, cx| {
+                            root.sub_local = Some((mac.clone(), sid.clone(), eid.clone()));
+                            root.sub_local_at = Some(std::time::Instant::now());
+                            root.send_setting(&mac, &sid, &eid);
+                            cx.notify();
+                        });
+                    })
+                    .child(label),
+                on,
+                seg_key,
+            )
         }))
 }
 
@@ -844,25 +836,6 @@ fn quick_toggles(
                         .text_color(theme::foreground())
                         .child(data::pretty_setting_id(&id)),
                 )
-                .child(toggle_switch(on))
+                .child(toggle_switch(on, format!("quick-{id}")))
         }))
-}
-
-fn toggle_switch(on: bool) -> impl IntoElement {
-    div()
-        .w(px(32.))
-        .h(px(18.))
-        .rounded_full()
-                .bg(if on { theme::brand() } else { theme::toggle_off() })
-        .flex_shrink_0()
-        .relative()
-        .child(
-            div()
-                .absolute()
-                .top(px(2.))
-                .left(if on { px(16.) } else { px(2.) })
-                .size(px(14.))
-                .rounded_full()
-                .bg(theme::toggle_thumb()),
-        )
 }
