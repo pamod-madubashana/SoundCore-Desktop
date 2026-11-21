@@ -124,7 +124,7 @@ pub(crate) fn update_notice(
                     .text_color(theme::error_copy())
                     .max_w(px(240.))
                     .text_ellipsis()
-                    .child(e.chars().take(80).collect::<String>()),
+                    .child(e),
             )
         })
 }
