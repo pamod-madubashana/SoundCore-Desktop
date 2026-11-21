@@ -5,11 +5,6 @@ edition = "2024"
 description = "Cross-platform desktop tray app that mirrors Soundcore earbud settings (gaming mode, ANC, EQ) — fetch-only on connect, live single-setting controls from the tray. Windows & Linux."
 build = "build.rs"
 
-[lib]
-name = "soundcore_desktop_lib"
-crate-type = ["lib", "cdylib", "staticlib"]
-path = "src/lib.rs"
-
 [[bin]]
 name = "soundcore-desktop"
 path = "src/main.rs"
