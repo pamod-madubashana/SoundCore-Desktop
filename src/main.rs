@@ -549,6 +549,7 @@ pub fn show_window_now(cx: &mut App) {
         let start_y = target_y + 80;
         shell::set_pos(window, target_x, start_y);
         shell::show(window);
+        view.begin_device_entrance(cx);
         view.focus_handle.focus(window, cx);
         // SW_SHOWNOACTIVATE skips WM_ACTIVATE; bring to foreground explicitly
         // so focus-loss auto-hide can fire. Deferred initial_placement is

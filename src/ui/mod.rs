@@ -60,6 +60,7 @@ pub struct RootView {
     nav_phase: f32,
     nav_velocity: f32,
     nav_id: u64,
+    device_entry_id: u64,
     _states_task: Task<()>,
     _bt_task: Task<()>,
     _update_task: Task<()>,
@@ -201,6 +202,7 @@ impl RootView {
             nav_phase: 1.0,
             nav_velocity: 0.0,
             nav_id: 0,
+            device_entry_id: 0,
             _states_task: states_task,
             _bt_task: bt_task,
             _update_task: update_task,
@@ -539,6 +541,12 @@ fn downscale_png(bytes: Vec<u8>, max: u32) -> Vec<u8> {
 }
 
 impl RootView {
+    /// Replay the saved-device entrance when the window becomes visible.
+    pub fn begin_device_entrance(&mut self, cx: &mut Context<Self>) {
+        self.device_entry_id = self.device_entry_id.wrapping_add(1);
+        cx.notify();
+    }
+
     /// Detect a screen change and drive a spring phase 0 -> 1 for a fade+slide entrance.
     fn update_nav_animation(&mut self, key: &'static str, cx: &mut Context<Self>) {
         const NAV_SPRING: gpui::SpringConfig = gpui::SpringConfig::new(210.0, 26.0, 1.0);
@@ -549,6 +557,9 @@ impl RootView {
         self.nav_phase = 0.0;
         self.nav_velocity = 0.0;
         self.nav_id = self.nav_id.wrapping_add(1);
+        if key == "devices" {
+            self.device_entry_id = self.device_entry_id.wrapping_add(1);
+        }
         let nav_id = self.nav_id;
         cx.spawn(async move |this, cx| {
             loop {
