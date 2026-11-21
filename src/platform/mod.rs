@@ -1,4 +1,6 @@
-//! Platform detection and Windows accent color for theme selection.
+//! Platform detection, window/shell helpers, and Windows accent color.
+
+pub mod shell;
 
 use serde::Serialize;
 

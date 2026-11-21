@@ -1,6 +1,8 @@
 //! Configuration: the devices to watch and the per-device profile that is
 //! refreshed FROM the device on every connect (read-only fetch).
 
+pub mod autostart;
+
 use std::{path::PathBuf, str::FromStr};
 
 use anyhow::{Context, anyhow};

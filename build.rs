@@ -42,6 +42,10 @@ fn main() {
     fs::write(&dest, code).expect("failed to write embedded_devices.rs");
     println!("cargo:rerun-if-changed=assets/devices");
 
+    // dx hot-patch apply + full GPUI redraw needs a larger main stack.
+    #[cfg(windows)]
+    println!("cargo:rustc-link-arg=/STACK:67108864");
+
     // Windows exe/window icon: PE resource ID 1 (gpui `load_icon` reads this).
     // Under `dx serve` the CLI injects its own winres .lib; linking both emits
     // duplicate RT_ICON entries and fails rust-lld, so yield to dx there
