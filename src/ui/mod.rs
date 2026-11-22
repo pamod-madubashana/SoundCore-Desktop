@@ -6,6 +6,7 @@
 pub mod animation;
 pub mod background;
 pub mod data;
+pub mod notification;
 pub mod scale;
 pub mod screens;
 pub mod theme;
@@ -221,16 +222,19 @@ impl RootView {
     fn apply_states(&mut self, next: Vec<DeviceStateDto>, cx: &mut Context<Self>) {
         if let Some(prev) = &self.prev_connected {
             let notify = crate::get_config(crate::state()).notify_connect;
-            for d in &next {
-                let was = prev.contains(&d.mac_address);
-                if !notify {
-                    continue;
-                }
-                let name = data::display_device_name(d);
-                if d.connected && !was {
+            if notify {
+                let next_connected: HashSet<&str> = next
+                    .iter()
+                    .filter(|d| d.connected)
+                    .map(|d| d.mac_address.as_str())
+                    .collect();
+                for d in next
+                    .iter()
+                    .filter(|d| d.connected && !prev.contains(&d.mac_address))
+                {
                     let _ = show_notification(
-                        state(),
-                        name,
+                        cx,
+                        data::display_device_name(d),
                         d.image.clone(),
                         "Connected".into(),
                         d.battery_left,
@@ -238,11 +242,17 @@ impl RootView {
                         d.battery_combined,
                         d.battery_case,
                     );
-                } else if !d.connected && was {
+                }
+                for mac in prev.iter().filter(|mac| !next_connected.contains(mac.as_str())) {
+                    let old = self.devices.iter().find(|d| &d.mac_address == mac);
+                    let name = old
+                        .map(data::display_device_name)
+                        .unwrap_or_else(|| mac.to_string());
+                    let image = old.and_then(|d| d.image.clone());
                     let _ = show_notification(
-                        state(),
+                        cx,
                         name,
-                        d.image.clone(),
+                        image,
                         "Disconnected".into(),
                         None,
                         None,
@@ -522,28 +532,28 @@ impl RootView {
     }
 
     pub fn load_device_image(&self, d: &DeviceStateDto) -> Option<std::sync::Arc<gpui::Image>> {
-        let url = d.image.as_deref()?;
-        let key = url.to_owned();
-        {
-            let cache = device_image_cache().lock().unwrap();
-            if let Some(hit) = cache.get(&key) {
-                return Some(hit.clone());
-            }
-        }
-        let b64 = url.strip_prefix("data:image/png;base64,")?;
-        use base64::Engine as _;
-        let bytes = base64::engine::general_purpose::STANDARD.decode(b64).ok()?;
-        // CPU-downscale near display size (68px tile / 66px control header ×
-        // zoom 0.9 × ~2 DPI ≈ 120). DX samples bilinear without mips, so a
-        // large minification aliases (R60i speculars looked pixelated).
-        let bytes = downscale_png(bytes, 120);
-        let img = std::sync::Arc::new(gpui::Image::from_bytes(gpui::ImageFormat::Png, bytes));
-        device_image_cache()
-            .lock()
-            .unwrap()
-            .insert(key, img.clone());
-        Some(img)
+        load_device_image_url(d.image.as_deref()?)
     }
+}
+
+pub(crate) fn load_device_image_url(url: &str) -> Option<std::sync::Arc<gpui::Image>> {
+    let key = url.to_owned();
+    {
+        let cache = device_image_cache().lock().unwrap();
+        if let Some(hit) = cache.get(&key) {
+            return Some(hit.clone());
+        }
+    }
+    let b64 = url.strip_prefix("data:image/png;base64,")?;
+    use base64::Engine as _;
+    let bytes = base64::engine::general_purpose::STANDARD.decode(b64).ok()?;
+    let bytes = downscale_png(bytes, 120);
+    let img = std::sync::Arc::new(gpui::Image::from_bytes(gpui::ImageFormat::Png, bytes));
+    device_image_cache()
+        .lock()
+        .unwrap()
+        .insert(key, img.clone());
+    Some(img)
 }
 
 /// Keyed by the source data-URL; holds the downscaled `gpui::Image`.
