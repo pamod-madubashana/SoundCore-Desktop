@@ -57,6 +57,8 @@ pub struct RootView {
     pub(crate) eq_draft: Vec<i16>,
     /// Band index currently being dragged in the custom EQ graph.
     pub(crate) eq_drag_band: Option<usize>,
+    /// Preset selected by the user, updated optimistically on click.
+    pub(crate) eq_active_preset: Option<i64>,
     /// Screen-switch transition: current screen key and spring state (0..1 phase).
     nav_screen: &'static str,
     nav_phase: f32,
@@ -177,7 +179,7 @@ impl RootView {
 
         let version = get_version();
 
-        Self {
+        let mut view = Self {
             focus_handle,
             devices: Vec::new(),
             prev_connected: None,
@@ -198,6 +200,7 @@ impl RootView {
             toggle_local: HashMap::new(),
             eq_draft: Vec::new(),
             eq_drag_band: None,
+            eq_active_preset: None,
             se_local: None,
             spatial_local: None,
             last_preset_id: None,
@@ -209,7 +212,10 @@ impl RootView {
             _states_task: states_task,
             _bt_task: bt_task,
             _update_task: update_task,
-        }
+        };
+
+        view.reload_eq_presets();
+        view
     }
 
     fn apply_states(&mut self, next: Vec<DeviceStateDto>, cx: &mut Context<Self>) {
@@ -408,16 +414,20 @@ impl RootView {
     }
 
     fn reload_eq_presets(&mut self) {
-        let model = self
-            .devices
-            .iter()
-            .find(|d| d.connected)
-            .map(|d| d.model.clone());
-        let Some(model) = model else {
-            self.eq_presets = Vec::new();
-            return;
+        let model = self.active_device().map(|d| d.model.clone());
+        self.eq_presets = match model {
+            Some(model) => crate::list_eq_presets(state(), &model),
+            None => crate::get_config(state())
+                .eq_presets
+                .into_iter()
+                .map(|p| EqPresetDto {
+                    id: p.id,
+                    name: p.name,
+                    bands: p.bands,
+                    model: p.model,
+                })
+                .collect(),
         };
-        self.eq_presets = crate::list_eq_presets(state(), &model);
     }
 
     pub fn active_device(&self) -> Option<&DeviceStateDto> {
