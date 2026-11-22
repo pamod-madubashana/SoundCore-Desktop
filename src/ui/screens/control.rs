@@ -300,7 +300,6 @@ fn header(
                                                 root.show_about = true;
                                                 root.show_settings = false;
                                                 root.show_sound_effects = false;
-                                                root.show_equalizer = false;
                                                 cx.notify();
                                             });
                                         })
@@ -324,7 +323,6 @@ fn header(
                                                 root.show_settings = true;
                                                 root.show_about = false;
                                                 root.show_sound_effects = false;
-                                                root.show_equalizer = false;
                                                 cx.notify();
                                             });
                                         })

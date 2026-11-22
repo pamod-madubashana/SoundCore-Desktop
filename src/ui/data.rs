@@ -67,6 +67,14 @@ pub fn has_custom(s: &SettingsMap) -> bool {
     setting(s, "volumeAdjustments").is_some()
 }
 
+/// Only devices with a writable custom EQ expose the editor.
+pub fn has_writable_custom(s: &SettingsMap) -> bool {
+    let Some(vol) = setting(s, "volumeAdjustments") else {
+        return false;
+    };
+    vol.get("readOnly").and_then(Value::as_bool) != Some(true)
+}
+
 /// Which card should read as selected. Order matters: spatial audio wins because
 /// the device keeps its last preset id around while spatial audio is engaged.
 pub fn derive_active_section(s: &SettingsMap) -> &'static str {

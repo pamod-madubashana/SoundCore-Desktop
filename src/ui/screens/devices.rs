@@ -102,7 +102,6 @@ pub fn render(
                                         root.show_about = true;
                                         root.show_settings = false;
                                         root.show_sound_effects = false;
-                                        root.show_equalizer = false;
                                         cx.notify();
                                     });
                                 })
@@ -127,7 +126,6 @@ pub fn render(
                                         root.show_settings = true;
                                         root.show_about = false;
                                         root.show_sound_effects = false;
-                                        root.show_equalizer = false;
                                         cx.notify();
                                     });
                                 })
@@ -185,35 +183,37 @@ pub fn render(
 }
 
 fn status_pill_entry(off: bool, status_text: String, entry_id: u64) -> impl IntoElement {
+    const FOOTER_ENTRY_SPRING: SpringConfig = SpringConfig::new(100.0, 16.0, 1.0);
+    const FOOTER_HOLD: f32 = 1.25;
     let key = SharedString::from(format!("device-footer-entry-{entry_id}"));
 
     div().w_full().self_center().with_spring(
         key,
-        SpringAnimation::new(DEVICE_ENTRY_SPRING)
-            .to(AnimationPhase(1.0))
-            .from(AnimationPhase(-0.9)),
+        SpringAnimation::new(FOOTER_ENTRY_SPRING)
+            .to(AnimationPhase(FOOTER_HOLD + 1.0))
+            .from(AnimationPhase(0.0)),
         move |this, phase| {
-            let p = phase.clamp(0.0..=1.0);
-            let alpha = ((phase.0 - 0.05) / 0.35).clamp(0.0, 1.0);
-            this.mt(p.interpolate(px(48.0), px(0.0)))
-                .w(gpui::relative(p.interpolate(0.78, 1.0)))
+            let p = AnimationPhase((phase.0 - FOOTER_HOLD).clamp(0.0, 1.0));
+            let alpha = ((p.0 - 0.05) / 0.35).clamp(0.0, 1.0);
+            this.mt(p.interpolate(px(96.0), px(0.0)))
+                .w(gpui::relative(p.interpolate(0.55, 1.0)))
                 .opacity(alpha)
                 .child(
                     div()
-                        .h(px(p.interpolate(26.0, 42.0)))
+                        .h(px(p.interpolate(20.0, 42.0)))
                         .rounded_full()
                         .bg(theme::surface())
                         .border_1()
                         .border_color(theme::border_subtle())
-                        .px(px(p.interpolate(10.0, 16.0)))
+                        .px(px(p.interpolate(6.0, 16.0)))
                         .flex()
                         .items_center()
                         .justify_center()
-                        .gap(px(p.interpolate(4.0, 6.0)))
+                        .gap(px(p.interpolate(2.0, 6.0)))
                         .child(status_dot(off, p))
                         .child(
                             div()
-                                .text_size(px(p.interpolate(9.0, 11.5)))
+                                .text_size(px(p.interpolate(8.0, 11.5)))
                                 .text_color(if off {
                                     theme::error_text()
                                 } else {

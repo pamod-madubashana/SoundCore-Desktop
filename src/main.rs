@@ -508,16 +508,36 @@ pub fn get_bluetooth_status(state: &AppState) -> bool {
 }
 
 pub fn open_url(url: String) {
+    #[cfg(target_os = "windows")]
+    {
+        std::thread::spawn(move || {
+            use windows::Win32::UI::Shell::ShellExecuteW;
+            use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+
+            let verb: Vec<u16> = "open".encode_utf16().chain(std::iter::once(0)).collect();
+            let target: Vec<u16> = url.encode_utf16().chain(std::iter::once(0)).collect();
+            let result = unsafe {
+                ShellExecuteW(
+                    None,
+                    windows::core::PCWSTR(verb.as_ptr()),
+                    windows::core::PCWSTR(target.as_ptr()),
+                    None,
+                    None,
+                    SW_SHOWNORMAL,
+                )
+            };
+            if (result.0 as usize) <= 32 {
+                tracing::warn!("ShellExecuteW failed for {url}: {}", result.0 as usize);
+            }
+        });
+    }
+
+    #[cfg(not(target_os = "windows"))]
     let _ = std::process::Command::new(match std::env::consts::OS {
-        "windows" => "cmd",
         "macos" => "open",
         _ => "xdg-open",
     })
-    .args(if std::env::consts::OS == "windows" {
-        vec!["/c", "start", "", url.as_str()]
-    } else {
-        vec![url.as_str()]
-    })
+    .arg(&url)
     .spawn();
 }
 
@@ -549,7 +569,7 @@ pub fn show_window_now(cx: &mut App) {
         let start_y = target_y + 80;
         shell::set_pos(window, target_x, start_y);
         shell::show(window);
-        view.begin_device_entrance(cx);
+        view.begin_device_entrance();
         view.focus_handle.focus(window, cx);
         // SW_SHOWNOACTIVATE skips WM_ACTIVATE; bring to foreground explicitly
         // so focus-loss auto-hide can fire. Deferred initial_placement is
