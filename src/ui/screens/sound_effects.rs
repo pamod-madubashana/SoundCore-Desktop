@@ -503,7 +503,7 @@ fn section_shell(
 
 
 /* -- Custom EQ graph (inline) ---------------------------------------- */
-const EQ_GRAPH_H: f32 = 300.0;
+const EQ_GRAPH_H: f32 = 240.0;
 const EQ_STEPS: usize = 25;
 
 fn eq_db(v: i16, digits: i32) -> String {
@@ -537,6 +537,12 @@ fn eq_hz(hz: u16) -> String {
 fn eq_value_y(v: i16, min: i16, max: i16) -> f32 {
     let range = (max - min).max(1) as f32;
     ((max as f32 - v as f32) / range * EQ_GRAPH_H).clamp(0.0, EQ_GRAPH_H)
+}
+
+fn parse_bands(raw: &str) -> Vec<i16> {
+    raw.split(',')
+        .filter_map(|value| value.trim().parse().ok())
+        .collect()
 }
 
 fn eq_graph(
@@ -591,7 +597,7 @@ fn eq_graph(
         .map(|dev| dev.model.clone())
         .unwrap_or_default();
     let presets = root.eq_presets.clone();
-    let active_preset = data::match_custom_preset(s, &presets).unwrap_or_default();
+    let active_preset_id = root.eq_active_preset;
     let drag_band = root.eq_drag_band;
 
     div()
@@ -631,6 +637,7 @@ fn eq_graph(
                             move |_, _, cx| {
                                 view.update(cx, |root, cx| {
                                     root.eq_draft = vec![0; count];
+                                    root.eq_active_preset = None;
                                     if !mac.is_empty() {
                                         let raw = vec!["0"; count].join(",");
                                         root.send_setting(&mac, "volumeAdjustments", &raw);
@@ -662,7 +669,7 @@ fn eq_graph(
                     div()
                         .relative()
                         .flex_1()
-                        .h(px(EQ_GRAPH_H))
+                        .h(px(EQ_GRAPH_H + 16.0))
                         .children((0..5).map(|i| {
                             div()
                                 .absolute()
@@ -708,10 +715,17 @@ fn eq_graph(
                                     div()
                                         .absolute()
                                         .left(px(0.))
+                                        .right(px(0.))
                                         .top(px(0.))
                                         .bottom(px(0.))
-                                        .w(px(1.))
-                                        .bg(theme::border_subtle()),
+                                        .flex()
+                                        .justify_center()
+                                        .child(
+                                            div()
+                                                .w(px(1.))
+                                                .h_full()
+                                                .bg(theme::border_subtle()),
+                                        ),
                                 )
                                 .children((0..EQ_STEPS).map(|k| {
                                     let value = (max as f32
@@ -736,6 +750,7 @@ fn eq_graph(
                                                         root.eq_draft[i] = value;
                                                     }
                                                     root.eq_drag_band = Some(i);
+                                                    root.eq_active_preset = None;
                                                     cx.notify();
                                                 });
                                             }
@@ -751,6 +766,7 @@ fn eq_graph(
                                                         && root.eq_draft[i] != value
                                                     {
                                                         root.eq_draft[i] = value;
+                                                        root.eq_active_preset = None;
                                                         cx.notify();
                                                     }
                                                 });
@@ -805,8 +821,9 @@ fn eq_graph(
         .child(
             div()
                 .id("eq-presets")
-                .mt(px(10.))
+                .mt(px(18.))
                 .w_full()
+                .h(px(38.))
                 .flex()
                 .items_center()
                 .gap_2()
@@ -844,7 +861,10 @@ fn eq_graph(
                                         bands.clone(),
                                         model.clone(),
                                     ) {
-                                        Ok(preset) => root.eq_presets.push(preset),
+                                        Ok(preset) => {
+                                            root.eq_active_preset = Some(preset.id);
+                                            root.eq_presets.push(preset);
+                                        }
                                         Err(err) => tracing::warn!("save eq preset failed: {err}"),
                                     }
                                     cx.notify();
@@ -857,7 +877,8 @@ fn eq_graph(
                     let view = view.clone();
                     let mac = mac.clone();
                     let bands = preset.bands.clone();
-                    let active = active_preset == preset.name;
+                    let preset_id = preset.id;
+                    let active = active_preset_id == Some(preset.id);
                     div()
                         .id(gpui::SharedString::from(format!(
                             "eq-preset-{}",
@@ -887,6 +908,11 @@ fn eq_graph(
                         .cursor_pointer()
                         .on_click(move |_, _, cx| {
                             view.update(cx, |root, cx| {
+                                let next = parse_bands(&bands);
+                                if !next.is_empty() {
+                                    root.eq_draft = next;
+                                }
+                                root.eq_active_preset = Some(preset_id);
                                 if !mac.is_empty() {
                                     root.send_setting(&mac, "volumeAdjustments", &bands);
                                 }
