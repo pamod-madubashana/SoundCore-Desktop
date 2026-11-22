@@ -1,10 +1,8 @@
 //! Shared chrome helpers — text/glyph icons (GPUI divs cannot rotate).
 
-use gpui::{Hsla, IntoElement, ParentElement, Styled, div, prelude::*};
+use gpui::{Hsla, IntoElement, ParentElement, Styled, div};
 use std::sync::OnceLock;
 use crate::ui::scale::px;
-
-use crate::ui::theme;
 
 /// Soundcore brand glyph (Lanczos-upscaled tray icon, smooth at display size).
 pub(crate) fn soundcore_glyph(size: f32) -> impl IntoElement {
@@ -75,31 +73,6 @@ pub(crate) fn eq_image_icon(kind: &str, size: f32) -> impl IntoElement {
         }),
     };
     gpui::img(img.clone()).size(px(size))
-}
-
-/// Radio-circle expand indicator (React `RadioCircle`).
-pub(crate) fn radio_circle(active: bool) -> impl IntoElement {
-    div()
-        .size(px(16.))
-        .flex()
-        .items_center()
-        .justify_center()
-        .rounded_full()
-        .border_2()
-        .border_color(if active {
-            theme::brand()
-        } else {
-            theme::border_strong()
-        })
-        .when(active, |el| el.bg(theme::brand()))
-        .when(active, |el| {
-            el.child(
-                div()
-                    .size(px(8.))
-                    .rounded_full()
-                    .bg(gpui::rgb(0xffffff)),
-            )
-        })
 }
 
 /// Download arrow (update badge).

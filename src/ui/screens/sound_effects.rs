@@ -1,11 +1,22 @@
 //! Sound Effects popup — full-screen overlay inside the control window.
 //! Sound effects screen (radio-group sections).
 
-use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, prelude::*};
+use gpui::{
+    AnimationExt as _, AnimationPhase, Context, Entity, IntoElement, ParentElement, SharedString,
+    SpringAnimation, SpringConfig, Styled, Window, div, prelude::*,
+};
 use crate::ui::scale::px;
 
-use super::common::{chevron_left, close_icon, eq_bars_icon, eq_image_icon, radio_circle};
+use super::common::{chevron_left, close_icon, eq_bars_icon, eq_image_icon};
 use crate::ui::{RootView, data, theme};
+
+const CARD_SPRING: SpringConfig = SpringConfig::new(150.0, 23.0, 1.0);
+const SECTION_SPRING: SpringConfig = SpringConfig::new(170.0, 25.0, 1.0);
+const BODY_SPRING: SpringConfig = SpringConfig::new(140.0, 22.0, 1.0);
+
+fn phase(on: bool) -> AnimationPhase {
+    AnimationPhase(if on { 1.0 } else { 0.0 })
+}
 
 pub fn render(
     root: &mut RootView,
@@ -25,11 +36,11 @@ pub fn render(
         .size_full()
         .relative()
         .overflow_hidden()
-        // Header pinned to top
+        // Header pinned to top with breathing room
         .child(
             div()
                 .absolute()
-                .top(px(0.))
+                .top(px(10.))
                 .left(px(0.))
                 .right(px(0.))
                 .h(px(44.))
@@ -66,7 +77,7 @@ pub fn render(
             div()
                 .id("se-body")
                 .absolute()
-                .top(px(49.))
+                .top(px(59.))
                 .left(px(0.))
                 .right(px(0.))
                 .bottom(px(0.))
@@ -128,6 +139,43 @@ fn header_btn(
         .child(icon)
 }
 
+fn animated_radio(active: bool, key: &str) -> impl IntoElement {
+    let outer_key = SharedString::from(format!("se-radio-{key}"));
+    let dot_key = SharedString::from(format!("se-radio-dot-{key}"));
+
+    div()
+        .size(px(16.))
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded_full()
+        .border_2()
+        .with_spring(
+            outer_key,
+            SpringAnimation::new(SECTION_SPRING).to(phase(active)),
+            move |this, p| {
+                let p = p.clamp(0.0..=1.0);
+                let border = p.interpolate(theme::border_strong(), theme::brand());
+                let bg = p.interpolate(gpui::transparent_black(), theme::brand());
+                this.border_color(border).bg(bg)
+            },
+        )
+        .child(
+            div()
+                .rounded_full()
+                .bg(gpui::rgb(0xffffff))
+                .with_spring(
+                    dot_key,
+                    SpringAnimation::new(SECTION_SPRING).to(phase(active)),
+                    move |this, p| {
+                        let p = p.clamp(0.0..=1.0);
+                        let size = p.0 * 8.0;
+                        this.size(px(size)).opacity(p.0)
+                    },
+                ),
+        )
+}
+
 /* ── Spatial Audio section ────────────────────────────────────────── */
 
 fn spatial_section(
@@ -168,6 +216,80 @@ fn spatial_section(
         opts
     };
 
+    let body = div()
+        .flex()
+        .gap(px(6.))
+        .px_3()
+        .pt_1()
+        .pb_3()
+        .children(ids.iter().enumerate().map(|(i, id)| {
+            let label = match id.as_str() {
+                "Music" => "Music Mode".to_string(),
+                "Movie" => "Movie Mode".to_string(),
+                "Gaming" => "Gaming Mode".to_string(),
+                _ => localized
+                    .get(i)
+                    .cloned()
+                    .filter(|x| !x.is_empty())
+                    .unwrap_or_else(|| id.clone()),
+            };
+            let on = *id == current;
+            let icon = match id.as_str() {
+                "Music" => "♪",
+                "Movie" => "▶",
+                "Gaming" => "◈",
+                _ => "♪",
+            };
+            let spring_key = SharedString::from(format!("spatial-mode-spring-{id}"));
+            let view = view.clone();
+            let id = id.clone();
+            div()
+                .id(SharedString::from(format!("spatial-mode-{id}")))
+                .flex_1()
+                .min_w_0()
+                .flex()
+                .flex_col()
+                .items_center()
+                .justify_center()
+                .gap_2()
+                .py_3()
+                .rounded_xl()
+                .text_size(px(11.))
+                .font_weight(gpui::FontWeight::MEDIUM)
+                .border_2()
+                .cursor_pointer()
+                .on_click(move |_, _window, cx| {
+                    let view = view.clone();
+                    let id = id.clone();
+                    view.update(cx, |root, cx| {
+                        root.set_spatial_mode(&id, cx);
+                    });
+                })
+                .with_spring(
+                    spring_key,
+                    SpringAnimation::new(CARD_SPRING).to(phase(on)),
+                    move |this, p| {
+                        let p = p.clamp(0.0..=1.0);
+                        let bg = p.interpolate(theme::surface_elevated(), theme::brand());
+                        let border = p.interpolate(theme::border_subtle(), theme::brand_40());
+                        let text = p.interpolate(theme::foreground(), theme::brand_foreground());
+                        let opacity = p.interpolate(0.7, 1.0);
+                        let el = this
+                            .bg(bg)
+                            .border_color(border)
+                            .text_color(text)
+                            .opacity(opacity);
+                        if on {
+                            el
+                        } else {
+                            el.hover(|st| st.opacity(1.0).bg(theme::hover_subtle()))
+                        }
+                    },
+                )
+                .child(div().text_size(px(14.)).child(icon))
+                .child(label)
+        }));
+
     section_shell(
         view,
         "spatial",
@@ -183,85 +305,8 @@ fn spatial_section(
                 let _ = &view;
             }
         },
-        if expanded {
-            Some(
-                div()
-                    .flex()
-                    .gap(px(6.))
-                    .px_3()
-                    .pt_1()
-                    .pb_3()
-                    .children(ids.iter().enumerate().map(|(i, id)| {
-                        let label = match id.as_str() {
-                            "Music" => "Music Mode".to_string(),
-                            "Movie" => "Movie Mode".to_string(),
-                            "Gaming" => "Gaming Mode".to_string(),
-                            _ => localized
-                                .get(i)
-                                .cloned()
-                                .filter(|x| !x.is_empty())
-                                .unwrap_or_else(|| id.clone()),
-                        };
-                        let on = *id == current;
-                        let icon = match id.as_str() {
-                            "Music" => "♪",
-                            "Movie" => "▶",
-                            "Gaming" => "◈",
-                            _ => "♪",
-                        };
-                        let view = view.clone();
-                        let id = id.clone();
-                        div()
-                            .id(gpui::SharedString::from(format!("spatial-mode-{id}")))
-                            .flex_1()
-                            .min_w_0()
-                            .flex()
-                            .flex_col()
-                            .items_center()
-                            .justify_center()
-                            .gap_2()
-                            .py_3()
-                            .rounded_xl()
-                            .text_size(px(11.))
-                            .font_weight(gpui::FontWeight::MEDIUM)
-                            .when(on, |el| {
-                                el.bg(theme::brand())
-                                    .text_color(theme::brand_foreground())
-                                    .border_2()
-                                    .border_color(theme::brand_40())
-                            })
-                            .when(!on, |el| {
-                                el.bg(theme::surface_elevated())
-                                    .text_color(theme::foreground())
-                                    .opacity(0.7)
-                                    .border_1()
-                                    .border_color(theme::border_subtle())
-                                    .hover(|st| st.opacity(1.0).bg(theme::hover_subtle()))
-                            })
-                            .cursor_pointer()
-                            .on_click(move |_, _window, cx| {
-                                let view = view.clone();
-                                let id = id.clone();
-                                view.update(cx, |root, cx| {
-                                    root.set_spatial_mode(&id, cx);
-                                });
-                            })
-                            .child(
-                                div()
-                                    .text_size(px(14.))
-                                    .text_color(if on {
-                                        theme::brand_foreground()
-                                    } else {
-                                        theme::foreground()
-                                    })
-                                    .child(icon),
-                            )
-                            .child(label)
-                    })),
-            )
-        } else {
-            None
-        },
+        body,
+        80.0,
     )
 }
 
@@ -286,6 +331,84 @@ fn default_card(
         })
         .or_else(|| current.clone());
 
+    let body = div()
+        .px_3()
+        .pt_1()
+        .pb_3()
+        .flex()
+        .flex_col()
+        .gap(px(10.))
+        .child(
+            div()
+                .id("preset-grid")
+                .grid()
+                .grid_cols(2)
+                .gap_2()
+                .max_h(px(120.))
+                .overflow_y_scroll()
+                .children(options.into_iter().map(|(id, label)| {
+                    let on = current.as_deref() == Some(id.as_str());
+                    let spring_key = SharedString::from(format!("preset-chip-spring-{id}"));
+                    let id_key = SharedString::from(format!("preset-chip-{id}"));
+                    let view = view.clone();
+                    let id = id.clone();
+                    div()
+                        .id(id_key)
+                        .w_full()
+                        .px_3()
+                        .py_2()
+                        .rounded_full()
+                        .text_size(px(12.))
+                        .font_weight(gpui::FontWeight::MEDIUM)
+                        .text_ellipsis()
+                        .whitespace_nowrap()
+                        .cursor_pointer()
+                        .on_click(move |_, _window, cx| {
+                            let view = view.clone();
+                            let id = id.clone();
+                            view.update(cx, |root, _cx| {
+                                if root
+                                    .active_device()
+                                    .map(|d| {
+                                        data::device_preset_id(&data::settings_map(d))
+                                    })
+                                    .flatten()
+                                    .as_deref()
+                                    != Some(id.as_str())
+                                {
+                                    let mac = root
+                                        .active_device()
+                                        .map(|d| d.mac_address.clone())
+                                        .unwrap_or_default();
+                                    root.send_setting(
+                                        &mac,
+                                        "presetEqualizerProfile",
+                                        &id,
+                                    );
+                                }
+                            });
+                        })
+                        .with_spring(
+                            spring_key,
+                            SpringAnimation::new(CARD_SPRING).to(phase(on)),
+                            move |this, p| {
+                                let p = p.clamp(0.0..=1.0);
+                                let bg =
+                                    p.interpolate(theme::surface_elevated(), theme::brand());
+                                let text =
+                                    p.interpolate(theme::foreground(), theme::brand_foreground());
+                                let opacity = p.interpolate(0.8, 1.0);
+                                let el = this.bg(bg).text_color(text).opacity(opacity);
+                                if on {
+                                    el
+                                } else {
+                                    el.hover(|st| st.opacity(1.0).bg(theme::hover_subtle()))
+                                }
+                            },
+                        )
+                        .child(label)
+                })));
+
     section_shell(
         view,
         "default",
@@ -301,83 +424,11 @@ fn default_card(
                 let _ = &view;
             }
         },
-        if expanded {
-            Some(
-                div()
-                    .px_3()
-                    .pt_1()
-                    .pb_3()
-                    .flex()
-                    .flex_col()
-                    .gap(px(10.))
-                    .child(
-                        div()
-                            .id("preset-grid")
-                            .grid()
-                            .grid_cols(2)
-                            .gap_2()
-                            .max_h(px(120.))
-                            .overflow_y_scroll()
-                            .children(options.into_iter().map(|(id, label)| {
-                                let on = current.as_deref() == Some(id.as_str());
-                                let view = view.clone();
-                                div()
-                                    .id(gpui::SharedString::from(format!("preset-chip-{id}")))
-                                    .w_full()
-                                    .px_3()
-                                    .py_2()
-                                    .rounded_full()
-                                    .text_size(px(12.))
-                                    .font_weight(gpui::FontWeight::MEDIUM)
-                                    .text_ellipsis()
-                                    .whitespace_nowrap()
-                                    .when(on, |el| {
-                                        el.bg(theme::brand())
-                                            .text_color(theme::brand_foreground())
-                                    })
-                                    .when(!on, |el| {
-                                        el.bg(theme::surface_elevated())
-                                            .text_color(theme::foreground())
-                                            .opacity(0.8)
-                                            .hover(|st| st.opacity(1.0).bg(theme::hover_subtle()))
-                                    })
-                                    .cursor_pointer()
-                                    .on_click(move |_, _window, cx| {
-                                        let view = view.clone();
-                                        let id = id.clone();
-                                        view.update(cx, |root, _cx| {
-                                            if root
-                                                .active_device()
-                                                .map(|d| {
-                                                    data::device_preset_id(
-                                                        &data::settings_map(d),
-                                                    )
-                                                })
-                                                .flatten()
-                                                .as_deref()
-                                                != Some(id.as_str())
-                                            {
-                                                let mac = root
-                                                    .active_device()
-                                                    .map(|d| d.mac_address.clone())
-                                                    .unwrap_or_default();
-                                                root.send_setting(
-                                                    &mac,
-                                                    "presetEqualizerProfile",
-                                                    &id,
-                                                );
-                                            }
-                                        });
-                                    })
-                                    .child(label)
-                            })),
-                    ),
-            )
-        } else {
-            None
-        },
+        body,
+        140.0,
     )
 }
+
 
 /* ── Custom EQ card (graph inline when selected) ──────────────────── */
 
@@ -390,11 +441,7 @@ fn custom_card(
     cx: &mut Context<RootView>,
 ) -> impl IntoElement {
     let name = data::match_custom_preset(s, &root.eq_presets).unwrap_or_else(|| "Custom".into());
-    let body = if expanded {
-        Some(eq_graph(root, view, d, s, cx))
-    } else {
-        None
-    };
+    let body = eq_graph(root, view, d, s, cx);
     section_shell(
         view,
         "custom",
@@ -411,6 +458,7 @@ fn custom_card(
             }
         },
         body,
+        360.0,
     )
 }
 
@@ -426,26 +474,36 @@ fn section_shell(
     icon: impl IntoElement,
     cx: &mut Context<RootView>,
     on_toggle: impl Fn(&mut RootView, &mut Context<RootView>) + 'static,
-    body: Option<gpui::Div>,
+    body: gpui::Div,
+    body_height: f32,
 ) -> impl IntoElement {
     let _ = cx;
     let view = view.clone();
     let title = title.to_string();
     let subtitle = subtitle;
+    let card_key = SharedString::from(format!("se-card-spring-{key}"));
+    let body_key = SharedString::from(format!("se-body-spring-{key}"));
 
     div()
-        .id(gpui::SharedString::from(format!("se-card-{key}")))
+        .id(SharedString::from(format!("se-card-{key}")))
         .w_full()
         .flex()
         .flex_col()
         .rounded_2xl()
-        .bg(theme::surface())
-        .border_1()
-        .border_color(theme::border_subtle())
         .overflow_hidden()
+        .with_spring(
+            card_key,
+            SpringAnimation::new(CARD_SPRING).to(phase(expanded)),
+            move |this, p| {
+                let p = p.clamp(0.0..=1.0);
+                let bg = p.interpolate(theme::surface(), theme::brand_10());
+                let border = p.interpolate(theme::border_subtle(), theme::brand_40());
+                this.bg(bg).border_1().border_color(border)
+            },
+        )
         .child(
             div()
-                .id(gpui::SharedString::from(format!("se-head-{key}")))
+                .id(SharedString::from(format!("se-head-{key}")))
                 .w_full()
                 .h(px(48.))
                 .px_3()
@@ -496,9 +554,22 @@ fn section_shell(
                                 }),
                         ),
                 )
-                .child(radio_circle(expanded)),
+                .child(animated_radio(expanded, key)),
         )
-        .children(body)
+        .child(
+            div()
+                .w_full()
+                .overflow_hidden()
+                .with_spring(
+                    body_key,
+                    SpringAnimation::new(BODY_SPRING).to(phase(expanded)),
+                    move |this, p| {
+                        let p = p.clamp(0.0..=1.0);
+                        this.h(px(body_height * p.0)).opacity(p.0)
+                    },
+                )
+                .child(body),
+        )
 }
 
 
@@ -879,8 +950,12 @@ fn eq_graph(
                     let bands = preset.bands.clone();
                     let preset_id = preset.id;
                     let active = active_preset_id == Some(preset.id);
+                    let spring_key = SharedString::from(format!(
+                        "eq-preset-spring-{}",
+                        preset.id
+                    ));
                     div()
-                        .id(gpui::SharedString::from(format!(
+                        .id(SharedString::from(format!(
                             "eq-preset-{}",
                             preset.id
                         )))
@@ -888,23 +963,11 @@ fn eq_graph(
                         .px_3()
                         .flex_shrink_0()
                         .rounded_xl()
-                        .bg(if active { theme::brand() } else { theme::surface_elevated() })
                         .border_1()
-                        .border_color(if active {
-                            theme::brand()
-                        } else {
-                            theme::border_subtle()
-                        })
                         .flex()
                         .items_center()
                         .text_size(px(12.))
                         .font_weight(gpui::FontWeight::MEDIUM)
-                        .text_color(if active {
-                            theme::brand_foreground()
-                        } else {
-                            theme::foreground()
-                        })
-                        .hover(|st| st.bg(theme::hover_subtle()))
                         .cursor_pointer()
                         .on_click(move |_, _, cx| {
                             view.update(cx, |root, cx| {
@@ -919,6 +982,25 @@ fn eq_graph(
                                 cx.notify();
                             });
                         })
+                        .with_spring(
+                            spring_key,
+                            SpringAnimation::new(CARD_SPRING).to(phase(active)),
+                            move |this, p| {
+                                let p = p.clamp(0.0..=1.0);
+                                let bg =
+                                    p.interpolate(theme::surface_elevated(), theme::brand());
+                                let border =
+                                    p.interpolate(theme::border_subtle(), theme::brand());
+                                let text =
+                                    p.interpolate(theme::foreground(), theme::brand_foreground());
+                                let el = this.bg(bg).border_color(border).text_color(text);
+                                if active {
+                                    el
+                                } else {
+                                    el.hover(|st| st.bg(theme::hover_subtle()))
+                                }
+                            },
+                        )
                         .child(preset.name.clone())
                 })),
         )
