@@ -38,24 +38,33 @@ pub fn render(
         .size_full()
         .relative()
         .overflow_hidden()
-        // Header pinned to top
+        // Header pinned to top with breathing room
         .child(
             div()
                 .absolute()
-                .top(px(0.))
+                .top(px(10.))
                 .left(px(0.))
                 .right(px(0.))
                 .h(px(44.))
                 .px_3()
                 .flex()
                 .items_center()
-                .gap_3()
+                .justify_center()
                 .border_b_1()
                 .border_color(theme::border_medium())
-                .child(header_btn(&view, cx, |root, cx| {
-                    root.show_settings = false;
-                    cx.notify();
-                }))
+                .child(
+                    div()
+                        .absolute()
+                        .left(px(12.))
+                        .top(px(0.))
+                        .bottom(px(0.))
+                        .flex()
+                        .items_center()
+                        .child(header_btn(&view, cx, |root, cx| {
+                            root.show_settings = false;
+                            cx.notify();
+                        })),
+                )
                 .child(
                     div()
                         .text_size(px(15.))
@@ -69,7 +78,7 @@ pub fn render(
             div()
                 .id("settings-body")
                 .absolute()
-                .top(px(49.))
+                .top(px(59.))
                 .left(px(0.))
                 .right(px(0.))
                 .bottom(px(0.))

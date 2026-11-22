@@ -4,7 +4,7 @@
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, prelude::*};
 use crate::ui::scale::px;
 
-use super::common::{chevron_left, close_icon, radio_circle, sliders_icon};
+use super::common::{chevron_left, close_icon, eq_bars_icon, eq_image_icon, radio_circle};
 use crate::ui::{RootView, data, theme};
 
 pub fn render(
@@ -15,16 +15,11 @@ pub fn render(
 ) -> gpui::Div {
     let view = cx.entity();
     let s = data::settings_map(d);
-    let eq = root.eq_presets.clone();
-
-    if root.show_equalizer {
-        return equalizer_screen(&view, d, &s, cx);
-    }
 
     let active = root.se_active();
     let show_spatial = data::has_spatial(&s);
     let show_default = data::has_default(&s);
-    let show_custom = data::has_custom(&s);
+    let show_custom = data::has_writable_custom(&s);
 
     div()
         .size_full()
@@ -51,7 +46,6 @@ pub fn render(
                         .gap_3()
                         .child(header_btn(&view, "se-back", cx, |root, cx| {
                             root.show_sound_effects = false;
-                            root.show_equalizer = false;
                             cx.notify();
                         }, chevron_left(14., theme::muted())))
                         .child(
@@ -64,7 +58,6 @@ pub fn render(
                 )
                 .child(header_btn(&view, "se-x", cx, |root, cx| {
                     root.show_sound_effects = false;
-                    root.show_equalizer = false;
                     cx.notify();
                 }, close_icon(14., theme::muted()))),
         )
@@ -95,9 +88,14 @@ pub fn render(
                     ))
                 })
                 .when(show_custom, |el| {
-                    let name =
-                        data::match_custom_preset(&s, &eq).unwrap_or_else(|| "Custom".into());
-                    el.child(custom_card(&view, &name, active == data::SECTION_CUSTOM, cx))
+                    el.child(custom_card(
+                        root,
+                        &view,
+                        d,
+                        &s,
+                        active == data::SECTION_CUSTOM,
+                        cx,
+                    ))
                 }),
         )
 }
@@ -176,7 +174,7 @@ fn spatial_section(
         "Spatial Audio",
         None,
         expanded,
-        "spatial-icon",
+        eq_image_icon("spatial-icon", 16.),
         cx,
         {
             let view = view.clone();
@@ -294,7 +292,7 @@ fn default_card(
         "Default",
         current_label,
         expanded,
-        "default-icon",
+        eq_image_icon("default-icon", 16.),
         cx,
         {
             let view = view.clone();
@@ -314,9 +312,12 @@ fn default_card(
                     .gap(px(10.))
                     .child(
                         div()
+                            .id("preset-grid")
                             .grid()
                             .grid_cols(2)
                             .gap_2()
+                            .max_h(px(120.))
+                            .overflow_y_scroll()
                             .children(options.into_iter().map(|(id, label)| {
                                 let on = current.as_deref() == Some(id.as_str());
                                 let view = view.clone();
@@ -378,21 +379,29 @@ fn default_card(
     )
 }
 
-/* ── Custom EQ card (header only) ─────────────────────────────────── */
+/* ── Custom EQ card (graph inline when selected) ──────────────────── */
 
 fn custom_card(
+    root: &RootView,
     view: &Entity<RootView>,
-    name: &str,
+    d: &crate::DeviceStateDto,
+    s: &data::SettingsMap,
     expanded: bool,
     cx: &mut Context<RootView>,
 ) -> impl IntoElement {
+    let name = data::match_custom_preset(s, &root.eq_presets).unwrap_or_else(|| "Custom".into());
+    let body = if expanded {
+        Some(eq_graph(root, view, d, s, cx))
+    } else {
+        None
+    };
     section_shell(
         view,
         "custom",
         "Custom EQ",
-        Some(name.to_string()),
+        Some(name),
         expanded,
-        "custom-icon",
+        eq_bars_icon(16., theme::brand()),
         cx,
         {
             let view = view.clone();
@@ -401,7 +410,7 @@ fn custom_card(
                 let _ = &view;
             }
         },
-        None,
+        body,
     )
 }
 
@@ -414,7 +423,7 @@ fn section_shell(
     title: &str,
     subtitle: Option<String>,
     expanded: bool,
-    icon_id: &'static str,
+    icon: impl IntoElement,
     cx: &mut Context<RootView>,
     on_toggle: impl Fn(&mut RootView, &mut Context<RootView>) + 'static,
     body: Option<gpui::Div>,
@@ -423,7 +432,6 @@ fn section_shell(
     let view = view.clone();
     let title = title.to_string();
     let subtitle = subtitle;
-    let icon = section_icon(icon_id);
 
     div()
         .id(gpui::SharedString::from(format!("se-card-{key}")))
@@ -493,157 +501,399 @@ fn section_shell(
         .children(body)
 }
 
-fn section_icon(kind: &str) -> &'static str {
-    match kind {
-        "spatial-icon" => "♪",
-        "default-icon" => "▦",
-        _ => "≡",
+
+/* -- Custom EQ graph (inline) ---------------------------------------- */
+const EQ_GRAPH_H: f32 = 300.0;
+const EQ_STEPS: usize = 25;
+
+fn eq_db(v: i16, digits: i32) -> String {
+    let scale = 10f32.powi(digits);
+    let n = v as f32 / scale;
+    let s = if digits > 0 {
+        format!("{n:.*}", digits as usize)
+    } else {
+        format!("{n:.0}")
+    };
+    if n > 0.0 {
+        format!("+{s}")
+    } else {
+        s
     }
 }
 
-/* ── Custom EQ second-level screen ────────────────────────────────── */
-
-fn equalizer_screen(
-    view: &Entity<RootView>,
-    d: &crate::DeviceStateDto,
-    s: &data::SettingsMap,
-    cx: &mut Context<RootView>,
-) -> gpui::Div {
-    let _ = d;
-    div()
-        .size_full()
-        .relative()
-        .overflow_hidden()
-        // Header pinned to top
-        .child(
-            div()
-                .absolute()
-                .top(px(0.))
-                .left(px(0.))
-                .right(px(0.))
-                .h(px(44.))
-                .px_3()
-                .flex()
-                .items_center()
-                .gap(px(10.))
-                .border_b_1()
-                .border_color(theme::border_medium())
-                .child(header_btn(view, "eq-back", cx, |root, cx| {
-                    root.show_equalizer = false;
-                    cx.notify();
-                }, chevron_left(14., theme::muted())))
-                .child(
-                    div()
-                        .text_size(px(15.))
-                        .font_weight(gpui::FontWeight::SEMIBOLD)
-                        .text_color(theme::foreground())
-                        .child("Custom EQ"),
-                ),
-        )
-        // Body fills below header
-        .child(
-            div()
-                .id("eq-body")
-                .absolute()
-                .top(px(49.))
-                .left(px(0.))
-                .right(px(0.))
-                .bottom(px(0.))
-                .overflow_y_scroll()
-                .p_4()
-                .child(equalizer(view, s)),
-        )
+fn eq_hz(hz: u16) -> String {
+    if hz >= 1000 {
+        let k = hz as f32 / 1000.0;
+        if k.fract() == 0.0 {
+            format!("{k:.0}k")
+        } else {
+            format!("{k:.1}k")
+        }
+    } else {
+        hz.to_string()
+    }
 }
 
-/* ── Read-only equalizer bars (display) ───────────────────────────── */
+fn eq_value_y(v: i16, min: i16, max: i16) -> f32 {
+    let range = (max - min).max(1) as f32;
+    ((max as f32 - v as f32) / range * EQ_GRAPH_H).clamp(0.0, EQ_GRAPH_H)
+}
 
-fn equalizer(view: &Entity<RootView>, s: &data::SettingsMap) -> impl IntoElement {
-    let _ = view;
-    let Some(eq) = s.get("volumeAdjustments").cloned() else {
-        return div();
-    };
-    let values: Vec<f64> = eq
-        .get("value")
-        .and_then(|v| v.as_array())
-        .map(|a| a.iter().filter_map(|x| x.as_f64()).collect())
-        .unwrap_or_default();
-    let band_meta = eq
+fn eq_graph(
+    root: &RootView,
+    view: &Entity<RootView>,
+    _d: &crate::DeviceStateDto,
+    s: &data::SettingsMap,
+    _cx: &mut Context<RootView>,
+) -> gpui::Div {
+    let eq = s
+        .get("volumeAdjustments")
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
+    let meta = eq
         .get("setting")
         .cloned()
         .unwrap_or(serde_json::Value::Null);
-    let min = band_meta.get("min").and_then(|v| v.as_f64()).unwrap_or(0.0);
-    let max = band_meta.get("max").and_then(|v| v.as_f64()).unwrap_or(1.0);
-    let range = (max - min).abs().max(1e-6);
+    let bands: Vec<String> = eq
+        .get("value")
+        .and_then(|v| v.as_array())
+        .map(|a| a.iter().map(|x| x.to_string()).collect())
+        .unwrap_or_default();
+    let values: Vec<i16> = bands.iter().filter_map(|x| x.parse().ok()).collect();
+    let draft = if root.eq_draft.len() == values.len() && !values.is_empty() {
+        root.eq_draft.clone()
+    } else {
+        values.clone()
+    };
+    let hz: Vec<u16> = meta
+        .get("bandHz")
+        .and_then(|v| v.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|x| x.as_u64().map(|n| n as u16))
+                .collect()
+        })
+        .unwrap_or_default();
+    let min = meta.get("min").and_then(|v| v.as_i64()).unwrap_or(-60) as i16;
+    let max = meta.get("max").and_then(|v| v.as_i64()).unwrap_or(60) as i16;
+    let digits = meta
+        .get("fractionDigits")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(1) as i32;
+    let levels = [max, (max as f32 * 0.5) as i16, 0, (min as f32 * 0.5) as i16, min];
+    let step_h = EQ_GRAPH_H / EQ_STEPS as f32;
+    let mac = root
+        .active_device()
+        .map(|dev| dev.mac_address.clone())
+        .unwrap_or_default();
+    let model = root
+        .active_device()
+        .map(|dev| dev.model.clone())
+        .unwrap_or_default();
+    let presets = root.eq_presets.clone();
+    let active_preset = data::match_custom_preset(s, &presets).unwrap_or_default();
+    let drag_band = root.eq_drag_band;
 
     div()
-        .rounded_2xl()
-        .bg(theme::surface())
-        .border_1()
-        .border_color(theme::border_subtle())
-        .overflow_hidden()
+        .px_3()
+        .pt_2()
+        .pb_3()
+        .flex()
+        .flex_col()
         .child(
             div()
-                .px_3()
-                .py_3()
+                .mb_2()
+                .w_full()
                 .flex()
                 .items_center()
-                .gap_2()
-                .border_b_1()
-                .border_color(theme::border_subtle())
-                .child(sliders_icon(16., theme::brand()))
+                .justify_between()
                 .child(
                     div()
-                        .text_size(px(14.))
+                        .text_size(px(10.))
                         .font_weight(gpui::FontWeight::SEMIBOLD)
-                        .text_color(theme::brand())
-                        .child("Equalizer"),
+                        .text_color(theme::muted())
+                        .child("EQ CURVE"),
                 )
                 .child(
                     div()
+                        .id("eq-reset")
+                        .px_2()
+                        .py_1()
+                        .rounded_md()
                         .text_size(px(11.))
-                        .text_color(theme::muted())
-                        .child("Read-only"),
+                        .text_color(theme::brand())
+                        .hover(|st| st.bg(theme::hover_subtle()))
+                        .cursor_pointer()
+                        .on_click({
+                            let view = view.clone();
+                            let mac = mac.clone();
+                            let count = draft.len();
+                            move |_, _, cx| {
+                                view.update(cx, |root, cx| {
+                                    root.eq_draft = vec![0; count];
+                                    if !mac.is_empty() {
+                                        let raw = vec!["0"; count].join(",");
+                                        root.send_setting(&mac, "volumeAdjustments", &raw);
+                                    }
+                                    cx.notify();
+                                });
+                            }
+                        })
+                        .child("Reset"),
                 ),
         )
         .child(
             div()
-                .p_3()
+                .w_full()
                 .flex()
-                .items_end()
-                .justify_between()
-                .gap_1()
-                .children(values.iter().enumerate().map(|(i, v)| {
-                    let frac = ((v - min) / range).clamp(0.0, 1.0) as f32;
-                    let h = 100.0 * frac + 8.0;
+                .child(
                     div()
-                        .id(("eq-band", i))
+                        .w(px(30.))
+                        .h(px(EQ_GRAPH_H))
                         .flex()
                         .flex_col()
-                        .items_center()
-                        .gap_1()
-                        .child(
+                        .justify_between()
+                        .pr_1()
+                        .text_size(px(9.))
+                        .text_color(theme::muted())
+                        .children(levels.iter().map(|v| eq_db(*v, digits))),
+                )
+                .child(
+                    div()
+                        .relative()
+                        .flex_1()
+                        .h(px(EQ_GRAPH_H))
+                        .children((0..5).map(|i| {
                             div()
-                                .w(px(14.))
-                                .h(px(h))
-                                .rounded_sm()
-                                .bg(theme::brand())
-                                .opacity(0.85),
-                        )
-                        .child(
+                                .absolute()
+                                .left(px(0.))
+                                .right(px(0.))
+                                .top(px(EQ_GRAPH_H * i as f32 / 4.0))
+                                .h(px(1.))
+                                .bg(theme::border_subtle())
+                        }))
+                        .flex()
+                        .children(draft.iter().enumerate().map(|(i, v)| {
+                            let y = eq_value_y(*v, min, max);
+                            let active = drag_band == Some(i);
+                            let size = if active { 18.0 } else { 14.0 };
+
                             div()
-                                .text_size(px(9.))
-                                .text_color(theme::muted())
-                                .child(format!("{}", i + 1)),
-                        )
-                })),
+                                .relative()
+                                .flex_1()
+                                .h(px(EQ_GRAPH_H))
+                                .on_mouse_up(gpui::MouseButton::Left, {
+                                    let view = view.clone();
+                                    let mac = mac.clone();
+                                    move |_, _, cx| {
+                                        view.update(cx, |root, cx| {
+                                            if root.eq_drag_band.is_none() {
+                                                return;
+                                            }
+                                            root.eq_drag_band = None;
+                                            if !mac.is_empty() {
+                                                let raw = root
+                                                    .eq_draft
+                                                    .iter()
+                                                    .map(|value| value.to_string())
+                                                    .collect::<Vec<_>>()
+                                                    .join(",");
+                                                root.send_setting(&mac, "volumeAdjustments", &raw);
+                                            }
+                                            cx.notify();
+                                        });
+                                    }
+                                })
+                                .child(
+                                    div()
+                                        .absolute()
+                                        .left(px(0.))
+                                        .top(px(0.))
+                                        .bottom(px(0.))
+                                        .w(px(1.))
+                                        .bg(theme::border_subtle()),
+                                )
+                                .children((0..EQ_STEPS).map(|k| {
+                                    let value = (max as f32
+                                        - k as f32 * (max - min) as f32
+                                            / (EQ_STEPS - 1) as f32)
+                                        .round()
+                                        as i16;
+                                    div()
+                                        .id(gpui::SharedString::from(format!(
+                                            "eq-step-{i}-{k}"
+                                        )))
+                                        .absolute()
+                                        .left(px(0.))
+                                        .right(px(0.))
+                                        .top(px(k as f32 * step_h))
+                                        .h(px(step_h))
+                                        .on_mouse_down(gpui::MouseButton::Left, {
+                                            let view = view.clone();
+                                            move |_, _, cx| {
+                                                view.update(cx, |root, cx| {
+                                                    if i < root.eq_draft.len() {
+                                                        root.eq_draft[i] = value;
+                                                    }
+                                                    root.eq_drag_band = Some(i);
+                                                    cx.notify();
+                                                });
+                                            }
+                                        })
+                                        .on_mouse_move({
+                                            let view = view.clone();
+                                            move |_, _, cx| {
+                                                if view.read(cx).eq_drag_band != Some(i) {
+                                                    return;
+                                                }
+                                                view.update(cx, |root, cx| {
+                                                    if i < root.eq_draft.len()
+                                                        && root.eq_draft[i] != value
+                                                    {
+                                                        root.eq_draft[i] = value;
+                                                        cx.notify();
+                                                    }
+                                                });
+                                            }
+                                        })
+                                }))
+                                .child(
+                                    div()
+                                        .absolute()
+                                        .left(px(0.))
+                                        .right(px(0.))
+                                        .top(px(y - size * 0.5))
+                                        .h(px(size))
+                                        .flex()
+                                        .justify_center()
+                                        .child(
+                                            div()
+                                                .size(px(size))
+                                                .rounded_full()
+                                                .bg(if active {
+                                                    theme::brand()
+                                                } else {
+                                                    theme::surface_elevated()
+                                                })
+                                                .border_2()
+                                                .border_color(if active {
+                                                    theme::foreground()
+                                                } else {
+                                                    theme::brand()
+                                                }),
+                                        ),
+                                )
+                                .child(
+                                    div()
+                                        .absolute()
+                                        .left(px(0.))
+                                        .right(px(0.))
+                                        .top(px(EQ_GRAPH_H + 2.))
+                                        .text_size(px(9.))
+                                        .text_color(theme::muted())
+                                        .text_center()
+                                        .child(
+                                            hz.get(i)
+                                                .copied()
+                                                .map(eq_hz)
+                                                .unwrap_or_default(),
+                                        ),
+                                )
+                        })),
+                ),
         )
         .child(
             div()
-                .px_3()
-                .pb_3()
-                .text_size(px(11.))
-                .text_color(theme::muted())
-                .text_center()
-                .child("Tune the sound exactly the way you like it."),
+                .id("eq-presets")
+                .mt(px(10.))
+                .w_full()
+                .flex()
+                .items_center()
+                .gap_2()
+                .overflow_x_scroll()
+                .child(
+                    div()
+                        .id("eq-new-preset")
+                        .size(px(38.))
+                        .flex_shrink_0()
+                        .rounded_xl()
+                        .bg(theme::surface_elevated())
+                        .border_1()
+                        .border_color(theme::border_subtle())
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .text_size(px(18.))
+                        .text_color(theme::brand())
+                        .hover(|st| st.bg(theme::hover_subtle()))
+                        .cursor_pointer()
+                        .on_click({
+                            let view = view.clone();
+                            let bands = draft
+                                .iter()
+                                .map(|value| value.to_string())
+                                .collect::<Vec<_>>()
+                                .join(",");
+                            let model = model.clone();
+                            let name = format!("Custom {}", presets.len() + 1);
+                            move |_, _, cx| {
+                                view.update(cx, |root, cx| {
+                                    match crate::save_eq_preset(
+                                        crate::state(),
+                                        name.clone(),
+                                        bands.clone(),
+                                        model.clone(),
+                                    ) {
+                                        Ok(preset) => root.eq_presets.push(preset),
+                                        Err(err) => tracing::warn!("save eq preset failed: {err}"),
+                                    }
+                                    cx.notify();
+                                });
+                            }
+                        })
+                        .child("+"),
+                )
+                .children(presets.iter().map(|preset| {
+                    let view = view.clone();
+                    let mac = mac.clone();
+                    let bands = preset.bands.clone();
+                    let active = active_preset == preset.name;
+                    div()
+                        .id(gpui::SharedString::from(format!(
+                            "eq-preset-{}",
+                            preset.id
+                        )))
+                        .h(px(38.))
+                        .px_3()
+                        .flex_shrink_0()
+                        .rounded_xl()
+                        .bg(if active { theme::brand() } else { theme::surface_elevated() })
+                        .border_1()
+                        .border_color(if active {
+                            theme::brand()
+                        } else {
+                            theme::border_subtle()
+                        })
+                        .flex()
+                        .items_center()
+                        .text_size(px(12.))
+                        .font_weight(gpui::FontWeight::MEDIUM)
+                        .text_color(if active {
+                            theme::brand_foreground()
+                        } else {
+                            theme::foreground()
+                        })
+                        .hover(|st| st.bg(theme::hover_subtle()))
+                        .cursor_pointer()
+                        .on_click(move |_, _, cx| {
+                            view.update(cx, |root, cx| {
+                                if !mac.is_empty() {
+                                    root.send_setting(&mac, "volumeAdjustments", &bands);
+                                }
+                                cx.notify();
+                            });
+                        })
+                        .child(preset.name.clone())
+                })),
         )
 }

@@ -55,6 +55,28 @@ pub(crate) fn chevron_left(size: f32, color: Hsla) -> impl IntoElement {
         .child("‹")
 }
 
+/// Section icons extracted from the official Soundcore APK.
+pub(crate) fn eq_image_icon(kind: &str, size: f32) -> impl IntoElement {
+    static SPATIAL: OnceLock<std::sync::Arc<gpui::Image>> = OnceLock::new();
+    static DEFAULT: OnceLock<std::sync::Arc<gpui::Image>> = OnceLock::new();
+
+    let img = match kind {
+        "spatial-icon" => SPATIAL.get_or_init(|| {
+            std::sync::Arc::new(gpui::Image::from_bytes(
+                gpui::ImageFormat::Png,
+                include_bytes!("../../../assets/icons/eq_spatial.png").to_vec(),
+            ))
+        }),
+        _ => DEFAULT.get_or_init(|| {
+            std::sync::Arc::new(gpui::Image::from_bytes(
+                gpui::ImageFormat::Png,
+                include_bytes!("../../../assets/icons/eq_default.png").to_vec(),
+            ))
+        }),
+    };
+    gpui::img(img.clone()).size(px(size))
+}
+
 /// Radio-circle expand indicator (React `RadioCircle`).
 pub(crate) fn radio_circle(active: bool) -> impl IntoElement {
     div()
@@ -140,6 +162,41 @@ pub(crate) fn gear_icon(size: f32, color: Hsla) -> impl IntoElement {
         .text_color(color)
         .text_size(px(size))
         .child("⚙︎")
+}
+
+/// Custom EQ glyph matching the official app's `ic_eq_custom.svg`.
+pub(crate) fn eq_bars_icon(size: f32, color: Hsla) -> impl IntoElement {
+    let s = size / 24.0;
+    let line = |x: f32, top: f32, bottom: f32| {
+        div()
+            .absolute()
+            .left(px((x - 0.75) * s))
+            .top(px(top * s))
+            .w(px(1.5 * s))
+            .h(px((bottom - top) * s))
+            .rounded_full()
+            .bg(color)
+    };
+    let knob = |x: f32, y: f32| {
+        div()
+            .absolute()
+            .left(px((x - 2.5) * s))
+            .top(px((y - 2.5) * s))
+            .size(px(5.0 * s))
+            .rounded_full()
+            .border_1()
+            .border_color(color)
+    };
+    div()
+        .size(px(size))
+        .relative()
+        .child(line(5.5, 8.0, 21.0))
+        .child(line(12.0, 3.0, 9.5))
+        .child(line(12.0, 14.5, 21.0))
+        .child(line(18.5, 3.0, 16.0))
+        .child(knob(5.5, 5.5))
+        .child(knob(12.0, 12.0))
+        .child(knob(18.5, 18.5))
 }
 
 /// Circled-i glyph (About nav).
