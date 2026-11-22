@@ -275,7 +275,11 @@ mod tests {
     use super::*;
 
     fn dev(mac: &str, last_connected: Option<u64>) -> DeviceConfig {
-        DeviceConfig { mac_address: mac.to_owned(), last_connected, ..DeviceConfig::default() }
+        DeviceConfig {
+            mac_address: mac.to_owned(),
+            last_connected,
+            ..DeviceConfig::default()
+        }
     }
 
     #[test]
@@ -308,7 +312,12 @@ mod tests {
 
     #[test]
     fn sort_devices_is_stable_for_ties_and_never_connected() {
-        let mut devices = vec![dev("first", Some(100)), dev("second", Some(100)), dev("third", None), dev("fourth", None)];
+        let mut devices = vec![
+            dev("first", Some(100)),
+            dev("second", Some(100)),
+            dev("third", None),
+            dev("fourth", None),
+        ];
         sort_devices_by_recency(&mut devices);
         let order: Vec<&str> = devices.iter().map(|d| d.mac_address.as_str()).collect();
         assert_eq!(order, vec!["first", "second", "third", "fourth"]);

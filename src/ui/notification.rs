@@ -100,9 +100,7 @@ impl Render for NotificationView {
                             .items_center()
                             .justify_center()
                             .children(image.map(|img| gpui::img(img).size_full()))
-                            .when(!has_image, |el| {
-                                el.child(sliders_icon(22., theme::brand()))
-                            }),
+                            .when(!has_image, |el| el.child(sliders_icon(22., theme::brand()))),
                     )
                     .child(
                         div()
@@ -124,12 +122,7 @@ impl Render for NotificationView {
                                     .flex()
                                     .items_center()
                                     .gap_2()
-                                    .child(
-                                        div()
-                                            .size(px(7.))
-                                            .rounded_full()
-                                            .bg(accent),
-                                    )
+                                    .child(div().size(px(7.)).rounded_full().bg(accent))
                                     .child(
                                         div()
                                             .text_size(px(11.))

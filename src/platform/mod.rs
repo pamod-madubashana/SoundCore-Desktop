@@ -31,8 +31,8 @@ pub fn get_windows_accent() -> Option<String> {
 
 #[cfg(target_os = "windows")]
 fn read_windows_accent() -> Result<String, Box<dyn std::error::Error>> {
-    use winreg::enums::HKEY_CURRENT_USER;
     use winreg::RegKey;
+    use winreg::enums::HKEY_CURRENT_USER;
 
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let dwm = hkcu.open_subkey("Software\\Microsoft\\Windows\\DWM")?;
@@ -55,7 +55,9 @@ fn read_accent_palette_light2() -> Option<String> {
 
     unsafe {
         let mut key = HKEY::default();
-        let subkey: Vec<u16> = "Software\\Microsoft\\Windows\\DWM\0".encode_utf16().collect();
+        let subkey: Vec<u16> = "Software\\Microsoft\\Windows\\DWM\0"
+            .encode_utf16()
+            .collect();
         let err = RegOpenKeyExW(
             HKEY_CURRENT_USER,
             PCWSTR(subkey.as_ptr()),
@@ -96,7 +98,11 @@ fn read_accent_palette_light2() -> Option<String> {
             let o = i * 4;
             tracing::info!(
                 "  AccentPalette[{}]: R={:02X} G={:02X} B={:02X} A={:02X}",
-                i, palette[o], palette[o + 1], palette[o + 2], palette[o + 3]
+                i,
+                palette[o],
+                palette[o + 1],
+                palette[o + 2],
+                palette[o + 3]
             );
         }
 
@@ -105,7 +111,12 @@ fn read_accent_palette_light2() -> Option<String> {
             let r = palette[offset];
             let g = palette[offset + 1];
             let b = palette[offset + 2];
-            tracing::info!("AccentPalette Light2 (offset 8): #{:02X}{:02X}{:02X}", r, g, b);
+            tracing::info!(
+                "AccentPalette Light2 (offset 8): #{:02X}{:02X}{:02X}",
+                r,
+                g,
+                b
+            );
             return Some(format!("#{:02X}{:02X}{:02X}", r, g, b));
         }
     }
@@ -117,12 +128,20 @@ pub fn get_platform_info() -> PlatformInfo {
     let accent = get_windows_accent();
     let accent_light2 = {
         #[cfg(target_os = "windows")]
-        { read_accent_palette_light2() }
+        {
+            read_accent_palette_light2()
+        }
         #[cfg(not(target_os = "windows"))]
-        { None }
+        {
+            None
+        }
     };
 
-    tracing::info!("platform info: accent={:?}, accent_light2={:?}", accent, accent_light2);
+    tracing::info!(
+        "platform info: accent={:?}, accent_light2={:?}",
+        accent,
+        accent_light2
+    );
 
     PlatformInfo {
         os: std::env::consts::OS.to_string(),

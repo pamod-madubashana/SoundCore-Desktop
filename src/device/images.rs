@@ -170,7 +170,11 @@ fn download_and_cache(model: &str, color_code: &str) -> anyhow::Result<PathBuf> 
 /// Images are compiled into the binary at build time — works in dev, built, and packaged apps.
 pub fn bundled_image_url(model: &str, color_code: &str) -> Option<String> {
     let product = normalize_model(model);
-    let effective_color = if color_code.is_empty() { "1" } else { color_code };
+    let effective_color = if color_code.is_empty() {
+        "1"
+    } else {
+        color_code
+    };
     let color_name = color_code_to_name(effective_color);
     let filename = format!("{product}_{color_name}_com_device.png");
 

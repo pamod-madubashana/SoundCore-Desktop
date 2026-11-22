@@ -71,7 +71,11 @@ pub(crate) fn segment_text<E: IntoElement + Styled + 'static>(
 /// (power3.out) while the trailing edge settles later (power3.inOut), producing
 /// the stretch-and-settle rhythm. Render this as an absolute inset-0 layer behind
 /// the transparent segment buttons.
-pub(crate) fn morphing_pill(active_index: usize, count: usize, key: &'static str) -> impl IntoElement {
+pub(crate) fn morphing_pill(
+    active_index: usize,
+    count: usize,
+    key: &'static str,
+) -> impl IntoElement {
     const LEAD: SpringConfig = SpringConfig::new(320.0, 28.0, 1.0);
     const TRAIL: SpringConfig = SpringConfig::new(170.0, 22.0, 1.0);
     let target = active_index.min(count.saturating_sub(1)) as f32;
@@ -84,13 +88,11 @@ pub(crate) fn morphing_pill(active_index: usize, count: usize, key: &'static str
         .absolute()
         .inset_0()
         .flex()
-        .child(
-            div()
-                .h_full()
-                .with_spring(lead_key, SpringAnimation::new(LEAD).to(target), |this, phase| {
-                    this.flex_grow(phase.max(0.0))
-                }),
-        )
+        .child(div().h_full().with_spring(
+            lead_key,
+            SpringAnimation::new(LEAD).to(target),
+            |this, phase| this.flex_grow(phase.max(0.0)),
+        ))
         .child(
             div()
                 .h_full()
@@ -103,17 +105,19 @@ pub(crate) fn morphing_pill(active_index: usize, count: usize, key: &'static str
                     spread_radius: px(0.),
                     inset: false,
                 }])
-                .with_spring(grow_key, SpringAnimation::new(TRAIL).to(target), move |this, phase| {
-                    // Width stretches while in flight, settles to one segment.
-                    let stretch = (phase - target).abs().clamp(0.0, 0.5);
-                    this.flex_grow(1.0 + stretch)
-                }),
+                .with_spring(
+                    grow_key,
+                    SpringAnimation::new(TRAIL).to(target),
+                    move |this, phase| {
+                        // Width stretches while in flight, settles to one segment.
+                        let stretch = (phase - target).abs().clamp(0.0, 0.5);
+                        this.flex_grow(1.0 + stretch)
+                    },
+                ),
         )
-        .child(
-            div()
-                .h_full()
-                .with_spring(space_key, SpringAnimation::new(LEAD).to(trailing_target), |this, phase| {
-                    this.flex_grow(phase.max(0.0))
-                }),
-        )
+        .child(div().h_full().with_spring(
+            space_key,
+            SpringAnimation::new(LEAD).to(trailing_target),
+            |this, phase| this.flex_grow(phase.max(0.0)),
+        ))
 }

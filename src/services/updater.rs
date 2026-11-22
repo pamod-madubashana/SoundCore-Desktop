@@ -43,8 +43,8 @@ fn parse_version(v: &str) -> Option<semver::Version> {
 /// Refuses a no-op install whose payload would still report the old version
 /// (e.g. tag bumped without bumping the version files baked into the exe).
 fn ensure_newer(current_str: &str, latest_str: &str) -> Result<(), String> {
-    let current =
-        parse_version(current_str).ok_or_else(|| format!("Invalid current version: {current_str}"))?;
+    let current = parse_version(current_str)
+        .ok_or_else(|| format!("Invalid current version: {current_str}"))?;
     let latest =
         parse_version(latest_str).ok_or_else(|| format!("Invalid latest version: {latest_str}"))?;
     if latest <= current {
@@ -76,7 +76,11 @@ fn exe_paths(current_exe: &Path) -> (PathBuf, PathBuf) {
 fn exe_dir_is_writable(dir: &Path) -> bool {
     let probe = dir.join(format!(".soundcore-write-{}", std::process::id()));
     let _ = fs::remove_file(&probe);
-    match fs::OpenOptions::new().write(true).create_new(true).open(&probe) {
+    match fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&probe)
+    {
         Ok(file) => {
             drop(file);
             let _ = fs::remove_file(&probe);
@@ -150,8 +154,8 @@ pub async fn check_for_update() -> Result<UpdateInfo, String> {
     let tag_name = release["tag_name"]
         .as_str()
         .ok_or("Missing tag_name in release")?;
-    let latest_version = parse_version(tag_name)
-        .ok_or_else(|| format!("Invalid version in tag: {tag_name}"))?;
+    let latest_version =
+        parse_version(tag_name).ok_or_else(|| format!("Invalid version in tag: {tag_name}"))?;
 
     if latest_version <= current_version {
         return Err("No update available".to_string());
@@ -163,8 +167,9 @@ pub async fn check_for_update() -> Result<UpdateInfo, String> {
 
     let (download_url, digest, size) = asset_fields(assets, ASSET_NAME)
         .ok_or_else(|| format!("{ASSET_NAME} not found in release assets"))?;
-    let (installer_url, installer_digest, installer_size) = asset_fields(assets, INSTALLER_ASSET_NAME)
-        .ok_or_else(|| format!("{INSTALLER_ASSET_NAME} not found in release assets"))?;
+    let (installer_url, installer_digest, installer_size) =
+        asset_fields(assets, INSTALLER_ASSET_NAME)
+            .ok_or_else(|| format!("{INSTALLER_ASSET_NAME} not found in release assets"))?;
 
     Ok(UpdateInfo {
         current_version: current_version_str,
@@ -232,7 +237,10 @@ async fn download_asset(
         .map_err(|e| format!("Failed to start {label} download: {e}"))?;
 
     if !response.status().is_success() {
-        return Err(format!("{label} download failed with status: {}", response.status()));
+        return Err(format!(
+            "{label} download failed with status: {}",
+            response.status()
+        ));
     }
 
     let mut downloaded: u64 = 0;
@@ -241,7 +249,11 @@ async fn download_asset(
     let mut last_emit = std::time::Instant::now();
 
     use std::io::Write;
-    while let Some(chunk) = stream.chunk().await.map_err(|e| format!("Download error: {e}"))? {
+    while let Some(chunk) = stream
+        .chunk()
+        .await
+        .map_err(|e| format!("Download error: {e}"))?
+    {
         file.write_all(&chunk).map_err(|e| e.to_string())?;
         downloaded += chunk.len() as u64;
 
@@ -363,11 +375,11 @@ pub fn install_update(
         fs::remove_file(&temp_exe).map_err(|e| format!("Failed to remove old temp: {e}"))?;
     }
     if wrong_exe.exists() {
-        fs::remove_file(&wrong_exe).map_err(|e| format!("Failed to remove old failed update: {e}"))?;
+        fs::remove_file(&wrong_exe)
+            .map_err(|e| format!("Failed to remove old failed update: {e}"))?;
     }
 
-    fs::copy(download_path, &temp_exe)
-        .map_err(|e| format!("Failed to prepare new exe: {e}"))?;
+    fs::copy(download_path, &temp_exe).map_err(|e| format!("Failed to prepare new exe: {e}"))?;
 
     fs::rename(&current_exe, &old_exe).map_err(|e| {
         let _ = fs::remove_file(&temp_exe);
@@ -385,7 +397,10 @@ pub fn install_update(
         .len();
     if target_len == 0 || target_len != staged_len {
         fs::rename(&target_exe, &wrong_exe).map_err(|e| {
-            format!("Installed exe is invalid and could not be isolated: {e}; original remains at {}", old_exe.display())
+            format!(
+                "Installed exe is invalid and could not be isolated: {e}; original remains at {}",
+                old_exe.display()
+            )
         })?;
         return match fs::rename(&old_exe, &current_exe) {
             Ok(()) => {
@@ -430,7 +445,8 @@ mod tests {
     use std::net::TcpListener;
 
     fn temp_dir(tag: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("soundcore-updater-{tag}-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("soundcore-updater-{tag}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir

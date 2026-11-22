@@ -282,10 +282,10 @@ pub fn sound_effect_label(s: &SettingsMap, eq_presets: &[EqPresetDto]) -> String
             Some(mode) => format!("Spatial Audio · {mode}"),
             None => "Spatial Audio".into(),
         },
-        SECTION_DEFAULT => preset_label(s, device_preset_id(s).as_deref()).unwrap_or_else(|| "Default".into()),
-        SECTION_CUSTOM => {
-            match_custom_preset(s, eq_presets).unwrap_or_else(|| "Custom".into())
+        SECTION_DEFAULT => {
+            preset_label(s, device_preset_id(s).as_deref()).unwrap_or_else(|| "Default".into())
         }
+        SECTION_CUSTOM => match_custom_preset(s, eq_presets).unwrap_or_else(|| "Custom".into()),
         _ => String::new(),
     }
 }
@@ -299,7 +299,11 @@ pub fn device_kind_label(name: &str) -> String {
     if is_overear_name(&n) {
         return "Over-ear headphones".into();
     }
-    let nc = if has_nc_token(&n) { " · Noise cancelling" } else { "" };
+    let nc = if has_nc_token(&n) {
+        " · Noise cancelling"
+    } else {
+        ""
+    };
     format!("Wireless earbuds{nc}")
 }
 
@@ -331,7 +335,11 @@ fn is_overear_name(n: &str) -> bool {
     for i in 0..bytes.len() {
         let boundary = i == 0 || bytes[i - 1].is_whitespace();
         if boundary && bytes[i] == 'q' {
-            if bytes.get(i + 1).map(|c| c.is_ascii_digit()).unwrap_or(false) {
+            if bytes
+                .get(i + 1)
+                .map(|c| c.is_ascii_digit())
+                .unwrap_or(false)
+            {
                 return true;
             }
         }

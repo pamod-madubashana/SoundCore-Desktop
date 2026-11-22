@@ -1,8 +1,8 @@
 //! Shared chrome helpers — text/glyph icons (GPUI divs cannot rotate).
 
+use crate::ui::scale::px;
 use gpui::{Hsla, IntoElement, ParentElement, Styled, div};
 use std::sync::OnceLock;
-use crate::ui::scale::px;
 
 /// Soundcore brand glyph (Lanczos-upscaled tray icon, smooth at display size).
 pub(crate) fn soundcore_glyph(size: f32) -> impl IntoElement {

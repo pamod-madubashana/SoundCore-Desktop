@@ -58,8 +58,12 @@ fn main() {
             let rc = icons_dir.join("app.rc");
             if rc.is_file() {
                 println!("cargo:rerun-if-changed={}", rc.display());
-                println!("cargo:rerun-if-changed={}", icons_dir.join("icon.ico").display());
-                let _ = embed_resource::compile(&rc, embed_resource::ParamsIncludeDirs([icons_dir]));
+                println!(
+                    "cargo:rerun-if-changed={}",
+                    icons_dir.join("icon.ico").display()
+                );
+                let _ =
+                    embed_resource::compile(&rc, embed_resource::ParamsIncludeDirs([icons_dir]));
             }
         }
     }

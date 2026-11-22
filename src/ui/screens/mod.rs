@@ -8,15 +8,12 @@ pub mod searching;
 pub mod settings;
 pub mod sound_effects;
 
-use gpui::{Entity, IntoElement, ParentElement, Styled, div, prelude::*};
 use crate::ui::scale::px;
+use gpui::{Entity, IntoElement, ParentElement, Styled, div, prelude::*};
 
 use crate::ui::{RootView, theme};
 
-pub(crate) fn update_notice(
-    root: &RootView,
-    view: &Entity<RootView>,
-) -> impl IntoElement {
+pub(crate) fn update_notice(root: &RootView, view: &Entity<RootView>) -> impl IntoElement {
     let info = root.update_info.clone();
     let progress = root.update_progress.clone();
     let error = root.update_error.clone();

@@ -17,7 +17,10 @@ use openscq30_lib::{
     DeviceModel, OpenSCQ30Session,
     connection::ConnectionStatus,
     device::OpenSCQ30Device,
-    settings::{CategoryId, ModifiableSelectCommand, MultiSelectWithRemoveCommand, Select, Setting, SettingId, Value},
+    settings::{
+        CategoryId, ModifiableSelectCommand, MultiSelectWithRemoveCommand, Select, Setting,
+        SettingId, Value,
+    },
     storage::PairedDevice,
 };
 use tokio::{
@@ -145,9 +148,15 @@ pub enum Command {
     /// Rebuild all per-device tasks from a new config.
     UpdateConfig(Config),
     /// Apply a single live setting change (from a popup widget).
-    SetSetting { mac: MacAddr6, id: SettingId, value: Value },
+    SetSetting {
+        mac: MacAddr6,
+        id: SettingId,
+        value: Value,
+    },
     /// Scan for connectable Bluetooth devices (to pick a MAC).
-    Scan { model: DeviceModel },
+    Scan {
+        model: DeviceModel,
+    },
     Quit,
 }
 
@@ -275,7 +284,9 @@ fn diff_tasks(old: &[DeviceConfig], new: &[DeviceConfig]) -> (Vec<MacAddr6>, Vec
     let mut to_abort = Vec::new();
     let mut to_spawn = Vec::new();
     for (idx, dev) in new.iter().enumerate() {
-        let Some(fp) = task_fingerprint(dev) else { continue };
+        let Some(fp) = task_fingerprint(dev) else {
+            continue;
+        };
         if !live.insert(fp.0) {
             continue;
         }
@@ -331,7 +342,11 @@ fn spawn_device(
     tasks.handles.insert(mac, handle);
 }
 
-fn spawn_devices(session: &Arc<OpenSCQ30Session>, state: &Arc<SharedState>, config: &Config) -> DeviceTasks {
+fn spawn_devices(
+    session: &Arc<OpenSCQ30Session>,
+    state: &Arc<SharedState>,
+    config: &Config,
+) -> DeviceTasks {
     let mut tasks = DeviceTasks {
         senders: HashMap::new(),
         handles: HashMap::new(),
@@ -406,7 +421,9 @@ async fn device_loop(
     let (mac, model) = match dev.parse() {
         Ok(v) => v,
         Err(err) => {
-            set_device_state(&state, MacAddr6::nil(), |s| s.message = format!("config error: {err:#}"));
+            set_device_state(&state, MacAddr6::nil(), |s| {
+                s.message = format!("config error: {err:#}")
+            });
             return;
         }
     };
@@ -415,7 +432,8 @@ async fn device_loop(
     // (e.g. macOS) connecting would panic, so degrade gracefully and park the task.
     if openscq30_lib::default_backends().is_none() {
         set_device_state(&state, mac, |s| {
-            s.message = "This OS has no Bluetooth backend (OpenSCQ30 supports Windows & Linux)".into();
+            s.message =
+                "This OS has no Bluetooth backend (OpenSCQ30 supports Windows & Linux)".into();
         });
         while rx.recv().await.is_some() {}
         return;
@@ -423,7 +441,11 @@ async fn device_loop(
 
     // Idempotent mac<->model registration.
     let _ = session
-        .pair(PairedDevice { mac_address: mac, model, is_demo: false })
+        .pair(PairedDevice {
+            mac_address: mac,
+            model,
+            is_demo: false,
+        })
         .await;
 
     let poll = Duration::from_secs(dev.poll_seconds.max(1));
@@ -521,7 +543,9 @@ async fn handle_device_command(
             if let Err(err) = device.set_setting_values(vec![(id, value)]).await {
                 warn!("set failed: {err}");
                 if matches!(err, openscq30_lib::device::Error::ConnectionError { .. }) {
-                    tracing::debug!("connection error during set, treating as disconnect for {mac}");
+                    tracing::debug!(
+                        "connection error during set, treating as disconnect for {mac}"
+                    );
                     return false;
                 }
                 set_device_state(state, mac, |s| s.message = format!("set failed: {err}"));
@@ -808,7 +832,11 @@ pub async fn bluetooth_is_on() -> bool {
     true
 }
 
-fn publish_snapshot(device: &(dyn OpenSCQ30Device + Send + Sync), state: &SharedState, mac: MacAddr6) {
+fn publish_snapshot(
+    device: &(dyn OpenSCQ30Device + Send + Sync),
+    state: &SharedState,
+    mac: MacAddr6,
+) {
     let snapshot: Snapshot = device
         .settings_by_category()
         .into_iter()
@@ -841,11 +869,19 @@ fn setting_to_raw(setting: &Setting) -> Option<String> {
         Setting::OptionalSelect { value, .. } => Some(value.as_deref().unwrap_or("").to_owned()),
         Setting::ModifiableSelect { value, .. } => value.as_ref().map(|v| v.to_string()),
         Setting::MultiSelect { values, .. } => Some(values.join(",")),
-        Setting::Equalizer { value, .. } => {
-            Some(value.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(","))
+        Setting::Equalizer { value, .. } => Some(
+            value
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join(","),
+        ),
+        Setting::PresetEqualizerProfileSelect { value, .. } => {
+            value.as_ref().map(|v| v.to_string())
         }
-        Setting::PresetEqualizerProfileSelect { value, .. } => value.as_ref().map(|v| v.to_string()),
-        Setting::TimeOfDay { minutes_after_midnight } => Some(minutes_after_midnight.to_string()),
+        Setting::TimeOfDay {
+            minutes_after_midnight,
+        } => Some(minutes_after_midnight.to_string()),
         _ => None,
     }
 }
@@ -865,7 +901,10 @@ fn fetch_profile_from_device(device: &(dyn OpenSCQ30Device + Send + Sync)) -> Ve
                 continue;
             }
             if let Some(raw) = setting_to_raw(&setting) {
-                entries.push(SettingEntry { id: id.to_string(), value: raw });
+                entries.push(SettingEntry {
+                    id: id.to_string(),
+                    value: raw,
+                });
             }
         }
     }
@@ -887,15 +926,18 @@ fn store_fetched_profile(mac: MacAddr6, mut profile: Vec<SettingEntry>) {
     let mut cfg = match Config::load(&path) {
         Ok(cfg) => cfg,
         Err(err) => {
-            warn!("could not reload {}: {err:#}; connect recency and profile not persisted", path.display());
+            warn!(
+                "could not reload {}: {err:#}; connect recency and profile not persisted",
+                path.display()
+            );
             return;
         }
     };
     let key = mac.to_string();
-    let device = cfg
-        .devices
-        .iter_mut()
-        .find(|d| d.mac_address.eq_ignore_ascii_case(&key) || MacAddr6::from_str(d.mac_address.trim()).is_ok_and(|m| m == mac));
+    let device = cfg.devices.iter_mut().find(|d| {
+        d.mac_address.eq_ignore_ascii_case(&key)
+            || MacAddr6::from_str(d.mac_address.trim()).is_ok_and(|m| m == mac)
+    });
     match device {
         Some(d) => {
             d.last_connected = Some(now_unix());
@@ -905,11 +947,17 @@ fn store_fetched_profile(mac: MacAddr6, mut profile: Vec<SettingEntry>) {
                 d.profile = profile;
             }
             if let Err(err) = cfg.save(&path) {
-                warn!("failed to persist connect state to {}: {err:#}", path.display());
+                warn!(
+                    "failed to persist connect state to {}: {err:#}",
+                    path.display()
+                );
             }
             info!("connect recorded for {mac}: {count} settings stored");
         }
-        None => tracing::debug!("device {mac} not present in {}; connect recency not persisted", path.display()),
+        None => tracing::debug!(
+            "device {mac} not present in {}; connect recency not persisted",
+            path.display()
+        ),
     }
 }
 
@@ -970,9 +1018,13 @@ pub fn parse_value(setting: &Setting, raw: &str) -> anyhow::Result<Value> {
         }
         Setting::ModifiableSelect { setting, .. } => {
             if let Some(rest) = raw.strip_prefix('+') {
-                Ok(Value::ModifiableSelectCommand(ModifiableSelectCommand::Add(rest.to_owned().into())))
+                Ok(Value::ModifiableSelectCommand(
+                    ModifiableSelectCommand::Add(rest.to_owned().into()),
+                ))
             } else if let Some(rest) = raw.strip_prefix('-') {
-                Ok(Value::ModifiableSelectCommand(ModifiableSelectCommand::Remove(rest.to_owned().into())))
+                Ok(Value::ModifiableSelectCommand(
+                    ModifiableSelectCommand::Remove(rest.to_owned().into()),
+                ))
             } else {
                 let name = raw.strip_prefix('\\').unwrap_or(raw);
                 Ok(Value::from(one_of(setting, name)?))
@@ -1001,7 +1053,11 @@ pub fn parse_value(setting: &Setting, raw: &str) -> anyhow::Result<Value> {
                 .map(|s| i16::from_str(s.trim()))
                 .collect::<Result<Vec<_>, _>>()?;
             if values.len() != setting.band_hz.len() {
-                bail!("expected {} bands, got {}", setting.band_hz.len(), values.len());
+                bail!(
+                    "expected {} bands, got {}",
+                    setting.band_hz.len(),
+                    values.len()
+                );
             }
             for v in &values {
                 if *v < setting.min || *v > setting.max {
@@ -1016,13 +1072,13 @@ pub fn parse_value(setting: &Setting, raw: &str) -> anyhow::Result<Value> {
         Setting::PresetEqualizerProfileSelect { .. } => {
             Ok(Value::String(std::borrow::Cow::from(raw.to_owned())))
         }
-        Setting::HueColorPicker { .. } => {
-            Ok(Value::String(std::borrow::Cow::from(raw.to_owned())))
-        }
+        Setting::HueColorPicker { .. } => Ok(Value::String(std::borrow::Cow::from(raw.to_owned()))),
         Setting::TimeOfDay { .. } => {
             let n = i32::from_str(raw.trim())?;
             if !(0..1440).contains(&n) {
-                bail!("{n} is not a valid time of day (expected minutes after midnight in 0..1440)");
+                bail!(
+                    "{n} is not a valid time of day (expected minutes after midnight in 0..1440)"
+                );
             }
             Ok(Value::I32(n))
         }
@@ -1033,14 +1089,20 @@ fn one_of(setting: &Select, raw: &str) -> anyhow::Result<std::borrow::Cow<'stati
     if let Some(exact) = setting.options.iter().find(|o| **o == raw) {
         return Ok(exact.clone());
     }
-    let mut matches = setting.options.iter().filter(|o| o.eq_ignore_ascii_case(raw));
+    let mut matches = setting
+        .options
+        .iter()
+        .filter(|o| o.eq_ignore_ascii_case(raw));
     let first = matches.next();
     if let (Some(a), Some(b)) = (first, matches.next()) {
         bail!("'{raw}' is ambiguous: could be {a} or {b}");
     }
-    first
-        .cloned()
-        .ok_or_else(|| anyhow!("'{raw}' is not valid. Expected one of: {:?}", setting.options))
+    first.cloned().ok_or_else(|| {
+        anyhow!(
+            "'{raw}' is not valid. Expected one of: {:?}",
+            setting.options
+        )
+    })
 }
 
 async fn open_session() -> anyhow::Result<OpenSCQ30Session> {
@@ -1083,19 +1145,34 @@ mod tests {
             (Setting::Toggle { value: true }, Value::Bool(true)),
             (Setting::Toggle { value: false }, Value::Bool(false)),
             (
-                Setting::I32Range { setting: Range { range: 0..=10, step: 1 }, value: 7 },
+                Setting::I32Range {
+                    setting: Range {
+                        range: 0..=10,
+                        step: 1,
+                    },
+                    value: 7,
+                },
                 Value::I32(7),
             ),
             (
-                Setting::Select { setting: select(&["Normal", "Transparency"]), value: Cow::Borrowed("Transparency") },
+                Setting::Select {
+                    setting: select(&["Normal", "Transparency"]),
+                    value: Cow::Borrowed("Transparency"),
+                },
                 Value::String(Cow::Borrowed("Transparency")),
             ),
             (
-                Setting::OptionalSelect { setting: select(&["a", "b"]), value: Some(Cow::Borrowed("a")) },
+                Setting::OptionalSelect {
+                    setting: select(&["a", "b"]),
+                    value: Some(Cow::Borrowed("a")),
+                },
                 Value::OptionalString(Some(Cow::Borrowed("a"))),
             ),
             (
-                Setting::OptionalSelect { setting: select(&["a", "b"]), value: None },
+                Setting::OptionalSelect {
+                    setting: select(&["a", "b"]),
+                    value: None,
+                },
                 Value::OptionalString(None),
             ),
             (
@@ -1132,13 +1209,18 @@ mod tests {
                 },
                 Value::String(Cow::Borrowed("Flat")),
             ),
-            (Setting::TimeOfDay { minutes_after_midnight: 480 }, Value::I32(480)),
+            (
+                Setting::TimeOfDay {
+                    minutes_after_midnight: 480,
+                },
+                Value::I32(480),
+            ),
         ];
 
         for (setting, expected) in cases {
             let raw = setting_to_raw(&setting).expect("representable setting must serialize");
-            let parsed =
-                parse_value(&setting, &raw).unwrap_or_else(|err| panic!("raw {raw:?} failed to parse: {err}"));
+            let parsed = parse_value(&setting, &raw)
+                .unwrap_or_else(|err| panic!("raw {raw:?} failed to parse: {err}"));
             assert_eq!(parsed, expected, "raw {raw:?}");
         }
     }
@@ -1154,9 +1236,17 @@ mod tests {
             None
         );
         assert_eq!(setting_to_raw(&Setting::Action), None);
-        assert_eq!(setting_to_raw(&Setting::ImportString { confirmation_message: None }), None);
         assert_eq!(
-            setting_to_raw(&Setting::ModifiableSelect { setting: select(&["a"]), value: None }),
+            setting_to_raw(&Setting::ImportString {
+                confirmation_message: None
+            }),
+            None
+        );
+        assert_eq!(
+            setting_to_raw(&Setting::ModifiableSelect {
+                setting: select(&["a"]),
+                value: None
+            }),
             None
         );
         assert_eq!(
@@ -1166,7 +1256,10 @@ mod tests {
             }),
             None
         );
-        assert_eq!(setting_to_raw(&Setting::HueColorPicker { hue: 200.0 }), None);
+        assert_eq!(
+            setting_to_raw(&Setting::HueColorPicker { hue: 200.0 }),
+            None
+        );
     }
 
     #[test]
@@ -1190,7 +1283,12 @@ mod tests {
     }
 
     fn device_cfg(mac: &str, model: &str, poll_seconds: u64) -> DeviceConfig {
-        DeviceConfig { mac_address: mac.to_owned(), model: model.to_owned(), poll_seconds, ..DeviceConfig::default() }
+        DeviceConfig {
+            mac_address: mac.to_owned(),
+            model: model.to_owned(),
+            poll_seconds,
+            ..DeviceConfig::default()
+        }
     }
 
     #[test]
@@ -1208,12 +1306,20 @@ mod tests {
     #[test]
     fn next_backoff_clamps_base_and_doubling_to_cap() {
         assert_eq!(
-            next_backoff(Duration::ZERO, Duration::from_secs(30), Duration::from_secs(10)),
+            next_backoff(
+                Duration::ZERO,
+                Duration::from_secs(30),
+                Duration::from_secs(10)
+            ),
             Duration::from_secs(10),
             "base must clamp down to cap"
         );
         assert_eq!(
-            next_backoff(Duration::from_secs(40), Duration::from_secs(5), Duration::from_secs(45)),
+            next_backoff(
+                Duration::from_secs(40),
+                Duration::from_secs(5),
+                Duration::from_secs(45)
+            ),
             Duration::from_secs(45),
             "doubling must clamp down to cap"
         );
@@ -1276,7 +1382,10 @@ mod tests {
         let old = [device_cfg("00:11:22:33:44:55", "SoundcoreA3959", 5)];
         let mut new = [device_cfg("00:11:22:33:44:55", "SoundcoreA3959", 5)];
         new[0].name = "Renamed".to_owned();
-        new[0].profile = vec![crate::config::SettingEntry { id: "gamingMode".into(), value: "true".into() }];
+        new[0].profile = vec![crate::config::SettingEntry {
+            id: "gamingMode".into(),
+            value: "true".into(),
+        }];
         new[0].image = Some("https://example.invalid/img.png".into());
         new[0].color = Some("#123456".into());
         let (abort, spawn) = diff_tasks(&old, &new);
@@ -1316,6 +1425,9 @@ mod tests {
         ];
         let (abort, spawn) = diff_tasks(&old, &new);
         assert!(abort.is_empty());
-        assert!(spawn.is_empty(), "entries with no fingerprint must never spawn");
+        assert!(
+            spawn.is_empty(),
+            "entries with no fingerprint must never spawn"
+        );
     }
 }

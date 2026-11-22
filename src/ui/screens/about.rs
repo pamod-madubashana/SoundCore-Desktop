@@ -1,18 +1,14 @@
 //! About screen (header 3-dots → About).
 
-use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, prelude::*};
 use crate::ui::scale::px;
+use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, prelude::*};
 
 use super::common::chevron_left;
 use crate::ui::{RootView, theme};
 
 const REPO: &str = "https://github.com/pamod-madubashana/SoundCore-Desktop";
 
-pub fn render(
-    root: &mut RootView,
-    _window: &mut Window,
-    cx: &mut Context<RootView>,
-) -> gpui::Div {
+pub fn render(root: &mut RootView, _window: &mut Window, cx: &mut Context<RootView>) -> gpui::Div {
     let view = cx.entity();
     let version = root.version.clone();
 
@@ -118,10 +114,7 @@ pub fn render(
                             div()
                                 .border_t_1()
                                 .border_color(theme::border_subtle())
-                                .child(link_row(
-                                    "Report an issue",
-                                    format!("{REPO}/issues/new"),
-                                )),
+                                .child(link_row("Report an issue", format!("{REPO}/issues/new"))),
                         ),
                 ),
         )
@@ -142,10 +135,7 @@ fn header_btn(
         .flex()
         .items_center()
         .justify_center()
-        .hover(|st| {
-            st.text_color(theme::foreground())
-                .bg(theme::hover_medium())
-        })
+        .hover(|st| st.text_color(theme::foreground()).bg(theme::hover_medium()))
         .cursor_pointer()
         .on_click(move |_, _window, cx| {
             view.update(cx, |root, cx| on(root, cx));

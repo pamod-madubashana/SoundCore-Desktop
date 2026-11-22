@@ -1,10 +1,10 @@
 //! MyDevices screen (saved devices list). Header: About + Settings nav.
 
-use gpui::{
-    div, prelude::*, rgba, AnimationExt as _, AnimationPhase, Context, IntoElement, ParentElement,
-    SharedString, SpringAnimation, SpringConfig, Styled, Window,
-};
 use crate::ui::scale::px;
+use gpui::{
+    AnimationExt as _, AnimationPhase, Context, IntoElement, ParentElement, SharedString,
+    SpringAnimation, SpringConfig, Styled, Window, div, prelude::*, rgba,
+};
 
 use super::common::{gear_icon, info_icon, soundcore_glyph};
 use crate::ui::{RootView, data, theme};
@@ -228,7 +228,11 @@ fn status_pill_entry(off: bool, status_text: String, entry_id: u64) -> impl Into
 }
 
 fn status_dot(off: bool, p: AnimationPhase) -> impl IntoElement {
-    let color = if off { theme::error() } else { theme::success() };
+    let color = if off {
+        theme::error()
+    } else {
+        theme::success()
+    };
     let size = p.interpolate(7.0, 10.0);
     let inset = p.interpolate(0.5, 1.0);
     div()
@@ -374,7 +378,7 @@ fn device_card(
                 )
                 .child(div().mt(px(p.interpolate(0.0, 6.0))).child(status_pill)),
         )
-    }
+}
 
 fn art_tile(
     _d: &crate::DeviceStateDto,
@@ -397,15 +401,18 @@ fn art_tile(
         .overflow_hidden();
 
     if let Some(img) = image {
-        tile.child(gpui::img(img).size_full().object_fit(gpui::ObjectFit::Cover))
+        tile.child(
+            gpui::img(img)
+                .size_full()
+                .object_fit(gpui::ObjectFit::Cover),
+        )
     } else {
-        tile
-            .bg(gpui::linear_gradient(
-                135.0,
-                gpui::linear_color_stop(gpui::rgb(0x2a3354), 0.0),
-                gpui::linear_color_stop(gpui::rgb(0x1a2038), 1.0),
-            ))
-            .child(device_art_placeholder(&name, gpui::rgb(0xc9d6ff).into()))
+        tile.bg(gpui::linear_gradient(
+            135.0,
+            gpui::linear_color_stop(gpui::rgb(0x2a3354), 0.0),
+            gpui::linear_color_stop(gpui::rgb(0x1a2038), 1.0),
+        ))
+        .child(device_art_placeholder(&name, gpui::rgb(0xc9d6ff).into()))
     }
 }
 
@@ -476,10 +483,7 @@ pub(crate) fn device_art_placeholder(name: &str, brand: gpui::Hsla) -> impl Into
             ),
         _ => {
             // Earbuds: line-art bud + sound waves (devices_window.svg).
-            div()
-                .relative()
-                .size(px(34.))
-                .child(earbud_line_art(brand))
+            div().relative().size(px(34.)).child(earbud_line_art(brand))
         }
     }
 }
@@ -519,7 +523,8 @@ fn earbud_line_art(stroke: gpui::Hsla) -> impl IntoElement {
             }
 
             // Waves: M10 -4 a5 5 0 0 1 0 8 / M14 -8 a10 10 0 0 1 0 16
-            for (rad, y0, y1, alpha) in [(5.0f32, -4.0f32, 4.0f32, 0.6f32), (10.0, -8.0, 8.0, 0.35)] {
+            for (rad, y0, y1, alpha) in [(5.0f32, -4.0f32, 4.0f32, 0.6f32), (10.0, -8.0, 8.0, 0.35)]
+            {
                 let mut w = gpui::PathBuilder::stroke(px(lw));
                 w.move_to(map(10. + (rad - 5.), y0));
                 w.relative_arc_to(

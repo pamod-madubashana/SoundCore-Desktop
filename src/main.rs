@@ -21,9 +21,8 @@ use std::{
     path::PathBuf,
     str::FromStr,
     sync::{
-        Arc,
+        Arc, Mutex, OnceLock,
         atomic::{AtomicBool, AtomicU64, Ordering},
-        Mutex, OnceLock,
     },
     time::Duration,
 };
@@ -31,8 +30,8 @@ use std::{
 use base64::Engine;
 use config::Config;
 use gpui::{
-    App, WindowBackgroundAppearance, WindowBounds, WindowKind, WindowOptions, point,
-    prelude::*, px, size,
+    App, WindowBackgroundAppearance, WindowBounds, WindowKind, WindowOptions, point, prelude::*,
+    px, size,
 };
 use macaddr::MacAddr6;
 use openscq30_lib::{
@@ -40,11 +39,11 @@ use openscq30_lib::{
     settings::{Setting, SettingId},
 };
 use serde::Serialize;
+use services::worker::{Command, WorkerHandle};
 use tray_icon::{
     Icon, TrayIconBuilder,
     menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem},
 };
-use services::worker::{Command, WorkerHandle};
 
 const AUTO_HIDE_ARM_DELAY: Duration = Duration::from_millis(750);
 const NOTIFICATION_DURATION: Duration = Duration::from_millis(3200);
@@ -94,7 +93,9 @@ fn fix_redirect_thunks() {
     let dll_addr = jt.map.values().next().copied().unwrap_or(0) as *const c_void;
     let mut dll_mod = std::ptr::null_mut();
     let exe_mod = unsafe { GetModuleHandleW(std::ptr::null()) };
-    let ok = unsafe { GetModuleHandleExW(FROM_ADDRESS | UNCHANGED_REFCOUNT, dll_addr, &mut dll_mod) } != 0;
+    let ok =
+        unsafe { GetModuleHandleExW(FROM_ADDRESS | UNCHANGED_REFCOUNT, dll_addr, &mut dll_mod) }
+            != 0;
     if !ok || dll_mod.is_null() || exe_mod.is_null() {
         tracing::warn!("hotreload: could not resolve patch DLL / EXE modules");
         return;
@@ -114,7 +115,10 @@ fn fix_redirect_thunks() {
             let target = u64::from_le_bytes(bytes[2..10].try_into().unwrap());
             if (exe_lo..exe_hi).contains(&target) {
                 let mut old_prot = 0u32;
-                if unsafe { VirtualProtect(p as *mut c_void, 14, PAGE_EXECUTE_READWRITE, &mut old_prot) } != 0 {
+                if unsafe {
+                    VirtualProtect(p as *mut c_void, 14, PAGE_EXECUTE_READWRITE, &mut old_prot)
+                } != 0
+                {
                     let t = target.to_le_bytes();
                     // mov r11, imm64 ; jmp r11  (+NOP)
                     let patch: [u8; 14] = [
@@ -171,8 +175,8 @@ static NOTIFICATION_WINDOW: OnceLock<
 > = OnceLock::new();
 static NOTIFICATION_EPOCH: AtomicU64 = AtomicU64::new(0);
 
-fn notification_window(
-) -> &'static Mutex<Option<gpui::WindowHandle<ui::notification::NotificationView>>> {
+fn notification_window()
+-> &'static Mutex<Option<gpui::WindowHandle<ui::notification::NotificationView>>> {
     NOTIFICATION_WINDOW.get_or_init(|| Mutex::new(None))
 }
 
@@ -271,7 +275,12 @@ fn build_categories(snapshot: &worker::Snapshot) -> Vec<CategoryDto> {
 // ---- command implementations (plain functions over AppState) ----
 
 fn battery_pct_from_setting(setting: &Setting) -> Option<i32> {
-    if let Setting::Information { translated_value, value, .. } = setting {
+    if let Setting::Information {
+        translated_value,
+        value,
+        ..
+    } = setting
+    {
         if let Some(stripped) = translated_value.trim().strip_suffix('%') {
             if let Ok(n) = stripped.trim().parse::<i32>() {
                 return Some(n.min(100));
@@ -318,7 +327,10 @@ fn extract_battery_from_snapshot(
 
 pub fn get_models() -> Vec<String> {
     use strum::VariantArray;
-    DeviceModel::VARIANTS.iter().map(|m| m.to_string()).collect()
+    DeviceModel::VARIANTS
+        .iter()
+        .map(|m| m.to_string())
+        .collect()
 }
 
 pub fn get_version() -> String {
@@ -332,10 +344,16 @@ pub fn get_states(state: &AppState) -> Vec<DeviceStateDto> {
     cfg.devices
         .iter()
         .map(|d| {
-            let live = MacAddr6::from_str(d.mac_address.trim()).ok().and_then(|m| map.get(&m));
+            let live = MacAddr6::from_str(d.mac_address.trim())
+                .ok()
+                .and_then(|m| map.get(&m));
             let (connected, message, categories, battery) = match live {
                 Some(s) => {
-                    let cats = s.snapshot.as_ref().map(build_categories).unwrap_or_default();
+                    let cats = s
+                        .snapshot
+                        .as_ref()
+                        .map(build_categories)
+                        .unwrap_or_default();
                     let bat = s
                         .snapshot
                         .as_ref()
@@ -377,9 +395,14 @@ pub fn get_states(state: &AppState) -> Vec<DeviceStateDto> {
 }
 
 pub fn save_config(state: &AppState, new_config: Config) -> Result<(), String> {
-    new_config.save(&state.config_path).map_err(|e| e.to_string())?;
+    new_config
+        .save(&state.config_path)
+        .map_err(|e| e.to_string())?;
     autostart::reconcile(new_config.autostart);
-    let _ = state.worker.tx.send(Command::UpdateConfig(new_config.clone()));
+    let _ = state
+        .worker
+        .tx
+        .send(Command::UpdateConfig(new_config.clone()));
     *state.config.lock().unwrap() = new_config;
     Ok(())
 }
@@ -388,12 +411,7 @@ pub fn get_config(state: &AppState) -> Config {
     state.config.lock().unwrap().clone()
 }
 
-pub fn set_setting(
-    state: &AppState,
-    mac: String,
-    id: String,
-    raw: String,
-) -> Result<(), String> {
+pub fn set_setting(state: &AppState, mac: String, id: String, raw: String) -> Result<(), String> {
     let mac = MacAddr6::from_str(mac.trim()).map_err(|e| e.to_string())?;
     let setting_id = SettingId::from_str(&id).map_err(|_| format!("unknown setting '{id}'"))?;
     let setting = {
@@ -577,8 +595,8 @@ pub fn show_window_now(cx: &mut App) {
     // animation â€” doing them here too re-enters GPUI's window RefCell
     // via activate_window().
     let prepared = h.update(cx, |view, window, cx| {
-        let (target_x, target_y) = shell::position_bottom_right(window)
-            .unwrap_or_else(|| shell::outer_pos(window));
+        let (target_x, target_y) =
+            shell::position_bottom_right(window).unwrap_or_else(|| shell::outer_pos(window));
         let start_y = target_y + 80;
         shell::set_pos(window, target_x, start_y);
         shell::show(window);
@@ -622,6 +640,10 @@ pub fn get_notification(state: &AppState) -> Option<PendingNotification> {
 
 pub fn get_update_progress(state: &AppState) -> Option<updater::UpdateProgress> {
     state.update_progress.lock().unwrap().clone()
+}
+
+pub fn set_update_progress(state: &AppState, progress: Option<updater::UpdateProgress>) {
+    *state.update_progress.lock().unwrap() = progress;
 }
 
 pub fn quit_app(cx: &mut App) {
@@ -804,10 +826,7 @@ fn open_notification_window(
         }
         None => (point(px(100.), px(100.)), None),
     };
-    let bounds = gpui::Bounds::new(
-        origin,
-        size(px(NOTIFICATION_W), px(NOTIFICATION_H)),
-    );
+    let bounds = gpui::Bounds::new(origin, size(px(NOTIFICATION_W), px(NOTIFICATION_H)));
 
     let handle = cx.open_window(
         WindowOptions {
@@ -842,9 +861,7 @@ fn schedule_notification_close(
     cx: &mut App,
 ) {
     cx.spawn(async move |cx| {
-        cx.background_executor()
-            .timer(NOTIFICATION_DURATION)
-            .await;
+        cx.background_executor().timer(NOTIFICATION_DURATION).await;
         let _ = cx.update(|cx| {
             if epoch != NOTIFICATION_EPOCH.load(Ordering::SeqCst) {
                 return;
@@ -910,7 +927,8 @@ fn setup_tray(cx: &mut App) {
     let quit = MenuItem::with_id("quit", "Quit", true, None);
     let open_id = open.id().clone();
     let quit_id = quit.id().clone();
-    if let Err(err) = menu.append(&open)
+    if let Err(err) = menu
+        .append(&open)
         .and_then(|_| menu.append(&PredefinedMenuItem::separator()))
         .and_then(|_| menu.append(&quit))
     {
@@ -942,7 +960,9 @@ fn setup_tray(cx: &mut App) {
     cx.spawn(async move |cx| {
         let _keep_alive = &tray;
         loop {
-            cx.background_executor().timer(Duration::from_millis(50)).await;
+            cx.background_executor()
+                .timer(Duration::from_millis(50))
+                .await;
             let mut toggle = false;
             let mut quit = false;
             while let Ok(ev) = tray_icon::TrayIconEvent::receiver().try_recv() {
@@ -1003,7 +1023,7 @@ fn open_main_window(cx: &mut App) -> gpui::Result<gpui::WindowHandle<ui::RootVie
             window_bounds: Some(WindowBounds::Windowed(bounds)),
             titlebar: None,
             focus: false,
-            show: false, // hidden until tray/UI shows it
+            show: false,             // hidden until tray/UI shows it
             kind: WindowKind::PopUp, // skip-taskbar + no decorations on Windows
             is_movable: false,
             is_resizable: false,
@@ -1229,9 +1249,11 @@ impl CappedLog {
 
     fn write(&self, buf: &[u8]) -> std::io::Result<()> {
         use std::io::Write as _;
-        let mut file = self.file.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-        let over_cap =
-            file.metadata()?.len().saturating_add(buf.len() as u64) > self.max_bytes;
+        let mut file = self
+            .file
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let over_cap = file.metadata()?.len().saturating_add(buf.len() as u64) > self.max_bytes;
         if over_cap {
             let _ = std::fs::rename(&self.path, self.path.with_extension("log.1"));
             *file = std::fs::OpenOptions::new()
@@ -1268,27 +1290,28 @@ impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for CappedLog {
 fn init_logging() {
     use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-        EnvFilter::new("info,soundcore_desktop=debug,openscq30_lib=trace")
-    });
+    let filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("info,soundcore_desktop=debug,openscq30_lib=trace"));
 
     let stdout = fmt::layer().with_target(false).with_filter(filter.clone());
 
     let file_layer = crate::config::resolve_path(None)
         .parent()
         .map(|dir| dir.join("soundcore.log"))
-        .and_then(|path| match CappedLog::open(path.clone(), 5 * 1024 * 1024) {
-            Ok(log) => Some(
-                fmt::layer()
-                    .with_writer(log)
-                    .with_target(false)
-                    .with_filter(filter.clone()),
-            ),
-            Err(err) => {
-                eprintln!("cannot open {} for logging: {err}", path.display());
-                None
-            }
-        });
+        .and_then(
+            |path| match CappedLog::open(path.clone(), 5 * 1024 * 1024) {
+                Ok(log) => Some(
+                    fmt::layer()
+                        .with_writer(log)
+                        .with_target(false)
+                        .with_filter(filter.clone()),
+                ),
+                Err(err) => {
+                    eprintln!("cannot open {} for logging: {err}", path.display());
+                    None
+                }
+            },
+        );
 
     let _ = tracing_subscriber::registry()
         .with(stdout)

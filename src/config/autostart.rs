@@ -36,9 +36,10 @@ fn disable() -> std::io::Result<()> {
     use winreg::RegKey;
     use winreg::enums::{HKEY_CURRENT_USER, KEY_SET_VALUE};
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    if let Ok(run) =
-        hkcu.open_subkey_with_flags(r"Software\Microsoft\Windows\CurrentVersion\Run", KEY_SET_VALUE)
-    {
+    if let Ok(run) = hkcu.open_subkey_with_flags(
+        r"Software\Microsoft\Windows\CurrentVersion\Run",
+        KEY_SET_VALUE,
+    ) {
         match run.delete_value(APP_NAME) {
             Ok(()) => {}
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}

@@ -1,11 +1,11 @@
 //! Sound Effects popup — full-screen overlay inside the control window.
 //! Sound effects screen (radio-group sections).
 
+use crate::ui::scale::px;
 use gpui::{
     AnimationExt as _, AnimationPhase, Context, Entity, IntoElement, ParentElement, SharedString,
     SpringAnimation, SpringConfig, Styled, Window, div, prelude::*,
 };
-use crate::ui::scale::px;
 
 use super::common::{chevron_left, close_icon, eq_bars_icon, eq_image_icon};
 use crate::ui::{RootView, data, theme};
@@ -55,10 +55,16 @@ pub fn render(
                         .flex()
                         .items_center()
                         .gap_3()
-                        .child(header_btn(&view, "se-back", cx, |root, cx| {
-                            root.show_sound_effects = false;
-                            cx.notify();
-                        }, chevron_left(14., theme::muted())))
+                        .child(header_btn(
+                            &view,
+                            "se-back",
+                            cx,
+                            |root, cx| {
+                                root.show_sound_effects = false;
+                                cx.notify();
+                            },
+                            chevron_left(14., theme::muted()),
+                        ))
                         .child(
                             div()
                                 .text_size(px(15.))
@@ -67,10 +73,16 @@ pub fn render(
                                 .child("Sound Effects"),
                         ),
                 )
-                .child(header_btn(&view, "se-x", cx, |root, cx| {
-                    root.show_sound_effects = false;
-                    cx.notify();
-                }, close_icon(14., theme::muted()))),
+                .child(header_btn(
+                    &view,
+                    "se-x",
+                    cx,
+                    |root, cx| {
+                        root.show_sound_effects = false;
+                        cx.notify();
+                    },
+                    close_icon(14., theme::muted()),
+                )),
         )
         // Body fills below header
         .child(
@@ -87,7 +99,14 @@ pub fn render(
                 .flex_col()
                 .gap(px(10.))
                 .when(show_spatial, |el| {
-                    el.child(spatial_section(root, &view, d, &s, active == data::SECTION_SPATIAL, cx))
+                    el.child(spatial_section(
+                        root,
+                        &view,
+                        d,
+                        &s,
+                        active == data::SECTION_SPATIAL,
+                        cx,
+                    ))
                 })
                 .when(show_default, |el| {
                     el.child(default_card(
@@ -128,10 +147,7 @@ fn header_btn(
         .flex()
         .items_center()
         .justify_center()
-        .hover(|st| {
-            st.text_color(theme::foreground())
-                .bg(theme::hover_medium())
-        })
+        .hover(|st| st.text_color(theme::foreground()).bg(theme::hover_medium()))
         .cursor_pointer()
         .on_click(move |_, _window, cx| {
             view.update(cx, |root, cx| on(root, cx));
@@ -160,20 +176,15 @@ fn animated_radio(active: bool, key: &str) -> impl IntoElement {
                 this.border_color(border).bg(bg)
             },
         )
-        .child(
-            div()
-                .rounded_full()
-                .bg(gpui::rgb(0xffffff))
-                .with_spring(
-                    dot_key,
-                    SpringAnimation::new(SECTION_SPRING).to(phase(active)),
-                    move |this, p| {
-                        let p = p.clamp(0.0..=1.0);
-                        let size = p.0 * 8.0;
-                        this.size(px(size)).opacity(p.0)
-                    },
-                ),
-        )
+        .child(div().rounded_full().bg(gpui::rgb(0xffffff)).with_spring(
+            dot_key,
+            SpringAnimation::new(SECTION_SPRING).to(phase(active)),
+            move |this, p| {
+                let p = p.clamp(0.0..=1.0);
+                let size = p.0 * 8.0;
+                this.size(px(size)).opacity(p.0)
+            },
+        ))
 }
 
 /* ── Spatial Audio section ────────────────────────────────────────── */
@@ -200,14 +211,22 @@ fn spatial_section(
         .and_then(|v| v.get("setting"))
         .and_then(|v| v.get("options"))
         .and_then(|v| v.as_array())
-        .map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect())
+        .map(|a| {
+            a.iter()
+                .filter_map(|x| x.as_str().map(String::from))
+                .collect()
+        })
         .unwrap_or_default();
     let localized: Vec<String> = mode_setting
         .as_ref()
         .and_then(|v| v.get("setting"))
         .and_then(|v| v.get("localizedOptions"))
         .and_then(|v| v.as_array())
-        .map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect())
+        .map(|a| {
+            a.iter()
+                .filter_map(|x| x.as_str().map(String::from))
+                .collect()
+        })
         .unwrap_or_default();
 
     let ids: Vec<String> = if opts.is_empty() {
@@ -369,9 +388,7 @@ fn default_card(
                             view.update(cx, |root, _cx| {
                                 if root
                                     .active_device()
-                                    .map(|d| {
-                                        data::device_preset_id(&data::settings_map(d))
-                                    })
+                                    .map(|d| data::device_preset_id(&data::settings_map(d)))
                                     .flatten()
                                     .as_deref()
                                     != Some(id.as_str())
@@ -380,11 +397,7 @@ fn default_card(
                                         .active_device()
                                         .map(|d| d.mac_address.clone())
                                         .unwrap_or_default();
-                                    root.send_setting(
-                                        &mac,
-                                        "presetEqualizerProfile",
-                                        &id,
-                                    );
+                                    root.send_setting(&mac, "presetEqualizerProfile", &id);
                                 }
                             });
                         })
@@ -393,8 +406,7 @@ fn default_card(
                             SpringAnimation::new(CARD_SPRING).to(phase(on)),
                             move |this, p| {
                                 let p = p.clamp(0.0..=1.0);
-                                let bg =
-                                    p.interpolate(theme::surface_elevated(), theme::brand());
+                                let bg = p.interpolate(theme::surface_elevated(), theme::brand());
                                 let text =
                                     p.interpolate(theme::foreground(), theme::brand_foreground());
                                 let opacity = p.interpolate(0.8, 1.0);
@@ -407,7 +419,8 @@ fn default_card(
                             },
                         )
                         .child(label)
-                })));
+                })),
+        );
 
     section_shell(
         view,
@@ -428,7 +441,6 @@ fn default_card(
         140.0,
     )
 }
-
 
 /* ── Custom EQ card (graph inline when selected) ──────────────────── */
 
@@ -572,7 +584,6 @@ fn section_shell(
         )
 }
 
-
 /* -- Custom EQ graph (inline) ---------------------------------------- */
 const EQ_GRAPH_H: f32 = 240.0;
 const EQ_STEPS: usize = 25;
@@ -585,11 +596,7 @@ fn eq_db(v: i16, digits: i32) -> String {
     } else {
         format!("{n:.0}")
     };
-    if n > 0.0 {
-        format!("+{s}")
-    } else {
-        s
-    }
+    if n > 0.0 { format!("+{s}") } else { s }
 }
 
 fn eq_hz(hz: u16) -> String {
@@ -657,7 +664,13 @@ fn eq_graph(
         .get("fractionDigits")
         .and_then(|v| v.as_i64())
         .unwrap_or(1) as i32;
-    let levels = [max, (max as f32 * 0.5) as i16, 0, (min as f32 * 0.5) as i16, min];
+    let levels = [
+        max,
+        (max as f32 * 0.5) as i16,
+        0,
+        (min as f32 * 0.5) as i16,
+        min,
+    ];
     let step_h = EQ_GRAPH_H / EQ_STEPS as f32;
     let mac = root
         .active_device()
@@ -791,23 +804,15 @@ fn eq_graph(
                                         .bottom(px(0.))
                                         .flex()
                                         .justify_center()
-                                        .child(
-                                            div()
-                                                .w(px(1.))
-                                                .h_full()
-                                                .bg(theme::border_subtle()),
-                                        ),
+                                        .child(div().w(px(1.)).h_full().bg(theme::border_subtle())),
                                 )
                                 .children((0..EQ_STEPS).map(|k| {
                                     let value = (max as f32
-                                        - k as f32 * (max - min) as f32
-                                            / (EQ_STEPS - 1) as f32)
+                                        - k as f32 * (max - min) as f32 / (EQ_STEPS - 1) as f32)
                                         .round()
                                         as i16;
                                     div()
-                                        .id(gpui::SharedString::from(format!(
-                                            "eq-step-{i}-{k}"
-                                        )))
+                                        .id(gpui::SharedString::from(format!("eq-step-{i}-{k}")))
                                         .absolute()
                                         .left(px(0.))
                                         .right(px(0.))
@@ -879,12 +884,7 @@ fn eq_graph(
                                         .text_size(px(9.))
                                         .text_color(theme::muted())
                                         .text_center()
-                                        .child(
-                                            hz.get(i)
-                                                .copied()
-                                                .map(eq_hz)
-                                                .unwrap_or_default(),
-                                        ),
+                                        .child(hz.get(i).copied().map(eq_hz).unwrap_or_default()),
                                 )
                         })),
                 ),
@@ -950,15 +950,9 @@ fn eq_graph(
                     let bands = preset.bands.clone();
                     let preset_id = preset.id;
                     let active = active_preset_id == Some(preset.id);
-                    let spring_key = SharedString::from(format!(
-                        "eq-preset-spring-{}",
-                        preset.id
-                    ));
+                    let spring_key = SharedString::from(format!("eq-preset-spring-{}", preset.id));
                     div()
-                        .id(SharedString::from(format!(
-                            "eq-preset-{}",
-                            preset.id
-                        )))
+                        .id(SharedString::from(format!("eq-preset-{}", preset.id)))
                         .h(px(38.))
                         .px_3()
                         .flex_shrink_0()
@@ -987,10 +981,8 @@ fn eq_graph(
                             SpringAnimation::new(CARD_SPRING).to(phase(active)),
                             move |this, p| {
                                 let p = p.clamp(0.0..=1.0);
-                                let bg =
-                                    p.interpolate(theme::surface_elevated(), theme::brand());
-                                let border =
-                                    p.interpolate(theme::border_subtle(), theme::brand());
+                                let bg = p.interpolate(theme::surface_elevated(), theme::brand());
+                                let border = p.interpolate(theme::border_subtle(), theme::brand());
                                 let text =
                                     p.interpolate(theme::foreground(), theme::brand_foreground());
                                 let el = this.bg(bg).border_color(border).text_color(text);

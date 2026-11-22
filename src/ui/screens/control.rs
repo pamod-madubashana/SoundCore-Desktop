@@ -710,7 +710,10 @@ fn sub_row(
         .map(|(_, _, v)| v.clone());
     let active = local.unwrap_or(current);
     let sub_count = entries.len();
-    let sub_active_index = entries.iter().position(|(eid, _)| eid == &active).unwrap_or(0);
+    let sub_active_index = entries
+        .iter()
+        .position(|(eid, _)| eid == &active)
+        .unwrap_or(0);
     let pill_key: &'static str = if id == "transparencyMode" {
         "sub-transparency"
     } else {

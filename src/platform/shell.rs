@@ -26,9 +26,7 @@ fn hwnd_of(window: &Window) -> Option<windows::Win32::Foundation::HWND> {
     // Inherent Window::window_handle() returns AnyWindowHandle; use the trait method.
     let handle = HasWindowHandle::window_handle(window).ok()?;
     match handle.as_raw() {
-        RawWindowHandle::Win32(h) => {
-            Some(windows::Win32::Foundation::HWND(h.hwnd.get() as *mut _))
-        }
+        RawWindowHandle::Win32(h) => Some(windows::Win32::Foundation::HWND(h.hwnd.get() as *mut _)),
         _ => None,
     }
 }
@@ -77,7 +75,7 @@ pub fn is_visible(window: &Window) -> bool {
 pub fn position_bottom_right(window: &Window) -> Option<(i32, i32)> {
     use windows::Win32::Foundation::RECT;
     use windows::Win32::Graphics::Gdi::{
-        GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+        GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromWindow,
     };
 
     let hwnd = hwnd_of(window)?;
@@ -109,7 +107,7 @@ pub fn position_bottom_right(window: &Window) -> Option<(i32, i32)> {
 #[cfg(windows)]
 pub fn monitor_height(window: &Window) -> i32 {
     use windows::Win32::Graphics::Gdi::{
-        GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+        GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromWindow,
     };
 
     if let Some(hwnd) = hwnd_of(window) {
@@ -157,8 +155,8 @@ pub fn outer_pos(window: &Window) -> (i32, i32) {
 pub fn remove_dwm_border(window: &Window) {
     use std::ffi::c_void;
     use windows::Win32::Graphics::Dwm::{
-        DWMNCRENDERINGPOLICY, DWMNCRP_DISABLED, DWMWA_BORDER_COLOR, DWMWA_NCRENDERING_POLICY,
-        DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND, DWM_WINDOW_CORNER_PREFERENCE,
+        DWM_WINDOW_CORNER_PREFERENCE, DWMNCRENDERINGPOLICY, DWMNCRP_DISABLED, DWMWA_BORDER_COLOR,
+        DWMWA_NCRENDERING_POLICY, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_DONOTROUND,
         DwmSetWindowAttribute,
     };
 
@@ -262,7 +260,7 @@ pub struct Snap {
 pub fn position_bottom_right_from_snap(snap: &Snap) -> Option<(i32, i32)> {
     use windows::Win32::Foundation::RECT;
     use windows::Win32::Graphics::Gdi::{
-        GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+        GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromWindow,
     };
     if snap.hwnd == 0 {
         return None;
@@ -294,10 +292,7 @@ pub fn position_bottom_right_from_snap(_snap: &Snap) -> Option<(i32, i32)> {
 }
 
 /// Snapshot platform state for an animation. Must run on the GPUI main thread.
-pub fn snapshot<V: gpui::Render + 'static>(
-    handle: WindowHandle<V>,
-    cx: &mut App,
-) -> Option<Snap> {
+pub fn snapshot<V: gpui::Render + 'static>(handle: WindowHandle<V>, cx: &mut App) -> Option<Snap> {
     handle
         .update(cx, |_, window, _| {
             #[cfg(windows)]
@@ -403,7 +398,7 @@ impl Snap {
 
     pub fn target_y(&self) -> i32 {
         use windows::Win32::Graphics::Gdi::{
-            GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+            GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromWindow,
         };
         if self.hwnd != 0 {
             unsafe {

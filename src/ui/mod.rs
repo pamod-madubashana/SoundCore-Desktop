@@ -21,7 +21,8 @@ use gpui::{
 
 use crate::{
     DeviceStateDto, EqPresetDto, ScanDto, UpdateInfo, UpdateProgress, get_scan, get_states,
-    get_update_progress, get_version, hide_window_now, show_notification, state,
+    get_update_progress, get_version, hide_window_now, set_update_progress, show_notification,
+    state,
 };
 
 pub struct RootView {
@@ -243,7 +244,10 @@ impl RootView {
                         d.battery_case,
                     );
                 }
-                for mac in prev.iter().filter(|mac| !next_connected.contains(mac.as_str())) {
+                for mac in prev
+                    .iter()
+                    .filter(|mac| !next_connected.contains(mac.as_str()))
+                {
                     let old = self.devices.iter().find(|d| &d.mac_address == mac);
                     let name = old
                         .map(data::display_device_name)
@@ -470,12 +474,24 @@ impl RootView {
     }
 
     pub fn start_update(&mut self, cx: &mut Context<Self>) {
+        let checking = UpdateProgress {
+            phase: "checking".to_string(),
+            percent: 0.0,
+            message: "Checking for update...".to_string(),
+        };
+        set_update_progress(state(), Some(checking.clone()));
         self.update_error = None;
+        self.update_progress = Some(checking);
         cx.notify();
         cx.spawn(async move |this, cx| {
-            let result = std::thread::spawn(|| crate::start_update(state()))
-                .join()
+            let (tx, rx) = tokio::sync::oneshot::channel();
+            std::thread::spawn(move || {
+                let _ = tx.send(crate::start_update(state()));
+            });
+            let result = rx
+                .await
                 .unwrap_or_else(|_| Err("update thread panicked".into()));
+            set_update_progress(state(), None);
             this.update(&mut *cx, |view, cx| {
                 if let Err(e) = result {
                     view.update_error = Some(e);
