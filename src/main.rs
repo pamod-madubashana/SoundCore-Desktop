@@ -47,6 +47,9 @@ use tray_icon::{
 use services::worker::{Command, WorkerHandle};
 
 const AUTO_HIDE_ARM_DELAY: Duration = Duration::from_millis(750);
+const NOTIFICATION_DURATION: Duration = Duration::from_millis(3200);
+const NOTIFICATION_W: f32 = 360.0;
+const NOTIFICATION_H: f32 = 110.0;
 
 #[cfg(windows)]
 fn fix_redirect_thunks() {
@@ -161,6 +164,16 @@ static MAIN_WINDOW: OnceLock<Mutex<Option<gpui::WindowHandle<ui::RootView>>>> = 
 
 fn main_window() -> &'static Mutex<Option<gpui::WindowHandle<ui::RootView>>> {
     MAIN_WINDOW.get_or_init(|| Mutex::new(None))
+}
+
+static NOTIFICATION_WINDOW: OnceLock<
+    Mutex<Option<gpui::WindowHandle<ui::notification::NotificationView>>>,
+> = OnceLock::new();
+static NOTIFICATION_EPOCH: AtomicU64 = AtomicU64::new(0);
+
+fn notification_window(
+) -> &'static Mutex<Option<gpui::WindowHandle<ui::notification::NotificationView>>> {
+    NOTIFICATION_WINDOW.get_or_init(|| Mutex::new(None))
 }
 
 fn cancel_pending_hide() {
@@ -700,10 +713,10 @@ pub fn get_platform_info() -> platform::PlatformInfo {
     platform::get_platform_info()
 }
 
-// ---- notification (scaffold: store data; window port comes with UI) ----
+// ---- notification ----
 
 pub fn show_notification(
-    state: &AppState,
+    cx: &mut App,
     name: String,
     image: Option<String>,
     status: String,
@@ -727,15 +740,120 @@ pub fn show_notification(
     } else {
         None
     };
-    let mut pending = state.pending_notification.lock().unwrap();
-    *pending = Some(PendingNotification {
+    let notification = PendingNotification {
         name,
         image,
         status,
         battery,
-    });
-    // TODO(port): open a second GPUI window (360x110, bottom-right, auto-hide 3s).
+    };
+    *state().pending_notification.lock().unwrap() = Some(notification.clone());
+    let epoch = NOTIFICATION_EPOCH.fetch_add(1, Ordering::SeqCst) + 1;
+
+    cx.spawn(async move |cx| {
+        cx.update(|cx| {
+            if epoch != NOTIFICATION_EPOCH.load(Ordering::SeqCst) {
+                return;
+            }
+            present_notification(cx, &notification, epoch);
+        });
+    })
+    .detach();
     Ok(())
+}
+
+fn present_notification(cx: &mut App, notification: &PendingNotification, epoch: u64) {
+    if let Some(handle) = *notification_window().lock().unwrap() {
+        let updated = handle
+            .update(cx, |view, _window, cx| {
+                view.set_notification(notification.clone());
+                cx.notify();
+            })
+            .is_ok();
+        if updated {
+            schedule_notification_close(handle, epoch, cx);
+            return;
+        }
+    }
+
+    match open_notification_window(cx, notification.clone()) {
+        Ok(handle) => {
+            *notification_window().lock().unwrap() = Some(handle);
+            schedule_notification_close(handle, epoch, cx);
+        }
+        Err(err) => tracing::warn!("failed to open notification window: {err:#}"),
+    }
+}
+
+fn open_notification_window(
+    cx: &mut App,
+    notification: PendingNotification,
+) -> gpui::Result<gpui::WindowHandle<ui::notification::NotificationView>> {
+    let display = cx
+        .primary_display()
+        .or_else(|| cx.displays().into_iter().next());
+    let (origin, display_id) = match display {
+        Some(d) => {
+            let b = d.bounds();
+            let o = point(
+                (b.origin.x + b.size.width - px(NOTIFICATION_W) - px(shell::MARGIN_X))
+                    .max(b.origin.x),
+                (b.origin.y + b.size.height - px(NOTIFICATION_H) - px(shell::MARGIN_Y + 40.0))
+                    .max(b.origin.y),
+            );
+            (o, Some(d.id()))
+        }
+        None => (point(px(100.), px(100.)), None),
+    };
+    let bounds = gpui::Bounds::new(
+        origin,
+        size(px(NOTIFICATION_W), px(NOTIFICATION_H)),
+    );
+
+    let handle = cx.open_window(
+        WindowOptions {
+            window_bounds: Some(WindowBounds::Windowed(bounds)),
+            titlebar: None,
+            focus: false,
+            show: true,
+            kind: WindowKind::PopUp,
+            is_movable: false,
+            is_resizable: false,
+            is_minimizable: false,
+            display_id,
+            window_background: WindowBackgroundAppearance::Transparent,
+            app_id: Some("soundcore-notification".into()),
+            window_min_size: Some(size(px(NOTIFICATION_W), px(NOTIFICATION_H))),
+            ..Default::default()
+        },
+        |window, cx| {
+            window.set_rem_size(ui::scale::rem_base());
+            shell::remove_dwm_border(window);
+            cx.new(|_| ui::notification::NotificationView::new(notification))
+        },
+    )?;
+
+    let _ = handle.update(cx, |_, window, _| shell::apply_topmost(window));
+    Ok(handle)
+}
+
+fn schedule_notification_close(
+    handle: gpui::WindowHandle<ui::notification::NotificationView>,
+    epoch: u64,
+    cx: &mut App,
+) {
+    cx.spawn(async move |cx| {
+        cx.background_executor()
+            .timer(NOTIFICATION_DURATION)
+            .await;
+        let _ = cx.update(|cx| {
+            if epoch != NOTIFICATION_EPOCH.load(Ordering::SeqCst) {
+                return;
+            }
+            let _ = handle.update(cx, |_, window, _| window.remove_window());
+            *notification_window().lock().unwrap() = None;
+        });
+    })
+    .detach();
 }
 
 // ---- tray + window wiring ----
