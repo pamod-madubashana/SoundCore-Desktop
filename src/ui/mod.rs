@@ -36,8 +36,6 @@ pub struct RootView {
     pub(crate) version: String,
     pub(crate) eq_presets: Vec<EqPresetDto>,
     pub show_sound_effects: bool,
-    /// Second-level Custom EQ editor (React `showEqualizer`).
-    pub(crate) show_equalizer: bool,
     /// App Settings screen (header gear button).
     pub show_settings: bool,
     /// About screen (header info button).
@@ -55,6 +53,10 @@ pub struct RootView {
     pub(crate) spatial_local: Option<(String, String, std::time::Instant)>,
     /// Last built-in preset id seen, so re-selecting Default restores it.
     pub(crate) last_preset_id: Option<String>,
+    /// Live curve while editing the custom EQ (kept optimistic across polls).
+    pub(crate) eq_draft: Vec<i16>,
+    /// Band index currently being dragged in the custom EQ graph.
+    pub(crate) eq_drag_band: Option<usize>,
     /// Screen-switch transition: current screen key and spring state (0..1 phase).
     nav_screen: &'static str,
     nav_phase: f32,
@@ -187,7 +189,6 @@ impl RootView {
             version,
             eq_presets: Vec::new(),
             show_sound_effects: false,
-            show_equalizer: false,
             show_settings: false,
             show_about: false,
             spinner_tick: 0,
@@ -195,6 +196,8 @@ impl RootView {
             sub_local: None,
             sub_local_at: None,
             toggle_local: HashMap::new(),
+            eq_draft: Vec::new(),
+            eq_drag_band: None,
             se_local: None,
             spatial_local: None,
             last_preset_id: None,
@@ -326,12 +329,32 @@ impl RootView {
         polled.unwrap_or_else(|| "Music".into())
     }
 
+    fn sync_eq_draft(&mut self) {
+        let Some(mac) = self.active_device().map(|d| d.mac_address.clone()) else {
+            return;
+        };
+        let s = self.settings_for(&mac);
+        let Some(vol) = s.get("volumeAdjustments") else {
+            return;
+        };
+        self.eq_draft = vol
+            .get("value")
+            .and_then(|v| v.as_array())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|x| x.as_i64().map(|n| n as i16))
+                    .collect()
+            })
+            .unwrap_or_default();
+        self.eq_drag_band = None;
+    }
+
     /// Select an SE section (mirrors React `selectSection`).
     pub(crate) fn select_section(&mut self, section: &str, cx: &mut Context<Self>) {
         let active = self.se_active();
         if active == section {
             if section == data::SECTION_CUSTOM {
-                self.show_equalizer = true;
+                self.sync_eq_draft();
                 cx.notify();
             }
             return;
@@ -368,6 +391,7 @@ impl RootView {
                 return;
             }
             self.send_setting(&mac, "volumeAdjustments", &bands.join(","));
+            self.sync_eq_draft();
         }
         self.se_local = Some((section.to_string(), std::time::Instant::now()));
         cx.notify();
@@ -542,9 +566,8 @@ fn downscale_png(bytes: Vec<u8>, max: u32) -> Vec<u8> {
 
 impl RootView {
     /// Replay the saved-device entrance when the window becomes visible.
-    pub fn begin_device_entrance(&mut self, cx: &mut Context<Self>) {
+    pub fn begin_device_entrance(&mut self) {
         self.device_entry_id = self.device_entry_id.wrapping_add(1);
-        cx.notify();
     }
 
     /// Detect a screen change and drive a spring phase 0 -> 1 for a fade+slide entrance.
