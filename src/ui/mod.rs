@@ -73,11 +73,14 @@ pub struct RootView {
     pub(crate) eq_drag_band: Option<usize>,
     /// Preset selected by the user, updated optimistically on click.
     pub(crate) eq_active_preset: Option<i64>,
-    /// Screen-switch transition: current screen key and spring state (0..1 phase).
+    /// Screen-switch transition: current + outgoing screen keys and spring state.
     nav_screen: &'static str,
+    nav_prev_screen: &'static str,
     nav_phase: f32,
     nav_velocity: f32,
     nav_id: u64,
+    /// +1 push (deeper screen), -1 pop (back), 0 lateral / initial mount.
+    nav_direction: i8,
     device_entry_id: u64,
     _states_task: Task<()>,
     _bt_task: Task<()>,
@@ -311,9 +314,11 @@ impl RootView {
             spatial_local: None,
             last_preset_id: None,
             nav_screen: "",
+            nav_prev_screen: "",
             nav_phase: 1.0,
             nav_velocity: 0.0,
             nav_id: 0,
+            nav_direction: 0,
             device_entry_id: 0,
             _states_task: states_task,
             _bt_task: bt_task,
@@ -729,12 +734,19 @@ impl RootView {
         self.device_entry_id = self.device_entry_id.wrapping_add(1);
     }
 
-    /// Detect a screen change and drive a spring phase 0 -> 1 for a fade+slide entrance.
+    /// Detect a screen change, classify it as push/pop/lateral and drive a
+    /// spring phase 0 -> 1. The outgoing screen is held until the spring settles.
     fn update_nav_animation(&mut self, key: &'static str, cx: &mut Context<Self>) {
-        const NAV_SPRING: gpui::SpringConfig = gpui::SpringConfig::new(210.0, 26.0, 1.0);
+        const NAV_SPRING: gpui::SpringConfig = gpui::SpringConfig::new(280.0, 32.0, 1.0);
         if self.nav_screen == key {
             return;
         }
+        self.nav_direction = match screen_depth(key).cmp(&screen_depth(self.nav_screen)) {
+            std::cmp::Ordering::Greater => 1,
+            std::cmp::Ordering::Less => -1,
+            std::cmp::Ordering::Equal => 0,
+        };
+        self.nav_prev_screen = self.nav_screen;
         self.nav_screen = key;
         self.nav_phase = 0.0;
         self.nav_velocity = 0.0;
@@ -760,8 +772,14 @@ impl RootView {
                         let next = NAV_SPRING.step(state, 1.0, 1.0 / 60.0);
                         view.nav_phase = next.position;
                         view.nav_velocity = next.velocity;
+                        let done = NAV_SPRING.is_settled(next, 1.0, 0.001);
+                        if done {
+                            view.nav_phase = 1.0;
+                            view.nav_velocity = 0.0;
+                            view.nav_prev_screen = "";
+                        }
                         cx.notify();
-                        NAV_SPRING.is_settled(next, 1.0, 0.001)
+                        done
                     })
                     .unwrap_or(true);
                 if done {
@@ -770,6 +788,41 @@ impl RootView {
             }
         })
         .detach();
+    }
+
+    /// Render a screen by key. Each layer is wrapped in its own element id so
+    /// GPUI scopes the screens' static ids to that layer during a transition.
+    fn render_screen(
+        &mut self,
+        key: &str,
+        active: Option<&DeviceStateDto>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<gpui::AnyElement> {
+        Some(match key {
+            "control" => screens::control::render(self, active?, window, cx).into_any_element(),
+            "devices" => screens::devices::render(self, window, cx).into_any_element(),
+            "searching" => screens::searching::render(self, window, cx).into_any_element(),
+            "sound-effects" => {
+                screens::sound_effects::render(self, active?, window, cx).into_any_element()
+            }
+            "device-settings" => {
+                screens::device_settings::render(self, active?, window, cx).into_any_element()
+            }
+            "protocol-lab" => screens::protocol_lab::render(self, window, cx).into_any_element(),
+            "settings" => screens::settings::render(self, window, cx).into_any_element(),
+            "about" => screens::about::render(self, window, cx).into_any_element(),
+            _ => return None,
+        })
+    }
+}
+
+/// Navigation hierarchy depth, used to decide push (deeper) vs pop (shallower).
+fn screen_depth(key: &str) -> u8 {
+    match key {
+        "sound-effects" | "device-settings" | "settings" | "about" => 1,
+        "protocol-lab" => 2,
+        _ => 0,
     }
 }
 
@@ -823,7 +876,6 @@ impl Render for RootView {
             && !show_about
             && !show_protocol_lab
             && !show_device;
-        let overlay = show_se || show_settings || show_about || show_device || show_protocol_lab;
 
         let nav_key = if show_about {
             "about"
@@ -844,6 +896,81 @@ impl Render for RootView {
         };
         self.update_nav_animation(nav_key, cx);
         let nav_phase = self.nav_phase.clamp(0.0, 1.0);
+        let nav_dir = self.nav_direction;
+        let current_key = self.nav_screen;
+        let prev_key = self.nav_prev_screen;
+        let width = window.viewport_size().width.as_f32();
+
+        let incoming = self.render_screen(current_key, active.as_ref(), window, cx);
+        let outgoing = if nav_dir != 0 && !prev_key.is_empty() {
+            self.render_screen(prev_key, active.as_ref(), window, cx)
+        } else {
+            None
+        };
+
+        // Only the screen content slides — the glass background stays put.
+        // Two complementary clipped windows keep the screens from overlapping.
+        let mut layers: Vec<gpui::AnyElement> = Vec::new();
+        if let Some(outgoing_el) = outgoing {
+            let (left, clip, inner_offset) = if nav_dir > 0 {
+                (0.0, (1.0 - nav_phase) * width, -nav_phase * width * 0.3)
+            } else {
+                (nav_phase * width, (1.0 - nav_phase) * width, 0.0)
+            };
+            layers.push(
+                div()
+                    .id("nav-outgoing")
+                    .absolute()
+                    .top(px(0.))
+                    .left(gpui::px(left))
+                    .w(gpui::px(clip + 1.0))
+                    .h_full()
+                    .overflow_hidden()
+                    .child(
+                        div()
+                            .relative()
+                            .w(gpui::px(width))
+                            .h_full()
+                            .left(gpui::px(inner_offset))
+                            .child(outgoing_el),
+                    )
+                    .into_any_element(),
+            );
+        }
+        if let Some(incoming_el) = incoming {
+            let (left, clip, inner_offset, opacity) = if nav_dir > 0 {
+                ((1.0 - nav_phase) * width, nav_phase * width, 0.0, 1.0)
+            } else if nav_dir < 0 {
+                (
+                    0.0,
+                    nav_phase * width,
+                    -(1.0 - nav_phase) * width * 0.3,
+                    1.0,
+                )
+            } else {
+                (0.0, width, (1.0 - nav_phase) * 12.0, nav_phase)
+            };
+            layers.push(
+                div()
+                    .id("nav-incoming")
+                    .absolute()
+                    .top(px(0.))
+                    .left(gpui::px(left))
+                    .w(gpui::px(clip + 1.0))
+                    .h_full()
+                    .overflow_hidden()
+                    .opacity(opacity)
+                    .child(
+                        div()
+                            .relative()
+                            .w(gpui::px(width))
+                            .h_full()
+                            .left(gpui::px(inner_offset))
+                            .child(incoming_el),
+                    )
+                    .into_any_element(),
+            );
+        }
 
         // Root IS the glass: baked PNG (gradient+glows+sheen+stroke) masked
         // to rx=28. HWND stays a full transparent host; alpha defines shape.
@@ -877,52 +1004,8 @@ impl Render for RootView {
                 div()
                     .size_full()
                     .relative()
-                    .flex()
-                    .flex_col()
                     .overflow_hidden()
-                    .opacity(nav_phase)
-                    .left(px((1.0 - nav_phase) * 12.0))
-                    .when(active.is_some() && !overlay, |el| {
-                        el.child(screens::control::render(
-                            self,
-                            active.as_ref().unwrap(),
-                            window,
-                            cx,
-                        ))
-                    })
-                    .when(
-                        active.is_none() && !overlay && !self.devices.is_empty(),
-                        |el| el.child(screens::devices::render(self, window, cx)),
-                    )
-                    .when(
-                        active.is_none() && !overlay && self.devices.is_empty(),
-                        |el| el.child(screens::searching::render(self, window, cx)),
-                    )
-                    .when(show_se, |el| {
-                        el.child(screens::sound_effects::render(
-                            self,
-                            active.as_ref().unwrap(),
-                            window,
-                            cx,
-                        ))
-                    })
-                    .when(show_device, |el| {
-                        el.child(screens::device_settings::render(
-                            self,
-                            active.as_ref().unwrap(),
-                            window,
-                            cx,
-                        ))
-                    })
-                    .when(show_protocol_lab, |el| {
-                        el.child(screens::protocol_lab::render(self, window, cx))
-                    })
-                    .when(show_settings, |el| {
-                        el.child(screens::settings::render(self, window, cx))
-                    })
-                    .when(show_about, |el| {
-                        el.child(screens::about::render(self, window, cx))
-                    }),
+                    .children(layers),
             )
     }
 }
