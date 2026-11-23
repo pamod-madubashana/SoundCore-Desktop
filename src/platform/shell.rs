@@ -54,8 +54,53 @@ pub fn show(window: &Window) {
     use windows::Win32::UI::WindowsAndMessaging::{SW_SHOWNOACTIVATE, ShowWindow};
     if let Some(hwnd) = hwnd_of(window) {
         unsafe {
+            apply_rounded_region(hwnd, window);
             let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
         }
+    }
+}
+
+/// Clip the host HWND to the popup's rounded shape. GPUI content masks are
+/// rectangular, so sliding screen layers would otherwise paint into the
+/// transparent corners. The region is aligned with the client area that the
+/// baked background PNG masks.
+#[cfg(windows)]
+unsafe fn apply_rounded_region(
+    hwnd: windows::Win32::Foundation::HWND,
+    window: &Window,
+) {
+    use windows::Win32::Foundation::RECT;
+    use windows::Win32::Graphics::Gdi::{CreateRoundRectRgn, SetWindowRgn};
+    use windows::Win32::UI::WindowsAndMessaging::{GetClientRect, GetWindowRect};
+
+    let mut outer = RECT::default();
+    let mut client = RECT::default();
+    unsafe {
+        if GetWindowRect(hwnd, &mut outer).is_err()
+            || GetClientRect(hwnd, &mut client).is_err()
+        {
+            return;
+        }
+    }
+    let ow = outer.right - outer.left;
+    let oh = outer.bottom - outer.top;
+    let cw = client.right - client.left;
+    let ch = client.bottom - client.top;
+    let offset_x = (ow - cw) / 2;
+    let offset_y = oh - ch - offset_x;
+    let diameter = (2.0 * CORNER_RADIUS * window.scale_factor() as f32).round() as i32;
+    let region = unsafe {
+        CreateRoundRectRgn(
+            offset_x,
+            offset_y,
+            offset_x + cw + 1,
+            offset_y + ch + 1,
+            diameter,
+            diameter,
+        )
+    };
+    if !region.is_invalid() {
+        let _ = unsafe { SetWindowRgn(hwnd, Some(region), true) };
     }
 }
 
@@ -144,9 +189,9 @@ pub fn outer_pos(window: &Window) -> (i32, i32) {
     (0, 0)
 }
 
-/// Rounded shape is GPU-only: the HWND is a full transparent host and the
-/// baked PNG is masked to rx=28 (background::mask_rounded_rect). No
-/// SetWindowRgn — the PNG alpha owns the shape.
+/// Rounded shape is GPU-painted: the baked PNG is masked to rx=28
+/// (background::mask_rounded_rect). `show()` additionally clips the HWND to
+/// the same rounded region so sliding nav layers cannot leak into the corners.
 
 /// Kill DWM's 1px border, non-client frame, and shadow around the rectangular
 /// host so they don't outline the GPU-masked rounded paint. Also force
