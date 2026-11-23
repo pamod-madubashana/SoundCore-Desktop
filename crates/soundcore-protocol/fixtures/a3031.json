@@ -1,0 +1,8 @@
+{
+  "model": "SoundcoreA3031",
+  "aliases": [],
+  "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3031/packets/state_update_packet.rs:129",
+  "coverage": "none",
+  "state_vectors": [],
+  "outbound_vectors": []
+}

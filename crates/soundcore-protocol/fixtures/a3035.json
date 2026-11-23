@@ -1,0 +1,89 @@
+{
+  "model": "SoundcoreA3035",
+  "aliases": [],
+  "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3035.rs:84",
+  "coverage": "real-capture",
+  "state_vectors": [
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3035.rs:92",
+      "packet_hex": "05ff30362e3837333033353730353032383841394446340000787878787878787878001eff00ffffffffffffffffff000000000000ffffffffffffffffff00000004040703005000000105000100000031010001000102005a000101000000",
+      "expected": {
+        "ambientSoundMode": "NoiseCanceling",
+        "noiseCancelingMode": "Custom",
+        "manualNoiseCanceling": "5",
+        "manualTransparency": "5",
+        "windNoiseSuppression": "true",
+        "limitHighVolume": "false",
+        "limitHighVolumeDbLimit": "90",
+        "limitHighVolumeRefreshRate": "RealTime",
+        "doublePress": "BassUp",
+        "noiseCancelingModeInCycle": "true",
+        "transparencyModeInCycle": "true",
+        "normalModeInCycle": "false",
+        "autoPowerOff": "90m",
+        "autoPlayPause": "true",
+        "lowBatteryPrompt": "true",
+        "voicePrompt": "true",
+        "presetEqualizerProfile": "SoundcoreSignature",
+        "volumeAdjustments": "[0, 0, 0, 0, 0, 0, 0, 0]",
+        "dualConnections": "false"
+      }
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3035.rs:143",
+      "packet_hex": "05ff30362e38373330333537303530323838413944463400007878787878787878fafa1eff00ffffffffffffffffff000000000000ffffffffffffffffff00000004040703005000000105000100000031010001000102005a000101000000",
+      "expected": {}
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3035.rs:182",
+      "packet_hex": "05ff30362e38373330333537303530323838413944463400007878787878787878fafa1eff00ffffffffffffffffff000000000000ffffffffffffffffff00000004040703005000000105000100000031010001000102005a000101000000",
+      "expected": {}
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3035.rs:224",
+      "packet_hex": "05ff30362e3837333033353730353032383841394446340000787878787878787878001eff00ffffffffffffffffff000000000000ffffffffffffffffff00000004040703005000000105000100000031010001000102005a000101000000",
+      "expected": {}
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3035.rs:259",
+      "packet_hex": "05ff30362e3837333033353730353032383841394446340000787878787878787878001eff00ffffffffffffffffff000000000000ffffffffffffffffff00000004040703005000000105000100000031010101000102005a000101000000",
+      "expected": {
+        "dualConnections": "true"
+      }
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3035.rs:273",
+      "packet_hex": "010128016614922c3ad4506978656c20366100000000000000000000000000000000000000000000000028016714922c3ad4506978656c203761000000000000000000000000000000000000000000000000",
+      "expected": {
+        "dualConnectionsDevices": "2"
+      }
+    }
+  ],
+  "outbound_vectors": [
+    {
+      "name": "set_preset_eq",
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3035.rs:160",
+      "command_hex": "038701000000a0828c8ca0a0a08c7800ffff00ffffffffffffffffff000000000000ffffffffffffffffff007d767b787c7a7c79780000"
+    },
+    {
+      "name": "set_custom_eq",
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3035.rs:202",
+      "command_hex": "0387fefe00003c787878787878b47878ffff00ffffffffffffffffff000000000000ffffffffffffffffff00707c777977797481780000"
+    },
+    {
+      "name": "set_custom_transparency_1",
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3035.rs:241",
+      "command_hex": "0681015101000105"
+    },
+    {
+      "name": "set_custom_transparency_2",
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3035.rs:242",
+      "command_hex": "0681015101000103"
+    },
+    {
+      "name": "set_custom_transparency_3",
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3035.rs:243",
+      "command_hex": "0681005100000103"
+    }
+  ]
+}

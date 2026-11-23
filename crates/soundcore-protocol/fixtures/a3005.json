@@ -1,0 +1,21 @@
+{
+  "model": "SoundcoreA3005",
+  "aliases": [],
+  "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3005.rs:231",
+  "coverage": "real-capture",
+  "state_vectors": [
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3005.rs:239",
+      "packet_hex": "070030312e323133303035424142414642324339433138000078787878787878787800ffffffffffff01310000000101ffffffffffffff",
+      "expected": {
+        "batteryLevel": "8/10",
+        "isCharging": "No",
+        "firmwareVersion": "01.21",
+        "serialNumber": "3005BABAFB2C9C18",
+        "presetEqualizerProfile": "SoundcoreSignature",
+        "autoPowerOff": "60m"
+      }
+    }
+  ],
+  "outbound_vectors": []
+}

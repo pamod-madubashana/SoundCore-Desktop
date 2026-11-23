@@ -1,0 +1,46 @@
+{
+  "model": "SoundcoreA3909",
+  "aliases": [],
+  "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3909.rs:143",
+  "coverage": "real-capture",
+  "state_vectors": [
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3909.rs:149",
+      "packet_hex": "0100ff050000fefe0101010c0c0c0f0c0c0c0c0c0c0c0c0c0c0c0c698ea8670201030000",
+      "expected": {
+        "PresetEqualizerProfile": "None",
+        "VolumeAdjustments": "[0,0,0,0,0,0,0,0]",
+        "BatteryLevelRight": "5/5",
+        "IsChargingRight": "No",
+        "LeftDoublePress": "PreviousSong",
+        "RightDoublePress": "NextSong",
+        "LeftLongPress": "VolumeDown",
+        "RightLongPress": "VolumeUp",
+        "IsChargingLeft": "None",
+        "BatteryLevelLeft": "None"
+      }
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3909.rs:159",
+      "packet_hex": "30312e323830312e323833393039393835323344384342454146",
+      "expected": {
+        "FirmwareVersionLeft": "01.28",
+        "FirmwareVersionRight": "01.28",
+        "SerialNumber": "390998523D8CBEAF"
+      }
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3909.rs:212",
+      "packet_hex": "0100ff05000006000101010c0c0c0f0c0c0c0c0c0c0c0c0c0c0c0c698ea8670201030000",
+      "expected": {
+        "VolumeAdjustments": "[2,-3,-1,1,2,2,1,-3]"
+      }
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3909.rs:222",
+      "packet_hex": "30312e323830312e323833393039393835323344384342454146",
+      "expected": {}
+    }
+  ],
+  "outbound_vectors": []
+}

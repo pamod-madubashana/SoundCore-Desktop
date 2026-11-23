@@ -1,0 +1,33 @@
+{
+  "model": "SoundcoreD1204",
+  "aliases": [],
+  "source": "devices/soundcore/d1204.rs:57",
+  "coverage": "synthetic",
+  "state_vectors": [
+    {
+      "source": "devices/soundcore/d1204.rs:84",
+      "packet_hex": "020101030200570402005c0801400b021eff0c200000803f00008040666666bf9a991940000000000000c0bf00005040000000c02403010001250203022c030102022e0101fa03010203",
+      "expected": {
+        "BatteryLevelLeft": "87/100",
+        "BatteryLevelRight": "92/100",
+        "CaseBatteryLevel": "64/100",
+        "AmbientSoundMode": "NoiseCanceling",
+        "ManualNoiseCanceling": "3",
+        "ManualTransparency": "2",
+        "SpatialAudio": "true"
+      }
+    }
+  ],
+  "outbound_vectors": [
+    {
+      "name": "set_sound_mode_and_spatial_audio",
+      "source": "devices/soundcore/d1204.rs:131",
+      "command_hex": "068102000103120000"
+    },
+    {
+      "name": "set_spatial_audio",
+      "source": "devices/soundcore/d1204.rs:132",
+      "command_hex": "1081000202"
+    }
+  ]
+}

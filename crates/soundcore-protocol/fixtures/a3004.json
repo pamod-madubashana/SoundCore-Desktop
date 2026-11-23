@@ -1,0 +1,8 @@
+{
+  "model": "SoundcoreA3004",
+  "aliases": [],
+  "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3004/packets/state_update_packet.rs:93",
+  "coverage": "none",
+  "state_vectors": [],
+  "outbound_vectors": []
+}

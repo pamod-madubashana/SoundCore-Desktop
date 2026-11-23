@@ -1,0 +1,80 @@
+{
+  "model": "SoundcoreA3955",
+  "aliases": [],
+  "source": "devices/soundcore/a3955.rs:149",
+  "coverage": "real-capture",
+  "state_vectors": [
+    {
+      "source": "devices/soundcore/a3955.rs:160",
+      "packet_hex": "00010505000130312e363130312e363133393535393834373434363666353733302e312e38030800968c648c828c96967800ffffffffffffffffffffff00ffffffffffffffffff00ffffffffffffffffff000000000000ffffffffffffffffff00ffffffffffffffffff0000000affff6366f4ff4444350051010201ff0100000000ffff016f0001015f0001020201ffffffffffffffffffff6789",
+      "expected": {
+        "BatteryLevelLeft": "5/5",
+        "BatteryLevelRight": "5/5",
+        "CaseBatteryLevel": "3/5",
+        "IsChargingLeft": "No",
+        "IsChargingRight": "Yes",
+        "AmbientSoundMode": "NoiseCanceling",
+        "NoiseCancelingMode": "MultiScene",
+        "MultiSceneNoiseCanceling": "Outdoor",
+        "ManualNoiseCanceling": "5",
+        "AdaptiveNoiseCanceling": "Weak",
+        "WindNoiseSuppression": "true",
+        "TransparencyMode": "VocalMode",
+        "LeftSinglePress": "None",
+        "LeftDoublePress": "NextSong",
+        "LeftTriplePress": "AmbientSoundMode",
+        "LeftLongPress": "AmbientSoundMode",
+        "RightSinglePress": "None",
+        "RightDoublePress": "PlayPause",
+        "RightTriplePress": "None",
+        "RightLongPress": "AmbientSoundMode",
+        "LimitHighVolume": "true",
+        "LimitHighVolumeDbLimit": "95",
+        "LimitHighVolumeRefreshRate": "RealTime",
+        "TouchTone": "false",
+        "LowBatteryPrompt": "true",
+        "AutoPowerOff": "30m",
+        "FirmwareVersionLeft": "01.61",
+        "FirmwareVersionRight": "01.61",
+        "SerialNumber": "395598474466f573",
+        "PresetEqualizerProfile": "Electronic"
+      }
+    },
+    {
+      "source": "devices/soundcore/a3955.rs:264",
+      "packet_hex": "01000505ff00ffffffffff30312e373233393535393834373434623037343835302e312e3805000078787878787878787800ffffffffffffffffffff05008a918e8e7b6e66613c3c8a918e8e7b6e66613c3c699686f1008a918e8e7b6e66613c3c8a918e8e7b6e66613c3c00000affff6366ffff4444330251000001ff0000000000ffff0031010100550001020101ffffffffffffffffffff",
+      "expected": {}
+    },
+    {
+      "source": "devices/soundcore/a3955.rs:291",
+      "packet_hex": "00010402000030312e363730312e363733393535393834373434363665666533302e312e3801fefeb4988c8c7885888e7878ffffffffffffffffffffff0178787878787878787878787878787878787878780000000002ffffffffffffffffff00ffffffffffffffffff0000000a11ff636633334433330051000201000100000000ffff0131010101520201030101ffffffffffffffffff19",
+      "expected": {
+        "ImmersiveExperience": "Disabled"
+      }
+    },
+    {
+      "source": "devices/soundcore/a3955.rs:340",
+      "packet_hex": "00010402000030312e363730312e363733393535393834373434363665666533302e312e3801fefeb4988c8c7885888e7878ffffffffffffffffffff000178787878787878787878787878787878787878780000000002787878787878787878787878787878787878787800000a11ff636633334433330051000201000100000000ffff0131010101520201030101ffffffffffffffffff19",
+      "expected": {
+        "ImmersiveExperience": "Disabled"
+      }
+    }
+  ],
+  "outbound_vectors": [
+    {
+      "name": "set_immersive_experience_movie_mode",
+      "source": "devices/soundcore/a3955.rs:248",
+      "command_hex": "128102"
+    },
+    {
+      "name": "set_equalizer_with_hear_id_uninitialized",
+      "source": "devices/soundcore/a3955.rs:315",
+      "command_hex": "0387fefe0000b43cb43cb43cb43c7878b43cb43cb43cb43c7878ffff00ffffffffffffffffff00ffffffffffffffffff000000000000ffffffffffffffffff00ffffffffffffffffff0085648d628e638c6a780085648d628e638c6a780000"
+    },
+    {
+      "name": "set_equalizer_with_hear_id_initialized",
+      "source": "devices/soundcore/a3955.rs:361",
+      "command_hex": "0387fefe00003c3c3c3c3c3c3c3c78783c3c3c3c3c3c3c3c7878000000787878787878787878787878787878787878787800000000027878787878787878787878787878787878787878737574747474747278007375747474747472780000"
+    }
+  ]
+}

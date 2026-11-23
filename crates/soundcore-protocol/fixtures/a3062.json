@@ -1,0 +1,43 @@
+{
+  "model": "SoundcoreA3062",
+  "aliases": [],
+  "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3062.rs:89",
+  "coverage": "real-capture",
+  "state_vectors": [
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3062.rs:97",
+      "packet_hex": "04ff30332e33373330363244423231324331334539374305005a8ca0a0968c786478001eff00ffffffffffffffffff000000000000ffffffffffffffffff0000000404070301500101000531010100010101005a0000010000000000000000",
+      "expected": {
+        "FirmwareVersion": "03.37",
+        "SerialNumber": "3062DB212C13E97C",
+        "PresetEqualizerProfile": "Podcast",
+        "BatteryLevel": "5/10",
+        "AmbientSoundMode": "Transparency",
+        "ManualTransparency": "5",
+        "NoiseCancelingMode": "Adaptive",
+        "ManualNoiseCanceling": "5",
+        "WindNoiseSuppression": "false",
+        "NoiseCancelingModeInCycle": "true",
+        "TransparencyModeInCycle": "true",
+        "NormalModeInCycle": "false",
+        "DoublePress": "BassUp",
+        "AutoPowerOff": "60m",
+        "LimitHighVolume": "false",
+        "LimitHighVolumeRefreshRate": "RealTime",
+        "LimitHighVolumeDbLimit": "90",
+        "SideTone": "false",
+        "LowBatteryPrompt": "true",
+        "VoicePrompt": "true",
+        "DolbyAudio": "true",
+        "DualConnections": "true"
+      }
+    }
+  ],
+  "outbound_vectors": [
+    {
+      "name": "set_equalizer_matches_known_good_packet",
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3062/packets/outbound.rs:87",
+      "command_hex": "0387fefe00003c7d3c94715f906f78780000007878787878787878783c00000000028282828282828282823c3c7d3c94715f906f787800"
+    }
+  ]
+}

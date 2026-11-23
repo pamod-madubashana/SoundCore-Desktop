@@ -1,0 +1,36 @@
+{
+  "model": "SoundcoreA3933",
+  "aliases": [
+    "A3939"
+  ],
+  "source": "a3933/packets/inbound/state_update_packet.rs:277",
+  "coverage": "real-capture",
+  "state_vectors": [
+    {
+      "source": "a3933.rs:83",
+      "packet_hex": "00010000000030302e303030302e30303030303030303030303030303030303000007878787878787878797a78787878787878787b7c000178787878787878787d7e78787878787878787f000000000000787878787878787801027878787878787878030400000000000000000000000000000700000000ffff00000000000000ffffff",
+      "expected": {
+        "PresetEqualizerProfile": "TrebleReducer"
+      }
+    },
+    {
+      "source": "a3933/packets/inbound/state_update_packet.rs:288",
+      "packet_hex": "09ff00000101018e0001010404000030322e363130322e363133393339324137464343324631324143000078787878787878787878ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff016301520166015401010100070000000affff00ff00000033ffffffff66",
+      "expected": {
+        "TwsStatus": "Connected",
+        "HostDevice": "Right",
+        "BatteryLevelLeft": "4/5",
+        "BatteryLevelRight": "4/5",
+        "IsChargingLeft": "No",
+        "IsChargingRight": "No",
+        "FirmwareVersionLeft": "02.61",
+        "FirmwareVersionRight": "02.61",
+        "SerialNumber": "39392A7FCC2F12AC",
+        "PresetEqualizerProfile": "SoundcoreSignature",
+        "AmbientSoundMode": "NoiseCanceling",
+        "ManualNoiseCanceling": "10"
+      }
+    }
+  ],
+  "outbound_vectors": []
+}

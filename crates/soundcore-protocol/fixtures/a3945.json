@@ -1,0 +1,28 @@
+{
+  "model": "SoundcoreA3945",
+  "aliases": [],
+  "source": "a3945.rs:173",
+  "coverage": "real-capture",
+  "state_vectors": [
+    {
+      "source": "a3945.rs:120",
+      "packet_hex": "00010000000030302e303030302e30303030303030303030303030303030303000007878787878787878797a78787878787878787b7c000000000000000000000000000000000000",
+      "expected": {
+        "PresetEqualizerProfile": "TrebleReducer"
+      }
+    },
+    {
+      "source": "a3945.rs:177",
+      "packet_hex": "00010405000030302e303030302e3030303030303030303030303030303030300000787878787878787878787878787878787878787801660155013301220101010000000000000000000000",
+      "expected": {
+        "LeftSinglePress": "VolumeDown",
+        "RightSinglePress": "VolumeUp",
+        "LeftDoublePress": "PlayPause",
+        "RightDoublePress": "NextSong",
+        "LeftLongPress": "VoiceAssistant",
+        "RightLongPress": "PreviousSong"
+      }
+    }
+  ],
+  "outbound_vectors": []
+}

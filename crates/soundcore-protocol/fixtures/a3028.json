@@ -1,0 +1,85 @@
+{
+  "model": "SoundcoreA3028",
+  "aliases": [
+    "SoundcoreA3029"
+  ],
+  "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3028.rs:103",
+  "coverage": "real-capture",
+  "state_vectors": [
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3028.rs:77",
+      "packet_hex": "09ff000001010146000500fefe3cb48fa08eb4748800000000000000000000000000000000000000000000000200010030322e33303330323930383645433832463132414330",
+      "expected": {
+        "ambientSoundMode": "Normal",
+        "noiseCancelingMode": "Transport",
+        "presetEqualizerProfile": "None",
+        "volumeAdjustments": "[-60, 60, 23, 40, 22, 60, -4, 16]"
+      }
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3028.rs:181",
+      "packet_hex": "09ff00000106010e000001010020",
+      "expected": {
+        "ambientSoundMode": "NoiseCanceling",
+        "noiseCancelingMode": "Outdoor"
+      }
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3028/packets/state_update_packet.rs:211",
+      "packet_hex": "09ff00000101014600050001003cb48fa08eb4748800000000000000000000000000000000000000000000000200010030322e33303330323930383645433832463132414335",
+      "expected": {
+        "ambientSoundMode": "Normal",
+        "noiseCancelingMode": "Transport",
+        "transparencyMode": "VocalMode",
+        "customNoiseCanceling": "0",
+        "equalizerPresetId": "1",
+        "volumeAdjustments": "[-60, 60, 23, 40, 22, 60, -4, 16]"
+      }
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3028/packets/state_update_packet.rs:245",
+      "packet_hex": "09ff000001010146000500fefe3cb48fa08eb4748800000000000000000000000000000000000000000000000200010030322e33303330323930383645433832463132414330",
+      "expected": {
+        "ambientSoundMode": "Normal",
+        "noiseCancelingMode": "Transport",
+        "equalizerPresetId": "65278",
+        "volumeAdjustments": "[-60, 60, 23, 40, 22, 60, -4, 16]"
+      }
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3028/packets/state_update_packet.rs:284",
+      "packet_hex": "09ff000001010146000400fefe3cb48fa08eb4748800000000000000000000000000000000000000000000000200010030322e3330333032393038364543383246313241432f",
+      "expected": {
+        "ambientSoundMode": "Normal",
+        "noiseCancelingMode": "Transport",
+        "equalizerPresetId": "65278",
+        "volumeAdjustments": "[-60, 60, 23, 40, 22, 60, -4, 16]"
+      }
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3028/packets/state_update_packet.rs:320",
+      "packet_hex": "09ff000001010146000500fefe3cb48fa08eb4748800000000000000000000000000000000000000000000000300010030322e33303330323930383645433832463132414331",
+      "expected": {
+        "ambientSoundMode": "NoiseCanceling"
+      }
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3028/packets/state_update_packet.rs:338",
+      "packet_hex": "09ff000001010146000500fefe3cb48fa08eb4748800000000000000000000000000000000000000000000000104010030322e33303330323930383645433832463132414333",
+      "expected": {
+        "noiseCancelingMode": "Transport"
+      }
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3028/packets/state_update_packet.rs:356",
+      "packet_hex": "09ff00000101014d0005000e007896968ca0aa96a000000000000000000000000000000000000000000000000000000030342e333333303238364443383933343434373938000001010101018a",
+      "expected": {}
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3028/packets/state_update_packet.rs:381",
+      "packet_hex": "05000000787878787878787800000000000000000000000000000000000000000000010101000030352e31393330323842334243323438353045383800010101000101030403",
+      "expected": {}
+    }
+  ],
+  "outbound_vectors": []
+}

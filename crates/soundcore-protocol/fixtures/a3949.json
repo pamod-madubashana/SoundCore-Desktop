@@ -1,0 +1,92 @@
+{
+  "model": "SoundcoreA3949",
+  "aliases": [],
+  "source": "a3949.rs:116",
+  "coverage": "real-capture",
+  "state_vectors": [
+    {
+      "source": "a3949.rs:125",
+      "packet_hex": "00010304000031342e343331342e343333393439423941454337324339433138000078787878787878787800000000000000000000000e010001110122013301550166ffffff610001ffffffffffffffffffffffffffffff",
+      "expected": {
+        "FirmwareVersionLeft": "14.43",
+        "FirmwareVersionRight": "14.43",
+        "SerialNumber": "3949B9AEC72C9C18",
+        "TouchTone": "true",
+        "GamingMode": "false",
+        "PresetEqualizerProfile": "SoundcoreSignature",
+        "LeftSinglePress": "VolumeUp",
+        "RightSinglePress": "VolumeDown",
+        "LeftDoublePress": "PreviousSong",
+        "RightDoublePress": "NextSong",
+        "LeftLongPress": "VoiceAssistant",
+        "RightLongPress": "PlayPause"
+      }
+    },
+    {
+      "source": "a3949.rs:165",
+      "packet_hex": "0100ff040000000000000031342e343333393439423941454337324339433138000078787878787878787800000000000000000000000e01ff01ff01f5016601f20133ffffff610001ffffffffffffffffffffffffffffff",
+      "expected": {
+        "FirmwareVersionRight": "14.43",
+        "SerialNumber": "3949B9AEC72C9C18",
+        "RightSinglePress": "None",
+        "RightDoublePress": "PlayPause",
+        "RightLongPress": "NextSong"
+      }
+    },
+    {
+      "source": "a3949.rs:198",
+      "packet_hex": "00010303000031392e343331392e343333393439334632343945324442364634000078787878787878787800000000000000000000000e01f601f60162016301330133ffffff310000ffffffffffffffffffffffffffffff",
+      "expected": {
+        "FirmwareVersionLeft": "19.43",
+        "FirmwareVersionRight": "19.43",
+        "SerialNumber": "39493F249E2DB6F4",
+        "TouchTone": "false",
+        "GamingMode": "false",
+        "PresetEqualizerProfile": "SoundcoreSignature",
+        "LeftSinglePress": "PlayPause",
+        "RightSinglePress": "PlayPause",
+        "LeftDoublePress": "PreviousSong",
+        "RightDoublePress": "NextSong",
+        "LeftLongPress": "NextSong",
+        "RightLongPress": "NextSong"
+      }
+    },
+    {
+      "source": "a3949.rs:238",
+      "packet_hex": "00010505000030382e333030382e3330333934394633464642323636414546300e007896968ca0aa96a07800000000000000000000000e01ff01ff0165016601320133ffffff310001ffffffffffffffffffffffffffffff",
+      "expected": {
+        "FirmwareVersionLeft": "08.30",
+        "FirmwareVersionRight": "08.30",
+        "SerialNumber": "3949F3FFB266AEF0",
+        "TouchTone": "true",
+        "GamingMode": "false",
+        "PresetEqualizerProfile": "Piano",
+        "LeftSinglePress": "None",
+        "RightSinglePress": "None",
+        "LeftDoublePress": "VoiceAssistant",
+        "RightDoublePress": "PlayPause",
+        "LeftLongPress": "PreviousSong",
+        "RightLongPress": "NextSong"
+      }
+    },
+    {
+      "source": "a3949.rs:281",
+      "packet_hex": "00010303000031392e343331392e343333393439334632343945324442364634000078787878787878787800000000000000000000000e01f601f60162016301330133ffffff310000ffffffffffffffffffffffffffffff",
+      "expected": {
+        "PresetEqualizerProfile": "Piano"
+      }
+    },
+    {
+      "source": "a3949.rs:316",
+      "packet_hex": "00010303000031392e343331392e343333393439334632343945324442364634000078787878787878787800000000000000000000000e01f601f60162016301330133ffffff310000ffffffffffffffffffffffffffffff",
+      "expected": {}
+    }
+  ],
+  "outbound_vectors": [
+    {
+      "name": "r50i_set_eq_matches_soundcore_app",
+      "source": "a3949.rs:297",
+      "command_hex": "02830e007896968ca0aa96a07800777b7a787b7c787d7800"
+    }
+  ]
+}

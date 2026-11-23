@@ -1,0 +1,65 @@
+{
+  "model": "SoundcoreA3954",
+  "aliases": [],
+  "source": "devices/soundcore/a3954.rs:208",
+  "coverage": "real-capture",
+  "state_vectors": [
+    {
+      "source": "devices/soundcore/a3954.rs:218",
+      "packet_hex": "00016364000030332e323930332e32393339353444453737353138413944463430322e353809f49d8a532bbafefe78787878787878787878ffffffffffffffffffff000191938b8d7a6f69643c3c91938b8d7a6f69643c3c000000000191938b827a8585723c3c91938b827a8585723c3c00000a66663233ffff44443302060000ff01ff000000005e016e010000000100015f000001000000006e0100010000ff00001111",
+      "expected": {
+        "BatteryLevelLeft": "99/100",
+        "BatteryLevelRight": "100/100",
+        "CaseBatteryLevel": "10/10",
+        "IsChargingLeft": "No",
+        "IsChargingRight": "No",
+        "AmbientSoundMode": "Normal",
+        "AirplaneMode": "ManualUpdate",
+        "AirPressure": "0.94",
+        "WindNoiseSuppression": "false",
+        "SpatialAudioMode": "Music",
+        "SpatialAudioMusicMode": "Fixed",
+        "LeftSinglePress": "PlayPause",
+        "LeftDoublePress": "PreviousSong",
+        "LeftTriplePress": "None",
+        "LeftLongPress": "AmbientSoundMode",
+        "LeftSlideUp": "VolumeUp",
+        "LeftSlideDown": "VolumeDown",
+        "RightSinglePress": "PlayPause",
+        "RightDoublePress": "NextSong",
+        "RightTriplePress": "None",
+        "RightLongPress": "AmbientSoundMode",
+        "RightSlideUp": "VolumeUp",
+        "RightSlideDown": "VolumeDown",
+        "EasyChat": "false",
+        "EasyChatWaitTime": "5s",
+        "WearingDetection": "false",
+        "SoundLeakCompensation": "false",
+        "LimitHighVolume": "true",
+        "LimitHighVolumeDbLimit": "95",
+        "LimitHighVolumeRefreshRate": "RealTime",
+        "LowBatteryPrompt": "false",
+        "Ldac": "false",
+        "DualConnections": "false",
+        "SpatialAudio": "false",
+        "Atmospheric": "false",
+        "FindDevice": "false",
+        "RemoteCamera": "false",
+        "CaseLanguage": "English",
+        "AutoPowerOff": "10m",
+        "FirmwareVersionLeft": "03.29",
+        "FirmwareVersionRight": "03.29",
+        "CaseFirmwareVersion": "02.58",
+        "SerialNumber": "3954DE77518A9DF4",
+        "CaseSerialNumber": "3954F49D8A532BBA"
+      }
+    }
+  ],
+  "outbound_vectors": [
+    {
+      "name": "set_eq_packet",
+      "source": "devices/soundcore/a3954.rs:313",
+      "command_hex": "0387fefe0000b47878787878783c7878b47878787878783c787800000091938b8d7a6f69643c3c91938b8d7a6f69643c3c000000000191938b827a8585723c3c91938b827a8585723c3cb4007800780078007800780078003c0078007800b4007800780078007800780078003c00780078000000"
+    }
+  ]
+}

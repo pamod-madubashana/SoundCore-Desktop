@@ -1,0 +1,63 @@
+{
+  "model": "SoundcoreA3953",
+  "aliases": [],
+  "source": "a3953.rs:152",
+  "coverage": "real-capture",
+  "state_vectors": [
+    {
+      "source": "a3953.rs:161",
+      "packet_hex": "01010505000030332e323330332e323333393533353443363333434345454538000078787878787878780000ffffffffffffffffffffff003c3c3c3c3c3c3c3c00003c3c3c3c3c3c3c3c000000000000003c3c3c3c3c3c3c3c00003c3c3c3c3c3c3c3c0000000012116611661134113411241124115211530302300000010100000000ffff0101000500000001020001010100010000000078ff3200ffff",
+      "expected": {
+        "TwsStatus": "Connected",
+        "HostDevice": "Right",
+        "BatteryLevelLeft": "5/5",
+        "BatteryLevelRight": "5/5",
+        "IsChargingLeft": "No",
+        "IsChargingRight": "No",
+        "FirmwareVersionLeft": "03.23",
+        "FirmwareVersionRight": "03.23",
+        "SerialNumber": "395354C633CCEEE8",
+        "AmbientSoundMode": "Normal",
+        "WindNoiseSuppression": "true",
+        "NormalModeInCycle": "false",
+        "TransparencyModeInCycle": "true",
+        "NoiseCancelingModeInCycle": "true",
+        "WearingDetection": "true",
+        "CaseBatteryLevel": "5/5",
+        "Ldac": "false",
+        "AutoPowerOff": "30m",
+        "WearingTone": "true",
+        "PressSensitivity": "0",
+        "LowBatteryPrompt": "true",
+        "AmbientSoundPrompt": "true",
+        "DualConnections": "false",
+        "SpatialAudio": "false",
+        "SpatialAudioMode": "Music",
+        "SpatialAudioMusicMode": "Fixed",
+        "VolumeAdjustments": "[0,0,0,0,0,0,0,0]"
+      }
+    },
+    {
+      "source": "a3953.rs:227",
+      "packet_hex": "01010505000030332e323330332e323333393533353443363333434345454538000078787878787878780000ffffffffffffffffffffff003c3c3c3c3c3c3c3c00003c3c3c3c3c3c3c3c000000000000003c3c3c3c3c3c3c3c00003c3c3c3c3c3c3c3c0000000012116611661134113411241124115211530302300000010100000000ffff0101000500000001020001010100010000000078ff3200ffff",
+      "expected": {
+        "VolumeAdjustments": "[60,-60,60,-60,60,-60,60,-60]"
+      }
+    },
+    {
+      "source": "a3953.rs:299",
+      "packet_hex": "01010505000030332e323330332e323333393533353443363333434345454538000078787878787878780000ffffffffffffffffffffff003c3c3c3c3c3c3c3c00003c3c3c3c3c3c3c3c000000000000003c3c3c3c3c3c3c3c00003c3c3c3c3c3c3c3c0000000012116611661134113411241124115211530300300000010100000000ffff0101000500000001020001010100010000000078ff3200ffff",
+      "expected": {
+        "AmbientSoundMode": "NoiseCanceling"
+      }
+    },
+    {
+      "source": "a3953.rs:328",
+      "packet_hex": "01010505000030332e323330332e323333393533353443363333434345454538000078787878787878780000ffffffffffffffffffffff003c3c3c3c3c3c3c3c00003c3c3c3c3c3c3c3c000000000000003c3c3c3c3c3c3c3c00003c3c3c3c3c3c3c3c0000000012116611661134113411241124115211530301300000010100000000ffff0101000500000001020001010100010000000078ff3200ffff",
+      "expected": {
+        "AmbientSoundMode": "Transparency"
+      }
+    }
+  ],
+  "outbound_vectors": []
+}

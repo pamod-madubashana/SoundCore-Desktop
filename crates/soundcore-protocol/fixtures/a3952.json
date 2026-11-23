@@ -1,0 +1,39 @@
+{
+  "model": "SoundcoreA3952",
+  "aliases": [],
+  "source": "a3952.rs:291",
+  "coverage": "real-capture",
+  "state_vectors": [
+    {
+      "source": "a3952.rs:300",
+      "packet_hex": "01010404000030342e393630342e39363339353232303636333143434545453800003c3c3c3c3c3c3c3c3c3cffffffffffffffffffff02017896b4b4787878b4000078b4b4b47896b4b4000065568af4007896b4b4787878b4000078b4b4b47896b4b400000000120061006011631166115411540041004003023000000101010100040000000001000001003affffffffffff655689f94609",
+      "expected": {
+        "BatteryLevelLeft": "4/5",
+        "BatteryLevelRight": "4/5",
+        "CaseBatteryLevel": "4/5",
+        "IsChargingLeft": "No",
+        "IsChargingRight": "No",
+        "AmbientSoundMode": "Normal",
+        "NoiseCancelingMode": "Manual",
+        "AdaptiveNoiseCanceling": "LowNoise",
+        "ManualNoiseCanceling": "Strong",
+        "TransparencyMode": "FullyTransparent",
+        "WindNoiseSuppression": "true",
+        "LeftSinglePress": "None",
+        "RightSinglePress": "None",
+        "LeftDoublePress": "NextSong",
+        "RightDoublePress": "PlayPause",
+        "LeftLongPress": "AmbientSoundMode",
+        "RightLongPress": "AmbientSoundMode",
+        "WearingDetection": "true",
+        "WearingTone": "false",
+        "TouchTone": "true",
+        "AutoPowerOff": "30m",
+        "FirmwareVersionLeft": "04.96",
+        "FirmwareVersionRight": "04.96",
+        "Ldac": "false"
+      }
+    }
+  ],
+  "outbound_vectors": []
+}
