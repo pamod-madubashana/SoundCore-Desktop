@@ -38,10 +38,22 @@ pub struct RootView {
     pub(crate) version: String,
     pub(crate) eq_presets: Vec<EqPresetDto>,
     pub show_sound_effects: bool,
+    pub show_device_settings: bool,
     /// App Settings screen (header gear button).
     pub show_settings: bool,
     /// About screen (header info button).
     pub show_about: bool,
+    pub show_protocol_lab: bool,
+    pub(crate) capture_frames: Vec<soundcore_protocol::analysis::CapturedFrameDto>,
+    pub(crate) protocol_selected: Option<usize>,
+    pub(crate) protocol_active_device: Option<(String, String, String)>,
+    pub(crate) protocol_capture_progress: Option<u8>,
+    pub(crate) protocol_capture_encrypting: bool,
+    pub(crate) protocol_share: Option<soundcore_protocol::analysis::ReportShare>,
+    pub(crate) unsupported_device: Option<(String, String, String)>,
+    pub(crate) protocol_show_details: bool,
+    pub(crate) protocol_share_error: Option<String>,
+    pub(crate) protocol_share_notice: Option<String>,
     /// 0..11 frame for the searching spinner
     pub(crate) spinner_tick: u8,
     /// Optimistic overrides so taps survive the 900ms poll.
@@ -83,10 +95,90 @@ impl RootView {
                     .timer(Duration::from_millis(900))
                     .await;
                 let next = get_states(state());
-                this.update(&mut *cx, |view, cx| {
-                    view.apply_states(next, cx);
-                })
-                .ok();
+                let capture = crate::get_capture(state());
+                let progress = crate::capture_progress(state());
+                let encrypt = this
+                    .update(&mut *cx, |view, cx| {
+                        view.apply_states(next, cx);
+                        view.capture_frames = capture;
+                        let mut encrypt = None;
+                        if view.protocol_capture_progress.is_some() {
+                            if view.protocol_capture_encrypting {
+                                let current = view.protocol_capture_progress.unwrap_or(0);
+                                if current < 90 {
+                                    view.protocol_capture_progress = Some((current + 10).min(90));
+                                }
+                            } else if let Some(percent) = progress {
+                                if percent >= 100 {
+                                    crate::stop_capture(state());
+                                    view.capture_frames = crate::get_capture(state());
+                                    view.protocol_capture_progress = Some(0);
+                                    view.protocol_capture_encrypting = true;
+                                    view.protocol_share = None;
+                                    view.protocol_share_error = None;
+                                    view.protocol_share_notice = None;
+                                    encrypt = view.protocol_active_device.as_ref().map(
+                                        |(_, name, model)| {
+                                            (
+                                                view.capture_frames.clone(),
+                                                name.clone(),
+                                                model.clone(),
+                                            )
+                                        },
+                                    );
+                                    if encrypt.is_none() {
+                                        view.protocol_capture_progress = None;
+                                        view.protocol_capture_encrypting = false;
+                                    }
+                                } else {
+                                    view.protocol_capture_progress = Some(percent);
+                                }
+                            } else if view.protocol_capture_progress == Some(100) {
+                                view.protocol_capture_progress = None;
+                            }
+                        }
+                        cx.notify();
+                        encrypt
+                    })
+                    .ok()
+                    .flatten();
+
+                if let Some((frames, name, model)) = encrypt {
+                    let this = this.clone();
+                    cx.spawn(async move |cx| {
+                        let result = std::thread::spawn(move || {
+                            soundcore_protocol::analysis::build_share_bundle(&model, &name, &frames)
+                        })
+                        .join();
+                        this.update(&mut *cx, |view, cx| {
+                            match result {
+                                Ok(Ok(share)) => {
+                                    view.protocol_share = Some(share);
+                                    view.protocol_share_error = None;
+                                    view.protocol_share_notice = None;
+                                }
+                                Ok(Err(err)) => {
+                                    view.protocol_share = None;
+                                    view.protocol_share_error =
+                                        Some(format!("Could not encrypt report: {err}"));
+                                    view.protocol_share_notice = None;
+                                }
+                                Err(_) => {
+                                    view.protocol_share = None;
+                                    view.protocol_share_error = Some(
+                                        "Could not encrypt report: worker panicked".to_string(),
+                                    );
+                                    view.protocol_share_notice = None;
+                                }
+                            }
+                            view.protocol_capture_encrypting = false;
+                            view.protocol_capture_progress = Some(100);
+                            cx.notify();
+                        })
+                        .ok();
+                    })
+                    .detach();
+                }
             }
         });
 
@@ -193,8 +285,20 @@ impl RootView {
             version,
             eq_presets: Vec::new(),
             show_sound_effects: false,
+            show_device_settings: false,
             show_settings: false,
             show_about: false,
+            show_protocol_lab: false,
+            capture_frames: Vec::new(),
+            protocol_selected: None,
+            protocol_active_device: None,
+            protocol_capture_progress: None,
+            protocol_capture_encrypting: false,
+            protocol_share: None,
+            unsupported_device: None,
+            protocol_show_details: false,
+            protocol_share_error: None,
+            protocol_share_notice: None,
             spinner_tick: 0,
             ambient_local: None,
             sub_local: None,
@@ -346,7 +450,9 @@ impl RootView {
                 return mode.clone();
             }
         }
-        polled.unwrap_or_else(|| "Music".into())
+        polled.unwrap_or_else(|| {
+            data::first_option(&self.settings_for(mac), "spatialAudioMode").unwrap_or_default()
+        })
     }
 
     fn sync_eq_draft(&mut self) {
@@ -422,8 +528,25 @@ impl RootView {
         let Some(mac) = self.active_device().map(|d| d.mac_address.clone()) else {
             return;
         };
+        if !data::has_option(&self.settings_for(&mac), "spatialAudioMode", mode) {
+            return;
+        }
         self.send_setting(&mac, "spatialAudioMode", mode);
         self.spatial_local = Some((mac, mode.to_string(), std::time::Instant::now()));
+        cx.notify();
+    }
+
+    pub(crate) fn set_named_select(
+        &mut self,
+        mac: &str,
+        id: &str,
+        value: &str,
+        cx: &mut Context<Self>,
+    ) {
+        if !data::has_option(&self.settings_for(mac), id, value) {
+            return;
+        }
+        self.send_setting(mac, id, value);
         cx.notify();
     }
 
@@ -670,17 +793,46 @@ impl Render for RootView {
             spinner_task.detach();
         }
 
-        let active = self.active_device().cloned();
-        // Render-time exclusivity: About > Settings > Sound Effects.
+        let connected_device = self.active_device().cloned();
+        self.unsupported_device = connected_device
+            .as_ref()
+            .filter(|d| d.categories.is_empty())
+            .map(|d| {
+                (
+                    d.mac_address.clone(),
+                    data::display_device_name(d),
+                    d.model.clone(),
+                )
+            });
+        let active = connected_device.filter(|d| !d.categories.is_empty());
+        // Render-time exclusivity: About > Settings > Protocol Lab > Device Settings > Sound Effects.
         let show_about = self.show_about;
+        if self.show_settings && !show_about {
+            self.show_protocol_lab = false;
+        }
         let show_settings = self.show_settings && !show_about;
-        let show_se = self.show_sound_effects && active.is_some() && !show_settings && !show_about;
-        let overlay = show_se || show_settings || show_about;
+        let show_protocol_lab = self.show_protocol_lab && !show_settings && !show_about;
+        let show_device = self.show_device_settings
+            && active.is_some()
+            && !show_settings
+            && !show_protocol_lab
+            && !show_about;
+        let show_se = self.show_sound_effects
+            && active.is_some()
+            && !show_settings
+            && !show_about
+            && !show_protocol_lab
+            && !show_device;
+        let overlay = show_se || show_settings || show_about || show_device || show_protocol_lab;
 
         let nav_key = if show_about {
             "about"
         } else if show_settings {
             "settings"
+        } else if show_protocol_lab {
+            "protocol-lab"
+        } else if show_device {
+            "device-settings"
         } else if show_se {
             "sound-effects"
         } else if active.is_some() {
@@ -753,6 +905,17 @@ impl Render for RootView {
                             window,
                             cx,
                         ))
+                    })
+                    .when(show_device, |el| {
+                        el.child(screens::device_settings::render(
+                            self,
+                            active.as_ref().unwrap(),
+                            window,
+                            cx,
+                        ))
+                    })
+                    .when(show_protocol_lab, |el| {
+                        el.child(screens::protocol_lab::render(self, window, cx))
                     })
                     .when(show_settings, |el| {
                         el.child(screens::settings::render(self, window, cx))

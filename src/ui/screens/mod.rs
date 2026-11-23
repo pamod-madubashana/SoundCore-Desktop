@@ -3,7 +3,9 @@
 pub mod about;
 pub mod common;
 pub mod control;
+pub mod device_settings;
 pub mod devices;
+pub mod protocol_lab;
 pub mod searching;
 pub mod settings;
 pub mod sound_effects;

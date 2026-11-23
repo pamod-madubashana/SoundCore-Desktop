@@ -88,8 +88,54 @@ pub fn render(
                 .flex_col()
                 .gap(px(14.))
                 .child(section("GENERAL", general))
-                .child(section("SYSTEM", system)),
+                .child(section("SYSTEM", system))
+                .child(section("DEVELOPER", vec![protocol_lab_row(&view)])),
         )
+}
+
+fn protocol_lab_row(view: &Entity<RootView>) -> gpui::Stateful<gpui::Div> {
+    let view = view.clone();
+    div()
+        .id("settings-protocol-lab")
+        .w_full()
+        .px_3()
+        .py(px(10.))
+        .flex()
+        .items_center()
+        .justify_between()
+        .gap_3()
+        .hover(|st| st.bg(theme::hover_subtle()))
+        .cursor_pointer()
+        .on_click(move |_, _, cx| {
+            view.update(cx, |root, cx| {
+                root.show_protocol_lab = true;
+                root.show_settings = false;
+                cx.notify();
+            });
+        })
+        .child(
+            div()
+                .min_w_0()
+                .flex()
+                .flex_col()
+                .gap(px(2.))
+                .child(
+                    div()
+                        .text_size(px(13.))
+                        .font_weight(gpui::FontWeight::MEDIUM)
+                        .text_color(theme::foreground())
+                        .child("Protocol Lab"),
+                )
+                .child(
+                    div()
+                        .min_w_0()
+                        .text_size(px(10.))
+                        .text_color(theme::muted())
+                        .text_ellipsis()
+                        .child("Capture, decode and pair unknown devices"),
+                ),
+        )
+        .child(chevron_right(16., theme::muted()))
 }
 
 fn header_btn(

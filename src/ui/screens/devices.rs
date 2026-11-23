@@ -18,6 +18,7 @@ pub fn render(
     let devices = root.devices.clone();
     let bt_on = root.bt_on;
     let scanning = root.scanning;
+    let unsupported = root.unsupported_device.clone();
 
     let off = bt_on == Some(false);
     let status_text = if off {
@@ -139,6 +140,60 @@ pub fn render(
                 .px_4()
                 .child(div().h(px(1.)).bg(theme::border_subtle()).w_full()),
         )
+        .child({
+            let view = view.clone();
+            if let Some((_, name, model)) = unsupported {
+                div()
+                    .id("unsupported-device-card")
+                    .mx_4()
+                    .mt_3()
+                    .p_3()
+                    .rounded_2xl()
+                    .bg(theme::surface())
+                    .border_1()
+                    .border_color(theme::border_subtle())
+                    .flex()
+                    .flex_col()
+                    .gap_2()
+                    .child(
+                        div()
+                            .text_size(px(12.))
+                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .child(format!("{name} · {model}")),
+                    )
+                    .child(
+                        div()
+                            .text_size(px(11.))
+                            .text_color(theme::muted())
+                            .child("This device is currently not supported. You can request support by sending device data from Protocol Lab."),
+                    )
+                    .child(
+                        div()
+                            .id("unsupported-open-lab")
+                            .self_start()
+                            .px_3()
+                            .py(px(6.))
+                            .rounded_md()
+                            .bg(theme::brand_20())
+                            .text_color(theme::foreground())
+                            .text_size(px(11.))
+                            .font_weight(gpui::FontWeight::MEDIUM)
+                            .cursor_pointer()
+                            .hover(|s| s.bg(theme::brand_40()))
+                            .on_click(move |_, _, cx| {
+                                view.update(cx, |root, cx| {
+                                    root.show_protocol_lab = true;
+                                    root.show_settings = false;
+                                    root.show_about = false;
+                                    cx.notify();
+                                });
+                            })
+                            .child("Open Protocol Lab"),
+                    )
+            } else {
+                div().id("unsupported-none")
+            }
+        })
         // List
         .child(
             div()

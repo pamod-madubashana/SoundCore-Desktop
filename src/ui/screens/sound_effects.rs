@@ -14,6 +14,8 @@ const CARD_SPRING: SpringConfig = SpringConfig::new(150.0, 23.0, 1.0);
 const SECTION_SPRING: SpringConfig = SpringConfig::new(170.0, 25.0, 1.0);
 const BODY_SPRING: SpringConfig = SpringConfig::new(140.0, 22.0, 1.0);
 
+type ExtraSpatialSetting = (String, String, Vec<(String, String)>, String);
+
 fn phase(on: bool) -> AnimationPhase {
     AnimationPhase(if on { 1.0 } else { 0.0 })
 }
@@ -189,6 +191,26 @@ fn animated_radio(active: bool, key: &str) -> impl IntoElement {
 
 /* ── Spatial Audio section ────────────────────────────────────────── */
 
+fn spatial_mode_icon(id: &str) -> &'static str {
+    let lower = id.to_ascii_lowercase();
+    if lower.contains("music") {
+        "♪"
+    } else if lower.contains("movie") || lower.contains("cinema") {
+        "▶"
+    } else if lower.contains("game") {
+        "◈"
+    } else {
+        "◉"
+    }
+}
+
+fn is_spatial_select(value: &serde_json::Value) -> bool {
+    matches!(
+        value.get("type").and_then(|v| v.as_str()),
+        Some("select" | "optionalSelect" | "modifiableSelect")
+    )
+}
+
 fn spatial_section(
     root: &RootView,
     view: &Entity<RootView>,
@@ -198,70 +220,26 @@ fn spatial_section(
     cx: &mut Context<RootView>,
 ) -> impl IntoElement {
     let mac = d.mac_address.clone();
-    let mode_setting = s.get("spatialAudioMode").cloned();
-    let polled = mode_setting
-        .as_ref()
+    let polled = s
+        .get("spatialAudioMode")
         .and_then(|v| v.get("value"))
         .and_then(|v| v.as_str())
         .map(|x| x.to_string());
     let current = root.spatial_mode(&mac, polled);
 
-    let opts: Vec<String> = mode_setting
-        .as_ref()
-        .and_then(|v| v.get("setting"))
-        .and_then(|v| v.get("options"))
-        .and_then(|v| v.as_array())
-        .map(|a| {
-            a.iter()
-                .filter_map(|x| x.as_str().map(String::from))
-                .collect()
-        })
-        .unwrap_or_default();
-    let localized: Vec<String> = mode_setting
-        .as_ref()
-        .and_then(|v| v.get("setting"))
-        .and_then(|v| v.get("localizedOptions"))
-        .and_then(|v| v.as_array())
-        .map(|a| {
-            a.iter()
-                .filter_map(|x| x.as_str().map(String::from))
-                .collect()
-        })
-        .unwrap_or_default();
+    let entries = data::select_entries(s, "spatialAudioMode");
+    let allowed: Vec<String> = entries.iter().map(|(id, _)| id.clone()).collect();
 
-    let ids: Vec<String> = if opts.is_empty() {
-        vec!["Music".into(), "Movie".into(), "Gaming".into()]
-    } else {
-        opts
-    };
-
-    let body = div()
+    let main_row = div()
+        .w_full()
         .flex()
         .gap(px(6.))
-        .px_3()
-        .pt_1()
-        .pb_3()
-        .children(ids.iter().enumerate().map(|(i, id)| {
-            let label = match id.as_str() {
-                "Music" => "Music Mode".to_string(),
-                "Movie" => "Movie Mode".to_string(),
-                "Gaming" => "Gaming Mode".to_string(),
-                _ => localized
-                    .get(i)
-                    .cloned()
-                    .filter(|x| !x.is_empty())
-                    .unwrap_or_else(|| id.clone()),
-            };
-            let on = *id == current;
-            let icon = match id.as_str() {
-                "Music" => "♪",
-                "Movie" => "▶",
-                "Gaming" => "◈",
-                _ => "♪",
-            };
+        .children(entries.into_iter().map(|(id, label)| {
+            let on = id == current;
+            let icon = spatial_mode_icon(&id);
             let spring_key = SharedString::from(format!("spatial-mode-spring-{id}"));
             let view = view.clone();
-            let id = id.clone();
+            let allowed = allowed.clone();
             div()
                 .id(SharedString::from(format!("spatial-mode-{id}")))
                 .flex_1()
@@ -278,6 +256,9 @@ fn spatial_section(
                 .border_2()
                 .cursor_pointer()
                 .on_click(move |_, _window, cx| {
+                    if !allowed.contains(&id) {
+                        return;
+                    }
                     let view = view.clone();
                     let id = id.clone();
                     view.update(cx, |root, cx| {
@@ -309,6 +290,102 @@ fn spatial_section(
                 .child(label)
         }));
 
+    let mut extra: Vec<ExtraSpatialSetting> = Vec::new();
+    for (id, value) in s.iter() {
+        if !id.starts_with("spatial") || id == "spatialAudio" || id == "spatialAudioMode" {
+            continue;
+        }
+        if !is_spatial_select(value) {
+            continue;
+        }
+        let options = data::select_entries(s, id);
+        if options.is_empty() {
+            continue;
+        }
+        let selected = value
+            .get("value")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        let mut label = data::pretty_setting_id(id);
+        if let Some(short) = label.strip_prefix("Spatial ") {
+            label = short.to_string();
+        }
+        extra.push((id.clone(), selected, options, label));
+    }
+    extra.sort_by(|a, b| a.0.cmp(&b.0));
+    let has_extra = !extra.is_empty();
+
+    let view_for_extra = view.clone();
+    let mac_for_extra = mac.clone();
+    let extra_rows = extra
+        .into_iter()
+        .map(move |(setting_id, selected, options, label)| {
+            let view = view_for_extra.clone();
+            let mac = mac_for_extra.clone();
+            div()
+                .w_full()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(
+                    div()
+                        .text_size(px(10.))
+                        .font_weight(gpui::FontWeight::SEMIBOLD)
+                        .text_color(theme::muted())
+                        .child(label),
+                )
+                .child(div().w_full().flex().flex_wrap().gap(px(6.)).children(
+                    options.into_iter().map(move |(opt_id, opt_label)| {
+                        let on = opt_id == selected;
+                        let sid = setting_id.clone();
+                        let oid = opt_id.clone();
+                        let mac = mac.clone();
+                        let view = view.clone();
+                        div()
+                            .id(SharedString::from(format!("spatial-extra-{sid}-{oid}")))
+                            .px_3()
+                            .py_2()
+                            .rounded_full()
+                            .border_1()
+                            .flex_shrink_0()
+                            .text_size(px(11.))
+                            .font_weight(gpui::FontWeight::MEDIUM)
+                            .cursor_pointer()
+                            .when(on, |el| {
+                                el.bg(theme::brand())
+                                    .border_color(theme::brand())
+                                    .text_color(theme::brand_foreground())
+                            })
+                            .when(!on, |el| {
+                                el.bg(theme::surface_elevated())
+                                    .border_color(theme::border_subtle())
+                                    .text_color(theme::foreground())
+                                    .hover(|st| st.bg(theme::hover_subtle()))
+                            })
+                            .on_click(move |_, _, cx| {
+                                let sid = sid.clone();
+                                let oid = oid.clone();
+                                let mac = mac.clone();
+                                view.update(cx, move |root, cx| {
+                                    root.set_named_select(&mac, &sid, &oid, cx);
+                                });
+                            })
+                            .child(opt_label)
+                    }),
+                ))
+        });
+
+    let body = div()
+        .flex()
+        .flex_col()
+        .gap(px(8.))
+        .px_3()
+        .pt_1()
+        .pb_3()
+        .when(!allowed.is_empty(), |el| el.child(main_row))
+        .children(extra_rows);
+
     section_shell(
         view,
         "spatial",
@@ -325,7 +402,7 @@ fn spatial_section(
             }
         },
         body,
-        80.0,
+        if has_extra { 132.0 } else { 80.0 },
     )
 }
 
@@ -658,20 +735,31 @@ fn eq_graph(
                 .collect()
         })
         .unwrap_or_default();
-    let min = meta.get("min").and_then(|v| v.as_i64()).unwrap_or(-60) as i16;
-    let max = meta.get("max").and_then(|v| v.as_i64()).unwrap_or(60) as i16;
-    let digits = meta
-        .get("fractionDigits")
-        .and_then(|v| v.as_i64())
-        .unwrap_or(1) as i32;
+    let (min, max) = if meta.is_null() {
+        (0i16, 0i16)
+    } else {
+        let min = meta.get("min").and_then(|v| v.as_i64()).unwrap_or(0) as i16;
+        let max = meta.get("max").and_then(|v| v.as_i64()).unwrap_or(0) as i16;
+        if min <= max { (min, max) } else { (max, min) }
+    };
+    let digits = if meta.is_null() {
+        0i32
+    } else {
+        meta.get("fractionDigits")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0) as i32
+    };
+    let span = (max - min) as f32;
     let levels = [
         max,
-        (max as f32 * 0.5) as i16,
-        0,
-        (min as f32 * 0.5) as i16,
+        (max as f32 - span * 0.25).round() as i16,
+        (max as f32 - span * 0.50).round() as i16,
+        (max as f32 - span * 0.75).round() as i16,
         min,
     ];
-    let step_h = EQ_GRAPH_H / EQ_STEPS as f32;
+    let step_count = EQ_STEPS.max(2);
+    let step_h = EQ_GRAPH_H / step_count as f32;
+    let reset_value = 0i16.clamp(min, max);
     let mac = root
         .active_device()
         .map(|dev| dev.mac_address.clone())
@@ -718,12 +806,13 @@ fn eq_graph(
                             let view = view.clone();
                             let mac = mac.clone();
                             let count = draft.len();
+                            let reset = reset_value.to_string();
                             move |_, _, cx| {
                                 view.update(cx, |root, cx| {
-                                    root.eq_draft = vec![0; count];
+                                    root.eq_draft = vec![reset_value; count];
                                     root.eq_active_preset = None;
                                     if !mac.is_empty() {
-                                        let raw = vec!["0"; count].join(",");
+                                        let raw = vec![reset.as_str(); count].join(",");
                                         root.send_setting(&mac, "volumeAdjustments", &raw);
                                     }
                                     cx.notify();
@@ -806,10 +895,11 @@ fn eq_graph(
                                         .justify_center()
                                         .child(div().w(px(1.)).h_full().bg(theme::border_subtle())),
                                 )
-                                .children((0..EQ_STEPS).map(|k| {
-                                    let value = (max as f32
-                                        - k as f32 * (max - min) as f32 / (EQ_STEPS - 1) as f32)
+                                .children((0..step_count).map(|k| {
+                                    let t = k as f32 / (step_count - 1) as f32;
+                                    let value = (max as f32 - t * span)
                                         .round()
+                                        .clamp(min as f32, max as f32)
                                         as i16;
                                     div()
                                         .id(gpui::SharedString::from(format!("eq-step-{i}-{k}")))
