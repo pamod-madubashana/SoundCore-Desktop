@@ -1,0 +1,92 @@
+{
+  "model": "SoundcoreA3947",
+  "aliases": [],
+  "source": "a3947.rs:167",
+  "coverage": "real-capture",
+  "state_vectors": [
+    {
+      "source": "a3947.rs:177",
+      "packet_hex": "01010204000030352e383830352e38383339343742363632464443434545453830302e3030fefe78787878787878787878ffffffffffffffffffff000170758c94968e86833c3c70758c94968e86833c3c686422400070758c94968e86833c3c70758c94968e86833c3c00001211661165113211331144114400210020350050010001010300000000ff0102310100000100000100015001000001010101ff",
+      "expected": {
+        "BatteryLevelLeft": "2/5",
+        "BatteryLevelRight": "4/5",
+        "CaseBatteryLevel": "2/5",
+        "IsChargingLeft": "No",
+        "IsChargingRight": "No",
+        "AmbientSoundMode": "NoiseCanceling",
+        "NoiseCancelingMode": "Manual",
+        "ManualNoiseCanceling": "5",
+        "EnvironmentDetection": "true",
+        "TransportationMode": "Car",
+        "TransparencyMode": "VocalMode",
+        "LimitHighVolume": "true",
+        "LimitHighVolumeDbLimit": "80",
+        "LimitHighVolumeRefreshRate": "10s",
+        "LeftSinglePress": "PlayPause",
+        "LeftDoublePress": "PreviousSong",
+        "LeftTriplePress": "VolumeDown",
+        "LeftLongPress": "AmbientSoundMode",
+        "RightSinglePress": "VoiceAssistant",
+        "RightDoublePress": "NextSong",
+        "RightTriplePress": "VolumeUp",
+        "RightLongPress": "AmbientSoundMode",
+        "TouchTone": "true",
+        "AutoPowerOff": "20m",
+        "GamingMode": "false",
+        "Ldac": "false"
+      }
+    }
+  ],
+  "outbound_vectors": [
+    {
+      "name": "set_sound_modes_normal",
+      "source": "a3947.rs:321",
+      "command_hex": "068102500100010103"
+    },
+    {
+      "name": "set_equalizer_hear_id_volume_adjustments",
+      "source": "a3947.rs:270",
+      "command_hex": "0387fefe000078797a7b7c7d7e7f787878797a7b7c7d7e7f787800000070758c94968e86833c3c70758c94968e86833c3c686422400070758c94968e86833c3c70758c94968e86833c3c787878787878787978007878787878787879780000"
+    },
+    {
+      "name": "set_equalizer_configuration_known_good_framed",
+      "source": "a3947/packets/set_equalizer_configuration.rs:100",
+      "command_hex": "08ee00000003876700fefe0600b47878787878783c7878b47878787878783c787800000070758c94968e86833c3c70758c94968e86833c3c686422400270758c94968e86833c3c70758c94968e86833c3c8074797779777c6f78008074797779777c6f7800008f"
+    },
+    {
+      "name": "set_gaming_mode",
+      "source": "a3947.rs:363",
+      "command_hex": "108501"
+    },
+    {
+      "name": "set_sound_leak_compensation",
+      "source": "a3947.rs:403",
+      "command_hex": "108600"
+    },
+    {
+      "name": "set_surround_sound",
+      "source": "a3947.rs:443",
+      "command_hex": "028601"
+    },
+    {
+      "name": "set_wearing_tone",
+      "source": "a3947.rs:483",
+      "command_hex": "018c01"
+    },
+    {
+      "name": "set_auto_play_pause",
+      "source": "a3947.rs:523",
+      "command_hex": "018101"
+    },
+    {
+      "name": "set_touch_lock",
+      "source": "a3947.rs:563",
+      "command_hex": "048600"
+    },
+    {
+      "name": "set_low_battery_prompt",
+      "source": "a3947.rs:603",
+      "command_hex": "108200"
+    }
+  ]
+}

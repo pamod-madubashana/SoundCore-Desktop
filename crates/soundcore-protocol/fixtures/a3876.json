@@ -1,0 +1,49 @@
+{
+  "model": "SoundcoreA3876",
+  "aliases": [],
+  "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3876.rs:382",
+  "coverage": "real-capture",
+  "state_vectors": [
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3876.rs:388",
+      "packet_hex": "0101050930332e313530332e313533383736424534413936323736433134fffffffffffffefe787878787878787878787878787878787878787809fff6f363fff5fff001042d0117bbef3101010200006401000000000000000000000000",
+      "expected": {
+        "BatteryLevelLeft": "6/10",
+        "BatteryLevelRight": "10/10",
+        "LeftSinglePress": "None",
+        "LeftDoublePress": "NextSong",
+        "LeftTriplePress": "None",
+        "LeftLongPress": "None",
+        "RightSinglePress": "PlayPause",
+        "RightDoublePress": "NextSong",
+        "RightTriplePress": "VoiceAssistant",
+        "RightLongPress": "VolumeUp",
+        "GamingMode": "false",
+        "LightsEnabled": "true",
+        "LightsBrightness": "4",
+        "AutoLightsOffMinutes": "45",
+        "LightsColor": "194.44444",
+        "LightsMode": "Breathing",
+        "VolumeBalance": "0",
+        "VoicePrompt": "true",
+        "DualConnections": "true",
+        "AutoPowerOff": "30m",
+        "FirmwareVersionLeft": "03.15",
+        "FirmwareVersionRight": "03.15",
+        "SerialNumber": "3876BE4A96276C14"
+      }
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3876.rs:438",
+      "packet_hex": "0101050930332e313530332e313533383736424534413936323736433134fffffffffffffefe7878787878787878787878787878fafa7878787878787878fafa09fff6f363fff5fff001042d0117bbef3101010200006401000000000000000000000000",
+      "expected": {}
+    }
+  ],
+  "outbound_vectors": [
+    {
+      "name": "set_custom_equalizer",
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3876.rs:460",
+      "command_hex": "0283fefe78787878787878b4787878787878787974817800"
+    }
+  ]
+}

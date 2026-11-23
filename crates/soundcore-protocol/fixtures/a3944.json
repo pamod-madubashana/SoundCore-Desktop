@@ -1,0 +1,36 @@
+{
+  "model": "SoundcoreA3944",
+  "aliases": [],
+  "source": "a3944.rs:271",
+  "coverage": "real-capture",
+  "state_vectors": [
+    {
+      "source": "a3944.rs:275",
+      "packet_hex": "00010505000030322e323730322e323733393434463534443138434142413243000078787878787878787800000000000000000000000e010001000166016601320133ffffff360001ffffffffffffffffffffffffffffff",
+      "expected": {
+        "PresetEqualizerProfile": "SoundcoreSignature",
+        "LeftSinglePress": "VolumeUp",
+        "RightSinglePress": "VolumeUp",
+        "LeftDoublePress": "PlayPause",
+        "RightDoublePress": "PlayPause",
+        "LeftLongPress": "PreviousSong",
+        "RightLongPress": "NextSong",
+        "TouchTone": "true"
+      }
+    },
+    {
+      "source": "a3944.rs:329",
+      "packet_hex": "00010505000030322e323730322e323733393434463534443138434142413243000078787878787878787800000000000000000000000e010001000166016601320133ffffff360001ffffffffffffffffffffffffffffff",
+      "expected": {
+        "PresetEqualizerProfile": "Acoustic"
+      }
+    }
+  ],
+  "outbound_vectors": [
+    {
+      "name": "set_eq_packet_matches",
+      "source": "a3944.rs:352",
+      "command_hex": "02830100a0828c8ca0a0a08c78007d767b787c7a7c797800"
+    }
+  ]
+}

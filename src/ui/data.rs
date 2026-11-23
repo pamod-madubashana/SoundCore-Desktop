@@ -141,67 +141,55 @@ pub fn pretty_setting_id(id: &str) -> String {
     }
 }
 
-fn select_entries_raw(setting: &Value) -> Vec<(String, String)> {
-    let opts = setting
-        .get("setting")
+fn option_id(o: &Value) -> String {
+    match o {
+        Value::String(s) => s.clone(),
+        other => other.to_string(),
+    }
+}
+
+fn option_parts(container: Option<&Value>) -> (Vec<Value>, Vec<Value>) {
+    let opts = container
         .and_then(|x| x.get("options"))
         .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default();
-    let localized = setting
-        .get("setting")
+    let localized = container
         .and_then(|x| x.get("localizedOptions"))
         .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default();
+    (opts, localized)
+}
+
+fn entries_from_parts(
+    opts: &[Value],
+    localized: &[Value],
+    prettify: fn(&str) -> String,
+) -> Vec<(String, String)> {
     opts.iter()
         .enumerate()
         .map(|(i, o)| {
-            let id = match o {
-                Value::String(s) => s.clone(),
-                other => other.to_string(),
-            };
+            let id = option_id(o);
             let label = localized
                 .get(i)
                 .and_then(Value::as_str)
                 .filter(|s| !s.is_empty())
                 .map(|s| s.to_string())
-                .unwrap_or_else(|| pretty_select_id(&id));
+                .unwrap_or_else(|| prettify(&id));
             (id, label)
         })
         .collect()
 }
 
+fn select_entries_raw(setting: &Value) -> Vec<(String, String)> {
+    let (opts, localized) = option_parts(setting.get("setting"));
+    entries_from_parts(&opts, &localized, pretty_select_id)
+}
+
 fn preset_entries_raw(setting: &Value) -> Vec<(String, String)> {
-    // presetEqualizerProfile nests options under `select`, NOT `setting`.
-    let opts = setting
-        .get("select")
-        .and_then(|x| x.get("options"))
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
-    let localized = setting
-        .get("select")
-        .and_then(|x| x.get("localizedOptions"))
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
-    opts.iter()
-        .enumerate()
-        .map(|(i, o)| {
-            let id = match o {
-                Value::String(s) => s.clone(),
-                other => other.to_string(),
-            };
-            let label = localized
-                .get(i)
-                .and_then(Value::as_str)
-                .filter(|s| !s.is_empty())
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| pretty_preset_id(&id));
-            (id, label)
-        })
-        .collect()
+    let (opts, localized) = option_parts(setting.get("select"));
+    entries_from_parts(&opts, &localized, pretty_preset_id)
 }
 
 /// Built-in presets as `[(id, label)]`.
@@ -238,6 +226,38 @@ pub fn select_entries(s: &SettingsMap, id: &str) -> Vec<(String, String)> {
     setting(s, id).map(select_entries_raw).unwrap_or_default()
 }
 
+pub fn select_settings_with_prefix(
+    s: &SettingsMap,
+    prefix: &str,
+) -> Vec<(String, Vec<(String, String)>)> {
+    const SELECT_TYPES: &[&str] = &[
+        "select",
+        "optionalSelect",
+        "modifiableSelect",
+        "multiSelect",
+        "multiSelectWithRemove",
+        "presetEqualizerProfileSelect",
+    ];
+    let mut out: Vec<(String, Vec<(String, String)>)> = s
+        .iter()
+        .filter(|(id, _)| id.starts_with(prefix))
+        .filter_map(|(id, v)| {
+            let ty = v.get("type").and_then(Value::as_str)?;
+            if !SELECT_TYPES.contains(&ty) {
+                return None;
+            }
+            let entries = if ty == "presetEqualizerProfileSelect" {
+                preset_entries_raw(v)
+            } else {
+                select_entries_raw(v)
+            };
+            Some((id.clone(), entries))
+        })
+        .collect();
+    out.sort_by(|a, b| a.0.cmp(&b.0));
+    out
+}
+
 /// Localized label for a select value.
 pub fn select_label(s: &SettingsMap, id: &str) -> Option<String> {
     let value = as_str_opt(setting_value(s, id))?;
@@ -246,6 +266,24 @@ pub fn select_label(s: &SettingsMap, id: &str) -> Option<String> {
         .find(|(oid, _)| *oid == value)
         .map(|(_, label)| label)
         .or(Some(value))
+}
+
+pub fn has_option(s: &SettingsMap, id: &str, option: &str) -> bool {
+    let Some(v) = setting(s, id) else {
+        return false;
+    };
+    let (opts, _) = option_parts(v.get("setting"));
+    let (preset_opts, _) = option_parts(v.get("select"));
+    opts.iter()
+        .chain(preset_opts.iter())
+        .any(|o| option_id(o).eq_ignore_ascii_case(option))
+}
+
+pub fn first_option(s: &SettingsMap, id: &str) -> Option<String> {
+    let v = setting(s, id)?;
+    let (opts, _) = option_parts(v.get("setting"));
+    let (preset_opts, _) = option_parts(v.get("select"));
+    opts.iter().chain(preset_opts.iter()).next().map(option_id)
 }
 
 fn bands_key(bands: Option<&Value>) -> String {
@@ -263,14 +301,59 @@ fn bands_key(bands: Option<&Value>) -> String {
     }
 }
 
+pub struct EqMetadata {
+    pub bands: usize,
+    pub min: i16,
+    pub max: i16,
+    pub fraction_digits: i32,
+    pub band_hz: Vec<u16>,
+}
+
+pub fn eq_metadata(s: &SettingsMap) -> Option<EqMetadata> {
+    let vol = setting(s, "volumeAdjustments")?;
+    let meta = vol.get("setting")?;
+    let min = i16::try_from(meta.get("min")?.as_i64()?).ok()?;
+    let max = i16::try_from(meta.get("max")?.as_i64()?).ok()?;
+    let fraction_digits = i32::try_from(meta.get("fractionDigits")?.as_i64()?).ok()?;
+    let band_hz: Vec<u16> = meta
+        .get("bandHz")?
+        .as_array()?
+        .iter()
+        .map(|x| u16::try_from(x.as_u64()?).ok())
+        .collect::<Option<Vec<_>>>()?;
+    let value_len = vol
+        .get("value")
+        .and_then(Value::as_array)
+        .map(|a| a.len())
+        .unwrap_or(0);
+    let bands = if value_len > 0 {
+        value_len
+    } else {
+        band_hz.len()
+    };
+    Some(EqMetadata {
+        bands,
+        min,
+        max,
+        fraction_digits,
+        band_hz,
+    })
+}
+
 /// Name of the saved custom preset whose bands match exactly, or None.
 pub fn match_custom_preset(s: &SettingsMap, eq_presets: &[EqPresetDto]) -> Option<String> {
-    let key = bands_key(setting_value(s, "volumeAdjustments"));
+    let value = setting_value(s, "volumeAdjustments");
+    let key = bands_key(value);
     if key.is_empty() {
         return None;
     }
+    let device_bands = value
+        .and_then(Value::as_array)
+        .map(|a| a.len())
+        .unwrap_or(0);
     eq_presets
         .iter()
+        .filter(|p| p.bands.split(',').count() == device_bands)
         .find(|p| p.bands == key)
         .map(|p| p.name.clone())
 }
@@ -434,4 +517,216 @@ pub fn quick_toggles(s: &SettingsMap) -> Vec<(String, bool)> {
         rank(&a.0).cmp(&rank(&b.0)).then_with(|| a.0.cmp(&b.0))
     });
     toggles
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn select_entries_keeps_device_order_and_localized_labels() {
+        let mut m = SettingsMap::new();
+        m.insert(
+            "spatialAudioMode".into(),
+            serde_json::json!({
+                "id": "spatialAudioMode",
+                "type": "select",
+                "setting": {
+                    "options": ["movie", "music", "gaming"],
+                    "localizedOptions": ["Movie Mode", "Music Mode", "Gaming Mode"],
+                },
+                "value": "music",
+            }),
+        );
+        assert_eq!(
+            select_entries(&m, "spatialAudioMode"),
+            vec![
+                ("movie".to_string(), "Movie Mode".to_string()),
+                ("music".to_string(), "Music Mode".to_string()),
+                ("gaming".to_string(), "Gaming Mode".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn select_settings_with_prefix_filters_by_type_and_sorts() {
+        let mut m = SettingsMap::new();
+        m.insert(
+            "spatialAudioMode".into(),
+            serde_json::json!({
+                "id": "spatialAudioMode",
+                "type": "select",
+                "setting": {
+                    "options": ["music", "movie"],
+                    "localizedOptions": ["Music", "Movie"],
+                },
+                "value": "music",
+            }),
+        );
+        m.insert(
+            "spatialAudioMusicMode".into(),
+            serde_json::json!({
+                "id": "spatialAudioMusicMode",
+                "type": "optionalSelect",
+                "setting": {
+                    "options": ["bass", "treble"],
+                    "localizedOptions": ["Bass", "Treble"],
+                },
+                "value": "bass",
+            }),
+        );
+        m.insert(
+            "spatialAudio".into(),
+            serde_json::json!({
+                "id": "spatialAudio",
+                "type": "toggle",
+                "value": true,
+            }),
+        );
+
+        let found = select_settings_with_prefix(&m, "spatial");
+        assert_eq!(found.len(), 2);
+        assert_eq!(found[0].0, "spatialAudioMode");
+        assert_eq!(
+            found[0].1,
+            vec![
+                ("music".to_string(), "Music".to_string()),
+                ("movie".to_string(), "Movie".to_string()),
+            ]
+        );
+        assert_eq!(found[1].0, "spatialAudioMusicMode");
+        assert_eq!(
+            found[1].1,
+            vec![
+                ("bass".to_string(), "Bass".to_string()),
+                ("treble".to_string(), "Treble".to_string()),
+            ]
+        );
+        assert!(found.iter().all(|(id, _)| id.as_str() != "spatialAudio"));
+
+        let mut none = SettingsMap::new();
+        none.insert(
+            "presetEqualizerProfile".into(),
+            serde_json::json!({
+                "id": "presetEqualizerProfile",
+                "type": "select",
+                "setting": { "options": ["signature"], "localizedOptions": ["Signature"] },
+                "value": "signature",
+            }),
+        );
+        assert!(select_settings_with_prefix(&none, "spatial").is_empty());
+    }
+
+    #[test]
+    fn eq_metadata_parses_a3953_shape() {
+        let mut m = SettingsMap::new();
+        m.insert(
+            "volumeAdjustments".into(),
+            serde_json::json!({
+                "id": "volumeAdjustments",
+                "type": "equalizer",
+                "setting": {
+                    "bandHz": [100, 200, 400, 800, 1600, 3200, 6400, 12800],
+                    "fractionDigits": 1,
+                    "min": -120,
+                    "max": 134,
+                },
+                "value": [0, 0, 0, 0, 0, 0, 0, 0],
+            }),
+        );
+        let meta = eq_metadata(&m).unwrap();
+        assert_eq!(meta.bands, 8);
+        assert_eq!(meta.min, -120);
+        assert_eq!(meta.max, 134);
+        assert_eq!(meta.fraction_digits, 1);
+        assert_eq!(
+            meta.band_hz,
+            vec![100, 200, 400, 800, 1600, 3200, 6400, 12800]
+        );
+    }
+
+    #[test]
+    fn eq_metadata_returns_none_without_metadata() {
+        let mut m = SettingsMap::new();
+        m.insert(
+            "volumeAdjustments".into(),
+            serde_json::json!({
+                "id": "volumeAdjustments",
+                "type": "equalizer",
+                "value": [0, 0],
+            }),
+        );
+        assert!(eq_metadata(&m).is_none());
+        assert!(eq_metadata(&SettingsMap::new()).is_none());
+    }
+
+    #[test]
+    fn has_option_and_first_option_use_option_ids() {
+        let mut m = SettingsMap::new();
+        m.insert(
+            "spatialAudioMode".into(),
+            serde_json::json!({
+                "id": "spatialAudioMode",
+                "type": "select",
+                "setting": {
+                    "options": ["music", "movie"],
+                    "localizedOptions": ["Music", "Movie"],
+                },
+                "value": "music",
+            }),
+        );
+        assert!(has_option(&m, "spatialAudioMode", "MUSIC"));
+        assert!(has_option(&m, "spatialAudioMode", "Movie"));
+        assert!(!has_option(&m, "spatialAudioMode", "gaming"));
+        assert!(!has_option(&m, "missing", "music"));
+        assert_eq!(
+            first_option(&m, "spatialAudioMode").as_deref(),
+            Some("music")
+        );
+        assert_eq!(first_option(&m, "missing"), None);
+    }
+
+    #[test]
+    fn match_custom_preset_ignores_different_band_counts() {
+        let mut m = SettingsMap::new();
+        m.insert(
+            "volumeAdjustments".into(),
+            serde_json::json!({
+                "id": "volumeAdjustments",
+                "type": "equalizer",
+                "setting": {
+                    "bandHz": [100, 200, 400, 800, 1600, 3200, 6400, 12800],
+                    "fractionDigits": 1,
+                    "min": -120,
+                    "max": 134,
+                },
+                "value": [0, 1, 2, 3, 4, 5, 6, 7],
+            }),
+        );
+        let presets = vec![
+            EqPresetDto {
+                id: 1,
+                name: "Eight Band".into(),
+                bands: "0,1,2,3,4,5,6,7".into(),
+                model: "A3953".into(),
+            },
+            EqPresetDto {
+                id: 2,
+                name: "Ten Band".into(),
+                bands: "0,1,2,3,4,5,6,7,8,9".into(),
+                model: "R60i".into(),
+            },
+        ];
+        assert_eq!(
+            match_custom_preset(&m, &presets).as_deref(),
+            Some("Eight Band")
+        );
+
+        let mut collision = SettingsMap::new();
+        collision.insert(
+            "volumeAdjustments".into(),
+            serde_json::json!({ "value": ["1,2", "3"] }),
+        );
+        assert_eq!(match_custom_preset(&collision, &presets), None);
+    }
 }

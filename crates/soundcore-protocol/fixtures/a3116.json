@@ -1,0 +1,48 @@
+{
+  "model": "SoundcoreA3116",
+  "aliases": [],
+  "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3116.rs:89",
+  "coverage": "manual",
+  "state_vectors": [
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3116.rs:97",
+      "packet_hex": "000507000239392e393941424344454641424344454641424344ff060708090a06050403",
+      "expected": {
+        "IsCharging": "No",
+        "BatteryLevel": "5/5",
+        "Volume": "7",
+        "FirmwareVersion": "99.99",
+        "SerialNumber": "ABCDEFABCDEFABCD",
+        "PresetEqualizerProfile": "None",
+        "VolumeAdjustments": "[0,1,2,3,4,0,-1,-2,-3]"
+      }
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3116.rs:106",
+      "packet_hex": "01",
+      "expected": {
+        "VoicePrompt": "true"
+      }
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3116.rs:140",
+      "packet_hex": "000507000230302e393941424344454641424344454641424344ff060708090a06050403",
+      "expected": {
+        "FirmwareVersion": "00.99",
+        "VoicePrompt": "None"
+      }
+    }
+  ],
+  "outbound_vectors": [
+    {
+      "name": "set_custom_equalizer_profile_add",
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3116.rs:190",
+      "command_hex": "02810f"
+    },
+    {
+      "name": "set_equalizer_volume_adjustments",
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3116.rs:191",
+      "command_hex": "02830a0908070605040302"
+    }
+  ]
+}

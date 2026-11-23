@@ -2,6 +2,7 @@
 name = "soundcore-desktop"
 version = "2.0.0"
 edition = "2024"
+license = "GPL-3.0-or-later"
 description = "Cross-platform desktop tray app that mirrors Soundcore earbud settings (gaming mode, ANC, EQ) — fetch-only on connect, live single-setting controls from the tray. Windows & Linux."
 build = "build.rs"
 
@@ -18,7 +19,7 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 raw-window-handle = "0.6"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-openscq30-lib = { path = "OpenSCQ30/lib" }
+soundcore-protocol = { path = "crates/soundcore-protocol" }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
 macaddr = "1"
 strum = "0.28"

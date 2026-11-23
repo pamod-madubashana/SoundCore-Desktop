@@ -1,0 +1,146 @@
+{
+  "model": "SoundcoreD1402",
+  "aliases": [],
+  "source": "devices/soundcore/d1402.rs:122",
+  "coverage": "real-capture",
+  "state_vectors": [
+    {
+      "source": "devices/soundcore/d1402.rs:92",
+      "packet_hex": "020030322e3539313430323834394434423837303641380100a0828c8ca0a0a08c78001eff00ffffffffffffffffff000000000000ffffffffffffffffff000000060407ff0305005fff00000131000000010101010100005a000001000100000000ffffffffff",
+      "expected": {
+        "FirmwareVersion": "02.59",
+        "SerialNumber": "1402849D4B8706A8",
+        "PresetEqualizerProfile": "Acoustic",
+        "BatteryLevel": "3/10",
+        "AmbientSoundMode": "NoiseCanceling",
+        "ManualNoiseCanceling": "5",
+        "NoiseCancelingModeInCycle": "true",
+        "TransparencyModeInCycle": "true",
+        "NormalModeInCycle": "false",
+        "DoublePress": "BassUp",
+        "MfbLongPress": "SystemVoiceAssistant",
+        "AutoPowerOff": "30m",
+        "LimitHighVolume": "false",
+        "LimitHighVolumeRefreshRate": "RealTime",
+        "LimitHighVolumeDbLimit": "90",
+        "Ldac": "true",
+        "LowBatteryPrompt": "true",
+        "VoicePrompt": "true",
+        "SurroundSound": "false",
+        "DualConnections": "true",
+        "AutoPlayPause": "true",
+        "HeyAnkaWakeWord": "false"
+      }
+    },
+    {
+      "source": "devices/soundcore/d1402.rs:101",
+      "packet_hex": "040030312e3539313430323834394434424230424535410000787878787878787878001e03007d87969689776d673c3cffffffff017d7d7c7d7f7e7e793c3c000006040fff0305005fff00000131000000010100010103015a000001000000000000ffffffffff",
+      "expected": {
+        "FirmwareVersion": "01.59",
+        "SerialNumber": "1402849D4BB0BE5A",
+        "PresetEqualizerProfile": "SoundcoreSignature",
+        "BatteryLevel": "5/10",
+        "AmbientSoundMode": "NoiseCanceling",
+        "ManualNoiseCanceling": "5",
+        "NoiseCancelingModeInCycle": "true",
+        "TransparencyModeInCycle": "true",
+        "NormalModeInCycle": "false",
+        "DoublePress": "None",
+        "MfbLongPress": "SystemVoiceAssistant",
+        "AutoPowerOff": "300m",
+        "LimitHighVolume": "true",
+        "LimitHighVolumeRefreshRate": "RealTime",
+        "LimitHighVolumeDbLimit": "90",
+        "Ldac": "false",
+        "LowBatteryPrompt": "true",
+        "VoicePrompt": "true",
+        "SurroundSound": "false",
+        "DualConnections": "true",
+        "AutoPlayPause": "false",
+        "HeyAnkaWakeWord": "false"
+      }
+    }
+  ],
+  "outbound_vectors": [
+    {
+      "name": "set_ambient_sound_mode",
+      "source": "devices/soundcore/d1402.rs:192",
+      "command_hex": "0681015fff000001"
+    },
+    {
+      "name": "set_noise_canceling_level",
+      "source": "devices/soundcore/d1402.rs:207",
+      "command_hex": "0681003fff000001"
+    },
+    {
+      "name": "set_equalizer_preserves_hear_id",
+      "source": "devices/soundcore/d1402.rs:260",
+      "command_hex": "03870900000064646e787878646478001e03007d87969689776d673c3cffffffff017d7d7c7d7f7e7e793c3c7677777878797676780000"
+    },
+    {
+      "name": "set_equalizer_absent_hear_id",
+      "source": "devices/soundcore/d1402.rs:292",
+      "command_hex": "03870900000064646e787878646478001eff00ffffffffffffffffff000000000000ffffffffffffffffff007677777878797676780000"
+    },
+    {
+      "name": "set_ldac",
+      "source": "devices/soundcore/d1402.rs:325",
+      "command_hex": "01ff01"
+    },
+    {
+      "name": "set_three_d_sound",
+      "source": "devices/soundcore/d1402.rs:342",
+      "command_hex": "028601"
+    },
+    {
+      "name": "set_auto_power_off_60m",
+      "source": "devices/soundcore/d1402.rs:443",
+      "command_hex": "01860101"
+    },
+    {
+      "name": "set_auto_power_off_never",
+      "source": "devices/soundcore/d1402.rs:458",
+      "command_hex": "01860000"
+    },
+    {
+      "name": "set_ldac_off",
+      "source": "devices/soundcore/d1402.rs:402",
+      "command_hex": "01ff00"
+    },
+    {
+      "name": "set_ldac_low_battery_prompt_voice_prompt_auto_play_pause_off",
+      "source": "devices/soundcore/d1402.rs:425",
+      "command_hex": "01ff00"
+    },
+    {
+      "name": "set_low_battery_prompt_off",
+      "source": "devices/soundcore/d1402.rs:426",
+      "command_hex": "108200"
+    },
+    {
+      "name": "set_voice_prompt_off",
+      "source": "devices/soundcore/d1402.rs:427",
+      "command_hex": "01ae00"
+    },
+    {
+      "name": "set_auto_play_pause_on",
+      "source": "devices/soundcore/d1402.rs:428",
+      "command_hex": "018101"
+    },
+    {
+      "name": "set_double_press_bass_up",
+      "source": "devices/soundcore/d1402.rs:429",
+      "command_hex": "0481000007"
+    },
+    {
+      "name": "set_auto_power_off_180m",
+      "source": "devices/soundcore/d1402.rs:430",
+      "command_hex": "01860102"
+    },
+    {
+      "name": "set_mfb_long_press_nap_mode",
+      "source": "devices/soundcore/d1402.rs:492",
+      "command_hex": "046100010d"
+    }
+  ]
+}

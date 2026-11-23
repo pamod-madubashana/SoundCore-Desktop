@@ -1,0 +1,167 @@
+use nom::{
+    IResult, Parser,
+    combinator::map,
+    error::{ContextError, ParseError, context},
+    number::complete::le_u8,
+};
+
+use crate::devices::soundcore::{
+    a3945::{self, state::A3945State},
+    common::{
+        macros::state_update_packet_module,
+        packet::{self, Command, inbound::FromPacketBody, outbound::ToPacket, parsing::take_bool},
+        structures::{
+            CaseBatteryLevel, CommonEqualizerConfiguration, DualBattery, DualFirmwareVersion,
+            GamingMode, SerialNumber, TouchTone, TwsStatus, WearingDetection,
+            button_configuration::ButtonStatusCollection,
+        },
+    },
+};
+
+// A3945 only
+// Despite EQ being 10 bands, only the first 8 seem to be used?
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct A3945StateUpdatePacket {
+    pub tws_status: TwsStatus,
+    pub battery: DualBattery,
+    pub dual_firmware_version: DualFirmwareVersion,
+    pub serial_number: SerialNumber,
+    pub equalizer_configuration: CommonEqualizerConfiguration<2, 10>,
+    pub button_configuration: ButtonStatusCollection<6>,
+    pub touch_tone: TouchTone,
+    pub wearing_detection: WearingDetection,
+    pub gaming_mode: GamingMode,
+    pub case_battery_level: CaseBatteryLevel,
+    pub bass_up_switch: bool,
+    pub device_color: u8,
+}
+
+impl Default for A3945StateUpdatePacket {
+    fn default() -> Self {
+        Self {
+            tws_status: Default::default(),
+            battery: Default::default(),
+            dual_firmware_version: Default::default(),
+            serial_number: Default::default(),
+            equalizer_configuration: Default::default(),
+            button_configuration: a3945::BUTTON_CONFIGURATION_SETTINGS.default_status_collection(),
+            touch_tone: Default::default(),
+            wearing_detection: Default::default(),
+            gaming_mode: Default::default(),
+            case_battery_level: Default::default(),
+            bass_up_switch: Default::default(),
+            device_color: Default::default(),
+        }
+    }
+}
+
+impl FromPacketBody for A3945StateUpdatePacket {
+    type DirectionMarker = packet::InboundMarker;
+
+    fn take<'a, E: ParseError<&'a [u8]> + ContextError<&'a [u8]>>(
+        input: &'a [u8],
+    ) -> IResult<&'a [u8], Self, E> {
+        context(
+            "a3945 state update packet",
+            map(
+                (
+                    TwsStatus::take,
+                    DualBattery::take,
+                    DualFirmwareVersion::take,
+                    SerialNumber::take,
+                    CommonEqualizerConfiguration::take,
+                    ButtonStatusCollection::take(
+                        a3945::BUTTON_CONFIGURATION_SETTINGS.parse_settings(),
+                    ),
+                    TouchTone::take,
+                    WearingDetection::take,
+                    GamingMode::take,
+                    CaseBatteryLevel::take,
+                    take_bool,
+                    le_u8,
+                ),
+                |(
+                    tws_status,
+                    battery,
+                    dual_firmware_version,
+                    serial_number,
+                    equalizer_configuration,
+                    button_configuration,
+                    touch_tone,
+                    wearing_detection,
+                    gaming_mode,
+                    case_battery_level,
+                    bass_up_switch,
+                    device_color,
+                )| {
+                    Self {
+                        tws_status,
+                        battery,
+                        dual_firmware_version,
+                        serial_number,
+                        equalizer_configuration,
+                        button_configuration,
+                        touch_tone,
+                        wearing_detection,
+                        gaming_mode,
+                        case_battery_level,
+                        bass_up_switch,
+                        device_color,
+                    }
+                },
+            ),
+        )
+        .parse_complete(input)
+    }
+}
+
+impl ToPacket for A3945StateUpdatePacket {
+    type DirectionMarker = packet::InboundMarker;
+
+    fn command(&self) -> Command {
+        packet::inbound::STATE_COMMAND
+    }
+
+    fn body(&self) -> Vec<u8> {
+        self.tws_status
+            .bytes()
+            .into_iter()
+            .chain(self.battery.bytes())
+            .chain(self.dual_firmware_version.bytes())
+            .chain(self.serial_number.to_string().into_bytes())
+            .chain(self.equalizer_configuration.bytes())
+            .chain(
+                self.button_configuration
+                    .bytes(a3945::BUTTON_CONFIGURATION_SETTINGS.parse_settings()),
+            )
+            .chain(self.touch_tone.bytes())
+            .chain(self.wearing_detection.bytes())
+            .chain(self.gaming_mode.bytes())
+            .chain([
+                self.case_battery_level.0.0,
+                self.bass_up_switch as u8,
+                self.device_color,
+            ])
+            .collect()
+    }
+}
+
+state_update_packet_module!(A3945State, A3945StateUpdatePacket);
+
+#[cfg(test)]
+mod tests {
+    use nom_language::error::VerboseError;
+
+    use crate::devices::soundcore::common::packet::inbound::TryToPacket;
+
+    use super::*;
+
+    #[test]
+    fn serialize_and_deserialize() {
+        let bytes = A3945StateUpdatePacket::default()
+            .to_packet()
+            .bytes_with_checksum();
+        let (_, packet) = packet::Inbound::take_with_checksum::<VerboseError<_>>(&bytes).unwrap();
+        let _: A3945StateUpdatePacket = packet.try_to_packet().unwrap();
+    }
+}

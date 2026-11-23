@@ -1,0 +1,70 @@
+{
+    "model":  "SoundcoreD1202",
+    "aliases":  [
+                    "SoundcoreD1202C"
+                ],
+    "source":  "devices/soundcore/d1202.rs:166",
+    "coverage":  "real-capture",
+    "state_vectors":  [
+                          {
+                              "source":  "devices/soundcore/d1202.rs:176",
+                              "packet_hex":  "01010909000030302e303030302e30305245444143544544303030303030303030312e383303000078787878787878787878ffffffffffffffffffff000078787878787878787878787878787878787878780000000002787878787878787878787878787878787878787800000affff6366ffff444433005000020000000032010100010102005a0000000000000000000000ffffffffff",
+                              "expected":  {
+                                               "BatteryLevelLeft":  "10/10",
+                                               "BatteryLevelRight":  "10/10",
+                                               "CaseBatteryLevel":  "4/10",
+                                               "IsChargingLeft":  "No",
+                                               "IsChargingRight":  "No",
+                                               "AmbientSoundMode":  "NoiseCanceling",
+                                               "AdaptiveNoiseCanceling":  "Weak",
+                                               "ManualNoiseCanceling":  "5",
+                                               "MultiSceneNoiseCanceling":  "Transport",
+                                               "WindNoiseSuppression":  "false",
+                                               "RealTimeAdaptiveNoiseCanceling":  "false",
+                                               "LeftSinglePress":  "None",
+                                               "LeftDoublePress":  "NextSong",
+                                               "LeftTriplePress":  "None",
+                                               "LeftLongPress":  "AmbientSoundMode",
+                                               "RightSinglePress":  "None",
+                                               "RightDoublePress":  "PlayPause",
+                                               "RightTriplePress":  "None",
+                                               "RightLongPress":  "AmbientSoundMode",
+                                               "LimitHighVolume":  "false",
+                                               "LimitHighVolumeDbLimit":  "90",
+                                               "LimitHighVolumeRefreshRate":  "RealTime",
+                                               "DualConnections":  "true",
+                                               "TouchTone":  "true",
+                                               "LowBatteryPrompt":  "true",
+                                               "AutoPowerOff":  "30m",
+                                               "Ldac":  "false",
+                                               "FirmwareVersionLeft":  "00.00",
+                                               "FirmwareVersionRight":  "00.00",
+                                               "SerialNumber":  "REDACTED00000000",
+                                               "SpatialAudio":  "false",
+                                               "SpatialAudioMode":  "Music"
+                                           }
+                          }
+                      ],
+    "outbound_vectors":  [
+                             {
+                                 "name":  "set_sound_modes",
+                                 "source":  "devices/soundcore/common/modules/sound_modes_v2/state_modifier.rs:46",
+                                 "command_hex":  "0681"
+                             },
+                             {
+                                 "name":  "enable_spatial_audio",
+                                 "source":  "devices/soundcore/d1202.rs:270",
+                                 "command_hex":  "1081010000"
+                             },
+                             {
+                                 "name":  "set_preset_eq",
+                                 "source":  "devices/soundcore/d1202.rs:307",
+                                 "command_hex":  "038701000000a0828c8ca0a0a08c7800a0828c8ca0a0a08c7800000000787878787878787878787878787878787878787800000000027878787878787878787878787878787878787878a00082008c008c00a000a000a0008c0078000000a00082008c008c00a000a000a0008c00780000000000"
+                             },
+                             {
+                                 "name":  "disable_spatial_audio",
+                                 "source":  "devices/soundcore/d1202.rs:352",
+                                 "command_hex":  "0387000000007878787878787878780078787878787878787800000000787878787878787878787878787878787878787800000000027878787878787878787878787878787878787878780078007800780078007800780078007800000078007800780078007800780078007800780000000000"
+                             }
+                         ]
+}

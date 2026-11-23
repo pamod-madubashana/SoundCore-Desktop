@@ -1,0 +1,81 @@
+{
+  "model": "SoundcoreD1301",
+  "aliases": [],
+  "source": "devices/soundcore/d1301.rs:191",
+  "coverage": "real-capture",
+  "state_vectors": [
+    {
+      "source": "devices/soundcore/d1301.rs:202",
+      "packet_hex": "0101090938312e303038312e303031333031303030303030303030303030dfba70d9bf9030312e30300000000006dd660000ffffffffffffffff001e0001ffffff000000000032110100060000000000000000000001cb313d00000000000202018000000000000004030280000000000000040403800000000000000405048000000000000004010000010800000001010000010100",
+      "expected": {
+        "BatteryLevelLeft": "10/10",
+        "BatteryLevelRight": "10/10",
+        "NoiseCanceling": "false",
+        "ListeningMode": "Bluetooth",
+        "AutoStopTimer": "false",
+        "AutoStopTimerDuration": "30",
+        "ButtonsEnabled": "true",
+        "LeftDoublePress": "ChangeMode",
+        "LeftTriplePress": "VolumeUp",
+        "RightDoublePress": "PlayPause",
+        "RightTriplePress": "VolumeUp",
+        "DefaultListeningMode": "Bluetooth",
+        "IncomingCallsDuringBluetoothMode": "false",
+        "LowBatteryPrompt": "false",
+        "AutoPowerOffPrompt": "false",
+        "NoiseCancelingPrompt": "true",
+        "ListeningModePrompt": "true",
+        "FirmwareVersionLeft": "81.00",
+        "FirmwareVersionRight": "81.00",
+        "SerialNumber": "1301000000000000"
+      }
+    },
+    {
+      "source": "devices/soundcore/d1301.rs:217",
+      "packet_hex": "001e00013c000000",
+      "expected": {}
+    },
+    {
+      "source": "devices/soundcore/d1301.rs:225",
+      "packet_hex": "000095010003320a0101950280004b05",
+      "expected": {}
+    }
+  ],
+  "outbound_vectors": [
+    {
+      "name": "set_alarm_1",
+      "source": "devices/soundcore/d1301.rs:307",
+      "command_hex": "1481000000000000320a"
+    },
+    {
+      "name": "set_alarm_2",
+      "source": "devices/soundcore/d1301.rs:311",
+      "command_hex": "1481010000000000330a"
+    },
+    {
+      "name": "get_alarms",
+      "source": "devices/soundcore/d1301.rs:315",
+      "command_hex": "1401"
+    },
+    {
+      "name": "delete_alarm_1",
+      "source": "devices/soundcore/d1301.rs:326",
+      "command_hex": "148200"
+    },
+    {
+      "name": "set_alarm_captured_0930_weekends",
+      "source": "devices/soundcore/d1301/packets/outbound.rs:83",
+      "command_hex": "08ee0000000014811200010130028200320a8f"
+    },
+    {
+      "name": "set_alarm_captured_update_existing",
+      "source": "devices/soundcore/d1301/packets/outbound.rs:103",
+      "command_hex": "08ee00000000148112000001d10100013205a8"
+    },
+    {
+      "name": "delete_alarm_captured",
+      "source": "devices/soundcore/d1301/packets/outbound.rs:122",
+      "command_hex": "08ee0000000014820b000198"
+    }
+  ]
+}

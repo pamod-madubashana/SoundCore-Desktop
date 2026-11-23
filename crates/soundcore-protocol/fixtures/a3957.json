@@ -1,0 +1,51 @@
+{
+  "model": "SoundcoreA3957",
+  "aliases": [],
+  "source": "devices/soundcore/a3957.rs:161",
+  "coverage": "real-capture",
+  "state_vectors": [
+    {
+      "source": "devices/soundcore/a3957.rs:171",
+      "packet_hex": "00010808000030332e393030332e39303339353746343944384143323033333430302e303002000078787878787878787878ffffffffffffffffffff0001918273778b938f960000918273778b938f9600000000000000918273778b938f960000918273778b938f96000000000a66663233ffff4444330050000000000033010100010102005a0000010000ff01000001010001ffffff03ffff",
+      "expected": {
+        "FirmwareVersionLeft": "03.90",
+        "FirmwareVersionRight": "03.90",
+        "SerialNumber": "3957F49D8AC20334",
+        "PresetEqualizerProfile": "SoundcoreSignature",
+        "BatteryLevelLeft": "9/10",
+        "BatteryLevelRight": "9/10",
+        "CaseBatteryLevel": "3/10",
+        "AmbientSoundMode": "NoiseCanceling",
+        "NoiseCancelingMode": "Manual",
+        "ManualNoiseCanceling": "5",
+        "TransportationMode": "Plane",
+        "WindNoiseSuppression": "false",
+        "LeftSinglePress": "PlayPause",
+        "LeftDoublePress": "PreviousSong",
+        "LeftTriplePress": "None",
+        "LeftLongPress": "AmbientSoundMode",
+        "RightSinglePress": "PlayPause",
+        "RightDoublePress": "NextSong",
+        "RightTriplePress": "None",
+        "RightLongPress": "AmbientSoundMode",
+        "GamingMode": "false",
+        "WearingDetection": "true",
+        "SoundLeakCompensation": "false",
+        "TouchTone": "true",
+        "WearingTone": "true",
+        "LowBatteryPrompt": "true",
+        "LimitHighVolume": "false",
+        "LimitHighVolumeRefreshRate": "RealTime",
+        "LimitHighVolumeDbLimit": "90",
+        "DualConnections": "true"
+      }
+    }
+  ],
+  "outbound_vectors": [
+    {
+      "name": "set_gaming_mode",
+      "source": "devices/soundcore/a3957.rs:263",
+      "command_hex": "108501"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "model": "SoundcoreA3926",
+  "aliases": [],
+  "source": "a3926.rs:88",
+  "coverage": "synthetic",
+  "state_vectors": [],
+  "outbound_vectors": [
+    {
+      "name": "set_left_single_press",
+      "source": "a3926.rs:109",
+      "command_hex": "0481000206"
+    }
+  ]
+}

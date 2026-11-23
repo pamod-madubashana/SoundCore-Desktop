@@ -1,0 +1,20 @@
+[package]
+name = "soundcore-protocol"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+description = "Capability-driven Soundcore device protocol library"
+
+[dependencies]
+soundcore-protocol-core = { package = "openscq30-lib", path = "../soundcore-protocol-vendor/lib" }
+anyhow = "1"
+macaddr = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+async-trait = "0.1"
+tokio = { version = "1", features = ["sync", "time", "rt", "macros"] }
+tracing = "0.1"
+dirs = "6"
+strum = { version = "0.28", features = ["derive"] }
+age = { version = "0.12", features = ["armor"] }
+flate2 = "1"

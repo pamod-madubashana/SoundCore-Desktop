@@ -1,0 +1,46 @@
+{
+  "model": "SoundcoreD1101",
+  "aliases": [],
+  "source": "devices/soundcore/d1101.rs:242",
+  "coverage": "real-capture",
+  "state_vectors": [
+    {
+      "source": "devices/soundcore/d1101.rs:252",
+      "packet_hex": "0001090030312e323830312e323831313031463638454544433930393334fefea07878787878787878780966f632f3fffff1f0310101000100000000000000000000000000",
+      "expected": {
+        "ButtonsEnabled": "true",
+        "BatteryLevelLeft": "10/10",
+        "BatteryLevelRight": "1/10",
+        "LeftSinglePress": "PlayPause",
+        "LeftDoublePress": "PreviousSong",
+        "LeftTriplePress": "None",
+        "LeftLongPress": "VolumeDown",
+        "RightSinglePress": "PlayPause",
+        "RightDoublePress": "NextSong",
+        "RightTriplePress": "None",
+        "RightLongPress": "VolumeUp",
+        "DualConnections": "true",
+        "LowBatteryPrompt": "true",
+        "Ldac": "false",
+        "AutoPowerOff": "30m",
+        "FirmwareVersionLeft": "01.28",
+        "FirmwareVersionRight": "01.28",
+        "SerialNumber": "1101F68EEDC90934",
+        "TwsStatus": "Connected",
+        "HostDevice": "Left"
+      }
+    }
+  ],
+  "outbound_vectors": [
+    {
+      "name": "set_buttons_disabled",
+      "source": "devices/soundcore/d1101.rs:318",
+      "command_hex": "109401"
+    },
+    {
+      "name": "set_buttons_enabled",
+      "source": "devices/soundcore/d1101.rs:325",
+      "command_hex": "109400"
+    }
+  ]
+}

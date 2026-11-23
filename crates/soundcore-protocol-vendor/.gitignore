@@ -1,0 +1,12 @@
+/cli/target
+/gui/target
+/lib/target
+/target
+/gui/AppDir
+/gui/appimage-build
+/lcov.info
+/release-files
+/build-output
+.vscode
+.cargo
+.DS_Store

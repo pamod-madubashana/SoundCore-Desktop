@@ -1,5 +1,6 @@
-//! Configuration: the devices to watch and the per-device profile that is
-//! refreshed FROM the device on every connect (read-only fetch).
+//! Configuration: the devices to watch and the per-device profile that mirrors
+//! the settings reported by the device on every connect (read-only fetch).
+//! Profiles are plain id/value records; no cross-setting rules are invented.
 
 pub mod autostart;
 
@@ -7,8 +8,8 @@ use std::{path::PathBuf, str::FromStr};
 
 use anyhow::{Context, anyhow};
 use macaddr::MacAddr6;
-use openscq30_lib::DeviceModel;
 use serde::{Deserialize, Serialize};
+use soundcore_protocol::vendor::DeviceModel;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -82,75 +83,35 @@ pub struct SettingEntry {
     pub value: String,
 }
 
-/// Settings that each select the *source* of the equalizer curve. Only one can be
-/// in effect at a time.
-const EQ_SOURCE_IDS: [&str; 3] = [
-    "volumeAdjustments",
-    "presetEqualizerProfile",
-    "customEqualizerProfile",
-];
-
-fn is_eq_source(id: &str) -> bool {
-    EQ_SOURCE_IDS.contains(&id)
-}
-
-fn is_enabling_spatial(id: &str, value: &str) -> bool {
-    id == "spatialAudio" && value.trim().eq_ignore_ascii_case("true")
-}
-
-/// Drops entries that cannot coexist with `id`.
-///
-/// The device folds conflicting equalizer state into one target state: writing
-/// any equalizer value clears spatial audio device-side, and two equalizer
-/// sources simply overwrite each other. The stored profile must mirror that —
-/// holding e.g. both `volumeAdjustments` and `spatialAudio = true` would
-/// misrepresent what the device is actually doing. Keeping the record
-/// internally consistent is what makes it a faithful mirror.
-fn prune_conflicts(list: &mut Vec<SettingEntry>, id: &str, value: &str) {
-    let eq_source = is_eq_source(id);
-    if !eq_source && !is_enabling_spatial(id, value) {
-        return;
-    }
-    list.retain(|e| {
-        if e.id == id {
-            return true;
-        }
-        // At most one equalizer source survives, and enabling spatial audio
-        // removes all of them.
-        if is_eq_source(&e.id) {
-            return false;
-        }
-        // Picking an equalizer source turns spatial audio off. `spatialAudioMode`
-        // is kept so the choice is remembered for next time.
-        if e.id == "spatialAudio" && eq_source {
-            return false;
-        }
-        true
-    });
-}
-
-/// Upserts one entry into a profile, dropping anything it contradicts.
+/// Upserts one device-reported setting by id. No cross-setting rules: the
+/// profile only mirrors what the device reports.
 pub fn upsert_entry(list: &mut Vec<SettingEntry>, id: String, value: String) {
-    prune_conflicts(list, &id, &value);
     match list.iter_mut().find(|e| e.id == id) {
         Some(e) => e.value = value,
         None => list.push(SettingEntry { id, value }),
     }
 }
 
-/// Resolves contradictions in a profile that was written before the rules above
-/// existed. The last conflicting entry wins, matching "most recently changed".
-/// Returns true if anything was removed.
+/// Deduplicates a profile by id, keeping the last occurrence of each setting
+/// and the relative order of the survivors. Returns true if anything was
+/// removed.
 pub fn prune_profile(list: &mut Vec<SettingEntry>) -> bool {
-    let winner = list
-        .iter()
-        .rposition(|e| is_eq_source(&e.id) || is_enabling_spatial(&e.id, &e.value))
-        .map(|i| (list[i].id.clone(), list[i].value.clone()));
-    let Some((id, value)) = winner else {
-        return false;
-    };
     let before = list.len();
-    prune_conflicts(list, &id, &value);
+    let mut keep = vec![true; list.len()];
+    let mut seen: Vec<&str> = Vec::new();
+    for (i, entry) in list.iter().enumerate().rev() {
+        if !seen.contains(&entry.id.as_str()) {
+            seen.push(entry.id.as_str());
+        } else {
+            keep[i] = false;
+        }
+    }
+    let mut i = 0;
+    list.retain(|_| {
+        let retained = keep[i];
+        i += 1;
+        retained
+    });
     list.len() != before
 }
 
@@ -229,10 +190,7 @@ impl Config {
         let mut config: Self = toml::from_str(&text)?;
         for dev in &mut config.devices {
             if prune_profile(&mut dev.profile) {
-                tracing::info!(
-                    "dropped conflicting sound-effect entries from '{}' profile",
-                    dev.label()
-                );
+                tracing::info!("removed duplicate settings from '{}' profile", dev.label());
             }
         }
         Ok(config)
@@ -321,5 +279,71 @@ mod tests {
         sort_devices_by_recency(&mut devices);
         let order: Vec<&str> = devices.iter().map(|d| d.mac_address.as_str()).collect();
         assert_eq!(order, vec!["first", "second", "third", "fourth"]);
+    }
+
+    #[test]
+    fn upsert_entry_keeps_spatial_and_eq_entries_together() {
+        let mut profile = Vec::new();
+        upsert_entry(&mut profile, "spatialAudio".to_owned(), "true".to_owned());
+        upsert_entry(
+            &mut profile,
+            "volumeAdjustments".to_owned(),
+            "6,4,1,0,0".to_owned(),
+        );
+        upsert_entry(&mut profile, "spatialAudio".to_owned(), "false".to_owned());
+
+        assert_eq!(profile.len(), 2);
+        assert_eq!(profile[0].id, "spatialAudio");
+        assert_eq!(profile[0].value, "false");
+        assert_eq!(profile[1].id, "volumeAdjustments");
+        assert_eq!(profile[1].value, "6,4,1,0,0");
+    }
+
+    #[test]
+    fn prune_profile_keeps_last_duplicate_and_reports_removal() {
+        let mut profile = vec![
+            SettingEntry {
+                id: "a".to_owned(),
+                value: "1".to_owned(),
+            },
+            SettingEntry {
+                id: "b".to_owned(),
+                value: "2".to_owned(),
+            },
+            SettingEntry {
+                id: "a".to_owned(),
+                value: "3".to_owned(),
+            },
+            SettingEntry {
+                id: "c".to_owned(),
+                value: "4".to_owned(),
+            },
+            SettingEntry {
+                id: "b".to_owned(),
+                value: "5".to_owned(),
+            },
+        ];
+        assert!(prune_profile(&mut profile));
+        let pairs: Vec<(&str, &str)> = profile
+            .iter()
+            .map(|e| (e.id.as_str(), e.value.as_str()))
+            .collect();
+        assert_eq!(pairs, vec![("a", "3"), ("c", "4"), ("b", "5")]);
+    }
+
+    #[test]
+    fn prune_profile_returns_false_for_clean_profile() {
+        let mut profile = vec![
+            SettingEntry {
+                id: "a".to_owned(),
+                value: "1".to_owned(),
+            },
+            SettingEntry {
+                id: "b".to_owned(),
+                value: "2".to_owned(),
+            },
+        ];
+        assert!(!prune_profile(&mut profile));
+        assert_eq!(profile.len(), 2);
     }
 }

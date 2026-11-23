@@ -1,0 +1,73 @@
+{
+  "model": "SoundcoreA3040",
+  "aliases": [],
+  "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3040.rs:83",
+  "coverage": "real-capture",
+  "state_vectors": [
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3040.rs:91",
+      "packet_hex": "03ff30322e3334333034303141314132464343454545381100968c6e6e8296a0aa78007a7a7677797a7a7e780004040707005000010005ff0000ff00310001ff000100005a0001010100113201018f8f808a96968f8f3c3c8f8f808a96968f8f3c3c64988ccd008f8f808a96968f8f3c3c000000000000000000007a7a77797a7a797b7200110000000000000000",
+      "expected": {
+        "ambientSoundMode": "NoiseCanceling",
+        "noiseCancelingMode": "Adaptive",
+        "manualNoiseCanceling": "5",
+        "transparencyMode": "TalkMode",
+        "manualTransparency": "5",
+        "windNoiseSuppression": "false",
+        "limitHighVolume": "false",
+        "limitHighVolumeDbLimit": "90",
+        "limitHighVolumeRefreshRate": "RealTime",
+        "noiseCancelingModeInCycle": "true",
+        "transparencyModeInCycle": "true",
+        "normalModeInCycle": "true",
+        "autoPowerOff": "30m",
+        "ldac": "false",
+        "voicePrompt": "true",
+        "lowBatteryPrompt": "true",
+        "dualConnections": "true"
+      }
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3040.rs:138",
+      "packet_hex": "03ff30322e3334333034303141314132464343454545381100968c6e6e8296a0aa78007a7a7677797a7a7e780004040707005000010005ff0000ff00310001ff000100005a0001010100113201018f8f808a96968f8f3c3c8f8f808a96968f8f3c3c64988ccd008f8f808a96968f8f3c3c000000000000000000007a7a77797a7a797b7200110000000000000000",
+      "expected": {}
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3040.rs:174",
+      "packet_hex": "03ff30322e3334333034303141314132464343454545381100968c6e6e8296a0aa78007a7a7677797a7a7e780004040707005000010005ff0000ff00310001ff000100005a0001010100113201018f8f808a96968f8f3c3c8f8f808a96968f8f3c3c64988ccd008f8f808a96968f8f3c3c000000000000000000007a7a77797a7a797b7200110000000000000000",
+      "expected": {}
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3040.rs:220",
+      "packet_hex": "03ff30322e3334333034303141314132464343454545381100968c6e6e8296a0aa78007a7a7677797a7a7e780004040707005000010005ff0000ff00310001ff000100005a0001010100113201018f8f808a96968f8f3c3c8f8f808a96968f8f3c3c64988ccd008f8f808a96968f8f3c3c000000000000000000007a7a77797a7a797b7200110000000000000000",
+      "expected": {}
+    }
+  ],
+  "outbound_vectors": [
+    {
+      "name": "set_ambient_sound_mode",
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3040.rs:157",
+      "command_hex": "0681025000010005"
+    },
+    {
+      "name": "set_equalizer_soundcore_signature",
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3040.rs:196",
+      "command_hex": "03870000110078787878787878787800787878787878787878000001008f8f808a96968f8f3c3c8f8f808a96968f8f3c3c64988ccd008f8f808a96968f8f3c3c8f8f808a96968f8f3c3c787878787878787878007878787878787878780000"
+    },
+    {
+      "name": "set_equalizer_custom",
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3040.rs:242",
+      "command_hex": "0387fefe1100b47878787878783c7878b47878787878783c78780001008f8f808a96968f8f3c3c8f8f808a96968f8f3c3c64988ccd008f8f808a96968f8f3c3c8f8f808a96968f8f3c3c8074797779777c6f78008074797779777c6f780000"
+    },
+    {
+      "name": "set_button_double_press_action_bass_up",
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3040/packets/set_button_action.rs:19",
+      "command_hex": "08ee00000004810d000000078f"
+    },
+    {
+      "name": "set_button_double_press_action_disabled",
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3040/packets/set_button_action.rs:28",
+      "command_hex": "08ee00000004810d0000000f97"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "model": "SoundcoreA3030",
+  "aliases": [],
+  "source": "crates/soundcore-protocol-vendor/lib/src/devices/device_model.rs:96",
+  "coverage": "none",
+  "state_vectors": [],
+  "outbound_vectors": []
+}

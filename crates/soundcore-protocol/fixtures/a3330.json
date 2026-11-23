@@ -1,0 +1,46 @@
+{
+  "model": "SoundcoreA3330",
+  "aliases": [],
+  "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3330.rs:212",
+  "coverage": "real-capture",
+  "state_vectors": [
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3330.rs:220",
+      "packet_hex": "0101050530342e323730342e323733333330393834373434373966363239302e312e33020761603333f6f631000101000000fefe838788837c78787878780401010000ffffff",
+      "expected": {
+        "BatteryLevelLeft": "5/5",
+        "BatteryLevelRight": "5/5",
+        "CaseBatteryLevel": "2/5",
+        "LeftDoublePress": "VolumeDown",
+        "LeftTriplePress": "NextSong",
+        "LeftLongPress": "PlayPause",
+        "LeftDoublePressDuringCall": "AnswerCall",
+        "LeftLongPressDuringCall": "DeclineCall",
+        "RightDoublePress": "VolumeUp",
+        "RightTriplePress": "NextSong",
+        "RightLongPress": "PlayPause",
+        "RightDoublePressDuringCall": "AnswerCall",
+        "RightLongPressDuringCall": "DeclineCall",
+        "ButtonsEnabled": "true",
+        "DualConnections": "false",
+        "TouchTone": "true",
+        "LowBatteryPrompt": "true",
+        "FirmwareVersionLeft": "04.27",
+        "FirmwareVersionRight": "04.27",
+        "SerialNumber": "333098474479f629"
+      }
+    }
+  ],
+  "outbound_vectors": [
+    {
+      "name": "set_left_long_press_during_call",
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3330.rs:300",
+      "command_hex": "048700010f"
+    },
+    {
+      "name": "set_right_double_press",
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3330.rs:302",
+      "command_hex": "0481010063"
+    }
+  ]
+}

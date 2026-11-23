@@ -127,6 +127,67 @@ pub fn render(
                 )
                 .child(
                     div()
+                        .id("device-settings-row")
+                        .w_full()
+                        .rounded_2xl()
+                        .bg(theme::surface())
+                        .border_1()
+                        .border_color(theme::border_subtle())
+                        .px_3()
+                        .py(px(10.))
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .hover(|st| st.bg(theme::hover_subtle()))
+                        .cursor_pointer()
+                        .on_click({
+                            let view = view.clone();
+                            move |_, _window, cx| {
+                                view.update(cx, |root, cx| {
+                                    root.show_device_settings = true;
+                                    root.show_sound_effects = false;
+                                    cx.notify();
+                                });
+                            }
+                        })
+                        .child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap(px(10.))
+                                .child(
+                                    div()
+                                        .size(px(32.))
+                                        .rounded_xl()
+                                        .bg(theme::brand_10())
+                                        .flex()
+                                        .items_center()
+                                        .justify_center()
+                                        .child(gear_icon(16., theme::brand())),
+                                )
+                                .child(
+                                    div()
+                                        .flex()
+                                        .flex_col()
+                                        .child(
+                                            div()
+                                                .text_size(px(14.))
+                                                .font_weight(gpui::FontWeight::BOLD)
+                                                .text_color(theme::foreground())
+                                                .child("Device Settings"),
+                                        )
+                                        .child(
+                                            div()
+                                                .text_size(px(12.))
+                                                .text_color(theme::muted())
+                                                .child("All settings reported by this device"),
+                                        ),
+                                ),
+                        )
+                        .child(chevron_right(16., theme::muted())),
+                )
+                .child(
+                    div()
                         .id("quick-toggles")
                         .flex_1()
                         .min_h_0()
@@ -539,38 +600,10 @@ fn sound_mode(
         .map(|(_, v)| v.clone());
     let active = local.unwrap_or(polled);
 
-    let modes: Vec<(String, &'static str, &'static str)> = {
-        let mut mapped: Vec<(String, &'static str, &'static str)> = opts
-            .iter()
-            .filter_map(|(id, _)| {
-                let lower = id.to_lowercase();
-                let (kw, label) = if lower.contains("noise") {
-                    ("noise", "Noise Cancel")
-                } else if lower.contains("normal") {
-                    ("normal", "Normal")
-                } else if lower.contains("transparen") {
-                    ("transparen", "Transparency")
-                } else {
-                    return None;
-                };
-                Some((id.clone(), label, kw))
-            })
-            .collect();
-        // Fixed order: Noise Cancel → Normal → Transparency.
-        let rank = |kw: &str| match kw {
-            "noise" => 0,
-            "normal" => 1,
-            _ => 2,
-        };
-        mapped.sort_by_key(|(_, _, kw)| rank(kw));
-        mapped
-    };
+    let modes: Vec<(String, String)> = opts;
 
     let anc_count = modes.len();
-    let anc_active_index = modes
-        .iter()
-        .position(|(id, _, _)| id == &active)
-        .unwrap_or(0);
+    let anc_active_index = modes.iter().position(|(id, _)| id == &active).unwrap_or(0);
 
     let mut row = div()
         .rounded_2xl()
@@ -590,7 +623,7 @@ fn sound_mode(
                 .flex()
                 .relative()
                 .child(morphing_pill(anc_active_index, anc_count, "anc"))
-                .children(modes.into_iter().map(|(id, label, _kw)| {
+                .children(modes.into_iter().map(|(id, label)| {
                     let on = id == active;
                     let seg_key = format!("seg-mode-{id}");
                     let view = view.clone();
@@ -648,33 +681,34 @@ fn sound_mode(
         );
 
     let lower = active.to_lowercase();
-    if lower.contains("transparen") {
-        if let Some(entries) = select_sub(s, "transparencyMode") {
-            row = row.child(sub_row(entries, s, "transparencyMode", view, d, root));
-        }
+    let has_transparency = select_sub(s, "transparencyMode");
+    let has_nc = select_sub(s, "noiseCancelingMode");
+    if (lower.contains("transparen") || (has_transparency.is_some() && has_nc.is_none()))
+        && let Some(entries) = has_transparency
+    {
+        row = row.child(sub_row(entries, s, "transparencyMode", view, d, root));
     }
-    if lower.contains("noise") {
-        if let Some(entries) = select_sub(s, "noiseCancelingMode") {
-            row = row.child(sub_row(entries, s, "noiseCancelingMode", view, d, root));
-        }
-        // Scene row (Transport / Outdoor / Indoor) when Multi-Scene NC is active.
-        let nc = s
-            .get("noiseCancelingMode")
-            .and_then(|v| v.get("value"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_lowercase();
-        let nc_local = root
-            .sub_local
-            .as_ref()
-            .filter(|(m, i, _)| m == &d.mac_address && i == "noiseCancelingMode")
-            .map(|(_, _, v)| v.to_lowercase());
-        let nc_eff = nc_local.as_deref().unwrap_or(&nc);
-        if nc_eff.contains("multi") || nc_eff.contains("scene") {
-            if let Some(scene) = select_sub(s, "multiSceneNoiseCanceling") {
-                row = row.child(sub_row(scene, s, "multiSceneNoiseCanceling", view, d, root));
-            }
-        }
+    if (lower.contains("noise") || lower.contains("nc"))
+        && let Some(entries) = has_nc
+    {
+        row = row.child(sub_row(entries, s, "noiseCancelingMode", view, d, root));
+    }
+    let nc = s
+        .get("noiseCancelingMode")
+        .and_then(|v| v.get("value"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_lowercase();
+    let nc_local = root
+        .sub_local
+        .as_ref()
+        .filter(|(m, i, _)| m == &d.mac_address && i == "noiseCancelingMode")
+        .map(|(_, _, v)| v.to_lowercase());
+    let nc_eff = nc_local.as_deref().unwrap_or(&nc);
+    if (nc_eff.contains("multi") || nc_eff.contains("scene"))
+        && let Some(scene) = select_sub(s, "multiSceneNoiseCanceling")
+    {
+        row = row.child(sub_row(scene, s, "multiSceneNoiseCanceling", view, d, root));
     }
     row
 }

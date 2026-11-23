@@ -1,0 +1,56 @@
+{
+  "model": "SoundcoreA3948",
+  "aliases": [],
+  "source": "a3948.rs:112",
+  "coverage": "real-capture",
+  "state_vectors": [
+    {
+      "source": "a3948.rs:121",
+      "packet_hex": "000005ff000032312e353600000000003339343837313036383636364145463013005a64828c8c82785a7800000000000000000000000e01f101ff016201f6013601f3ffffff310001ffffffffffffffffffffffffffffff",
+      "expected": {
+        "FirmwareVersionLeft": "21.56",
+        "FirmwareVersionRight": ""
+      }
+    },
+    {
+      "source": "a3948.rs:143",
+      "packet_hex": "00010505000032342e353632342e3536333934383139464631444341424132430200a0968278787878787800000000000000000000000e01f600f0016f016f0131003fffffff610001ffffffffffffffffffffffffffffff",
+      "expected": {
+        "RightSinglePress": "VolumeUp",
+        "RightDoublePress": "None",
+        "RightLongPress": "None"
+      }
+    },
+    {
+      "source": "a3948.rs:178",
+      "packet_hex": "00010505000032342e353632342e3536333934383139464631444341424132430200a0968278787878787800000000000000000000000e01f600f0016f016f0131003fffffff610001ffffffffffffffffffffffffffffff",
+      "expected": {
+        "RightSinglePress": "VolumeUp",
+        "RightDoublePress": "VolumeUp",
+        "RightLongPress": "VolumeUp"
+      }
+    }
+  ],
+  "outbound_vectors": [
+    {
+      "name": "enable_right_single_press",
+      "source": "a3948.rs:208",
+      "command_hex": "0483010201"
+    },
+    {
+      "name": "enable_right_double_press",
+      "source": "a3948.rs:210",
+      "command_hex": "0481010060"
+    },
+    {
+      "name": "enable_right_long_press",
+      "source": "a3948.rs:212",
+      "command_hex": "0481010130"
+    },
+    {
+      "name": "enable_right_single_press_enabled_flag",
+      "source": "a3948.rs:213",
+      "command_hex": "0483010101"
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "model": "SoundcoreA3968",
+  "aliases": [],
+  "source": "devices/soundcore/a3968.rs:134",
+  "coverage": "real-capture",
+  "state_vectors": [
+    {
+      "source": "devices/soundcore/a3968.rs:144",
+      "packet_hex": "00010505000030312e363530312e363533393638623033386532366262653961000000000002fefe78787878787878787878ffffffffffffffffff30010187728c8e9691a6863c3c87728c8e9691a6863c3cffffffff0197978c8f9791a5863c0097978c8f9791a5863c00000008616630334444370032010000ff3601000100010201ffffffffffffffffffffffff",
+      "expected": {
+        "TwsStatus": "Connected",
+        "HostDevice": "Left",
+        "BatteryLevelLeft": "5/5",
+        "BatteryLevelRight": "5/5",
+        "IsChargingLeft": "No",
+        "IsChargingRight": "No",
+        "FirmwareVersionLeft": "01.65",
+        "FirmwareVersionRight": "01.65",
+        "SerialNumber": "3968b038e26bbe9a",
+        "AmbientSoundMode": "NoiseCanceling",
+        "NoiseCancelingMode": "Manual",
+        "ManualNoiseCanceling": "Strong",
+        "AdaptiveNoiseCanceling": "HighNoise",
+        "WindNoiseSuppression": "false",
+        "WindNoiseDetected": "false",
+        "TransparencyMode": "VocalMode",
+        "PresetEqualizerProfile": "None",
+        "CaseBatteryLevel": "2/5",
+        "LeftSinglePress": "VolumeDown",
+        "RightSinglePress": "PlayPause",
+        "LeftDoublePress": "VolumeUp",
+        "RightDoublePress": "NextSong",
+        "LeftLongPress": "AmbientSoundMode",
+        "RightLongPress": "AmbientSoundMode",
+        "NormalModeInCycle": "true",
+        "TransparencyModeInCycle": "true",
+        "NoiseCancelingModeInCycle": "true",
+        "DualConnections": "true",
+        "AutoPowerOff": "30m",
+        "TouchTone": "false",
+        "SurroundSound": "true"
+      }
+    }
+  ],
+  "outbound_vectors": []
+}

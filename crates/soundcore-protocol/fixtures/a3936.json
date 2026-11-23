@@ -1,0 +1,43 @@
+{
+  "model": "SoundcoreA3936",
+  "aliases": [],
+  "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3936.rs:147",
+  "coverage": "real-capture",
+  "state_vectors": [
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3936.rs:148",
+      "packet_hex": "01010503010130342e313930342e31393339333661343737353833646461396500007878787878787878780078787878787878787800ff00ffffffffffffffffff00ffffffffffffffffff000000000000ffffffffffffffffff00ffffffffffffffffff0000000e001100001163116611441149070230000100000008310001010000ffffffffffffffffffffffff",
+      "expected": {
+        "AmbientSoundMode": "Normal",
+        "NoiseCancelingMode": "Adaptive",
+        "TransparencyMode": "FullyTransparent",
+        "LeftSinglePress": "None",
+        "RightSinglePress": "None",
+        "LeftDoublePress": "NextSong",
+        "RightDoublePress": "PlayPause",
+        "LeftLongPress": "AmbientSoundMode",
+        "RightLongPress": "GamingMode",
+        "PresetEqualizerProfile": "SoundcoreSignature",
+        "TouchTone": "false",
+        "WindNoiseSuppression": "false",
+        "GamingMode": "false",
+        "AutoPowerOff": "30m",
+        "FirmwareVersionLeft": "04.19",
+        "FirmwareVersionRight": "04.19",
+        "SerialNumber": "3936a477583dda9e",
+        "DualConnections": "true"
+      }
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3936/packets/state_update_packet.rs:207",
+      "packet_hex": "09ff0000010101990001010505010130342e313930342e31393339333661343737353834373033363600007878787878787878783c7878787878787878783c010078787878787878783c3c78787878787878783c3c65268daf0278787878787878783c3c78787878787878783c3c00000e011101001163116611491144070232000100000004310001010000ffffffffffffffffffffffffdd",
+      "expected": {}
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3936/packets/state_update_packet.rs:227",
+      "packet_hex": "09ff0000010101990001010505010130352e333330352e33333339333638383065383530313537616100007878787878787878787878787878787878787878ff0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e00110000116311661144114407013000000000005531000101000000ffffffffffffffffffffff42",
+      "expected": {}
+    }
+  ],
+  "outbound_vectors": []
+}

@@ -1,0 +1,56 @@
+{
+  "model": "SoundcoreA3388",
+  "aliases": [],
+  "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3388.rs:147",
+  "coverage": "real-capture",
+  "state_vectors": [
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3388.rs:135",
+      "packet_hex": "0001080830312e343930312e343933333838383830453835353042444534c40e38f9d407076666323355553100010101000105005a8ca0a0968c78640000010000ff",
+      "expected": {
+        "BatteryLevelLeft": "9/10",
+        "BatteryLevelRight": "9/10",
+        "CaseBatteryLevel": "8/10",
+        "TouchTone": "true",
+        "LowBatteryPrompt": "true",
+        "DualConnections": "true",
+        "ButtonsEnabled": "true",
+        "LeftDoublePress": "PlayPause",
+        "RightDoublePress": "PlayPause",
+        "LeftTriplePress": "PreviousSong",
+        "RightTriplePress": "NextSong",
+        "PresetEqualizerProfile": "Podcast",
+        "FirmwareVersionLeft": "01.49",
+        "FirmwareVersionRight": "01.49",
+        "SerialNumber": "3388880E8550BDE4"
+      }
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3388.rs:218",
+      "packet_hex": "0001090930312e343930312e343933333838383830453835324532433543b8fd74fc300507060602030f0f31000101010101000078787878787878787878010000ff",
+      "expected": {
+        "BatteryLevelLeft": "10/10",
+        "LeftDoublePress": "PlayPause",
+        "RightTriplePress": "NextSong"
+      }
+    },
+    {
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3388.rs:249",
+      "packet_hex": "0101070730312e343930312e343933333838383830453835393335424238e8fc100facff07666633335555310001010100011e008c96a0aab4b4aaa07800010000ff",
+      "expected": {
+        "BatteryLevelLeft": "8/10",
+        "BatteryLevelRight": "8/10",
+        "FirmwareVersionLeft": "01.49",
+        "SerialNumber": "3388880E85935BB8",
+        "CaseBatteryLevel": "None"
+      }
+    }
+  ],
+  "outbound_vectors": [
+    {
+      "name": "set_preset_equalizer_profile_bass_booster",
+      "source": "crates/soundcore-protocol-vendor/lib/src/devices/soundcore/a3388.rs:199",
+      "command_hex": "02830200a0968278787878787800a0968278787878787800"
+    }
+  ]
+}
