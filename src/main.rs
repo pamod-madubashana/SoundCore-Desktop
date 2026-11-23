@@ -34,12 +34,13 @@ use gpui::{
     px, size,
 };
 use macaddr::MacAddr6;
-use openscq30_lib::{
+use serde::Serialize;
+use services::worker::{Command, WorkerHandle};
+use soundcore_protocol::analysis::CapturedFrameDto;
+use soundcore_protocol::vendor::{
     DeviceModel,
     settings::{Setting, SettingId},
 };
-use serde::Serialize;
-use services::worker::{Command, WorkerHandle};
 use tray_icon::{
     Icon, TrayIconBuilder,
     menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem},
@@ -216,6 +217,7 @@ pub struct DeviceStateDto {
     pub image: Option<String>,
     pub color: Option<String>,
     pub categories: Vec<CategoryDto>,
+    pub capabilities: Option<soundcore_protocol::DeviceCapabilities>,
     pub profile_ids: Vec<String>,
     pub battery_left: Option<i32>,
     pub battery_right: Option<i32>,
@@ -347,7 +349,7 @@ pub fn get_states(state: &AppState) -> Vec<DeviceStateDto> {
             let live = MacAddr6::from_str(d.mac_address.trim())
                 .ok()
                 .and_then(|m| map.get(&m));
-            let (connected, message, categories, battery) = match live {
+            let (connected, message, categories, capabilities, battery) = match live {
                 Some(s) => {
                     let cats = s
                         .snapshot
@@ -359,9 +361,21 @@ pub fn get_states(state: &AppState) -> Vec<DeviceStateDto> {
                         .as_ref()
                         .map(extract_battery_from_snapshot)
                         .unwrap_or((None, None, None, None));
-                    (s.connected, s.message.clone(), cats, bat)
+                    (
+                        s.connected,
+                        s.message.clone(),
+                        cats,
+                        s.capabilities.clone(),
+                        bat,
+                    )
                 }
-                None => (false, String::new(), Vec::new(), (None, None, None, None)),
+                None => (
+                    false,
+                    String::new(),
+                    Vec::new(),
+                    None,
+                    (None, None, None, None),
+                ),
             };
             DeviceStateDto {
                 name: d.name.clone(),
@@ -384,6 +398,7 @@ pub fn get_states(state: &AppState) -> Vec<DeviceStateDto> {
                 }),
                 color: d.color.clone(),
                 categories,
+                capabilities,
                 profile_ids: d.profile.iter().map(|e| e.id.clone()).collect(),
                 battery_left: battery.0,
                 battery_right: battery.1,
@@ -409,6 +424,49 @@ pub fn save_config(state: &AppState, new_config: Config) -> Result<(), String> {
 
 pub fn get_config(state: &AppState) -> Config {
     state.config.lock().unwrap().clone()
+}
+
+pub fn get_capture(state: &AppState) -> Vec<soundcore_protocol::analysis::CapturedFrameDto> {
+    state
+        .worker
+        .state
+        .capture_frames
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|frame| CapturedFrameDto {
+            direction: frame.direction.clone(),
+            timestamp_ms: frame.timestamp_ms,
+            hex: frame.hex.clone(),
+        })
+        .collect()
+}
+
+pub fn start_capture(state: &AppState) {
+    let _ = state.worker.tx.send(Command::StartCapture);
+}
+
+pub fn stop_capture(state: &AppState) {
+    let _ = state.worker.tx.send(Command::StopCapture);
+}
+
+pub fn capture_progress(state: &AppState) -> Option<u8> {
+    const DURATION_SECS: u64 = 10;
+    let started = (*state.worker.state.capture_started.lock().unwrap())?;
+    let elapsed = started.elapsed().as_secs_f64();
+    Some((elapsed / DURATION_SECS as f64 * 100.0).clamp(0.0, 100.0) as u8)
+}
+
+pub fn clear_capture(state: &AppState) {
+    let _ = state.worker.tx.send(Command::ClearCapture);
+}
+
+pub fn pair_device(state: &AppState, mac: String, model: String) -> Result<(), String> {
+    let mac = MacAddr6::from_str(mac.trim()).map_err(|e| e.to_string())?;
+    let model =
+        DeviceModel::from_str(model.trim()).map_err(|_| format!("invalid model '{model}'"))?;
+    let _ = state.worker.tx.send(Command::Pair { mac, model });
+    Ok(())
 }
 
 pub fn set_setting(state: &AppState, mac: String, id: String, raw: String) -> Result<(), String> {

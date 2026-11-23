@@ -4,8 +4,7 @@
 //! individual changes the user makes in the popup.
 
 use std::{
-    collections::{HashMap, HashSet},
-    path::PathBuf,
+    collections::{HashMap, HashSet, VecDeque},
     str::FromStr,
     sync::{Arc, Mutex},
     time::Duration,
@@ -13,16 +12,19 @@ use std::{
 
 use anyhow::{anyhow, bail};
 use macaddr::MacAddr6;
-use openscq30_lib::{
-    DeviceModel, OpenSCQ30Session,
-    connection::ConnectionStatus,
-    device::OpenSCQ30Device,
-    settings::{
-        CategoryId, ModifiableSelectCommand, MultiSelectWithRemoveCommand, Select, Setting,
-        SettingId, Value,
+use soundcore_protocol::{
+    SoundcoreSession,
+    vendor::{
+        DeviceModel,
+        connection::ConnectionStatus,
+        device::OpenSCQ30Device,
+        settings::{
+            CategoryId, ModifiableSelectCommand, MultiSelectWithRemoveCommand, Select, Setting,
+            SettingId, Value,
+        },
     },
-    storage::PairedDevice,
 };
+use strum::VariantArray;
 use tokio::{
     sync::mpsc,
     task::JoinHandle,
@@ -32,6 +34,8 @@ use tracing::{info, warn};
 
 use crate::config::{Config, DeviceConfig, SettingEntry};
 
+const CAPTURE_BUFFER_CAP: usize = 500;
+
 /// One category's worth of live settings, in display order.
 pub type Snapshot = Vec<(CategoryId, Vec<(SettingId, Setting)>)>;
 
@@ -40,6 +44,7 @@ pub struct DeviceState {
     pub connected: bool,
     pub message: String,
     pub snapshot: Option<Snapshot>,
+    pub capabilities: Option<soundcore_protocol::DeviceCapabilities>,
 }
 
 #[derive(Default)]
@@ -47,93 +52,94 @@ pub struct SharedState {
     pub devices: Mutex<HashMap<MacAddr6, DeviceState>>,
     pub scan_results: Mutex<Vec<ScanResult>>,
     pub scanning: Mutex<bool>,
+    pub capture_frames: Mutex<VecDeque<soundcore_protocol::analysis::CapturedFrameDto>>,
+    pub capture_active: Mutex<bool>,
+    pub capture_started: Mutex<Option<std::time::Instant>>,
 }
 
 /// Best-effort Bluetooth-name -> model guess for zero-config auto-detect.
 /// Order matters: more specific patterns must come before less specific ones.
 pub fn infer_model(name: &str) -> Option<DeviceModel> {
     let n = name.to_lowercase();
-    use DeviceModel::*;
-    let m = if n.contains("r50i nc") || n.contains("p30i") {
-        SoundcoreA3959
-    } else if n.contains("r50i") || n.contains("p20i") || n.contains("p25i") {
-        SoundcoreA3949
-    } else if n.contains("life tune pro") {
-        SoundcoreA3030
-    } else if n.contains("life tune") {
-        SoundcoreA3029
-    } else if n.contains("space one pro") {
-        SoundcoreA3062
-    } else if n.contains("space one") {
-        SoundcoreA3035
-    } else if n.contains("space q45") || n.contains("q45") {
-        SoundcoreA3040
-    } else if n.contains("space a40") || n.contains("a40") {
-        SoundcoreA3936
-    } else if n.contains("liberty air 2 pro") {
-        SoundcoreA3951
-    } else if n.contains("liberty 4 nc") {
-        SoundcoreA3947
-    } else if n.contains("liberty 3 pro") {
-        SoundcoreA3952
-    } else if n.contains("liberty 2 pro+") {
-        SoundcoreA3930
-    } else if n.contains("liberty 2 pro") {
-        SoundcoreA3909
-    } else if n.contains("liberty 5") {
-        SoundcoreA3957
-    } else if n.contains("life note 3s") {
-        SoundcoreA3945
-    } else if n.contains("life note 3") {
-        SoundcoreA3933
-    } else if n.contains("life dot 2 nc") {
-        SoundcoreA3931
-    } else if n.contains("life dot 2") {
-        SoundcoreA3926
-    } else if n.contains("life q35") || n.contains("q35") {
-        SoundcoreA3027
-    } else if n.contains("life q30") || n.contains("q30") {
-        SoundcoreA3028
-    } else if n.contains("life a2 nc") || n.contains("a2 nc") {
-        SoundcoreA3935
-    } else if n.contains("life 2 neo") || n.contains("life neo") {
-        SoundcoreA3033
-    } else if n.contains("life p2 mini") {
-        SoundcoreA3944
-    } else if n.contains("life p3") {
-        SoundcoreA3939
-    } else if n.contains("motion+") {
-        SoundcoreA3116
-    } else if n.contains("sport x20") {
-        SoundcoreA3968
-    } else if n.contains("a20i") {
-        SoundcoreA3948
-    } else if n.contains("p40i") {
-        SoundcoreA3955
-    } else if n.contains("q11i") {
-        SoundcoreA3005
-    } else if n.contains("q20i") || n.contains("q20") {
-        SoundcoreA3004
-    } else if n.contains("vortex") {
-        SoundcoreA3031
-    } else if n.contains("r60i nc") {
-        SoundcoreD1202C
-    } else if n.contains("r60i") {
-        SoundcoreD1202
-    } else if n.contains("liberty 4 pro") {
-        SoundcoreA3954
-    } else if n.contains("v20i") {
-        SoundcoreA3876
-    } else if n.contains("c30i") {
-        SoundcoreA3330
-    } else if n.contains("c50i") {
-        SoundcoreD1101
-    } else if n.contains("sleep a30") {
-        SoundcoreD1301
-    } else {
-        return None;
-    };
-    Some(m)
+
+    let mut codes: Vec<(String, DeviceModel)> = DeviceModel::VARIANTS
+        .iter()
+        .copied()
+        .filter(|model| *model != DeviceModel::SoundcoreDevelopment)
+        .map(|model| {
+            let display = model.to_string();
+            let code = display.strip_prefix("Soundcore").unwrap_or(&display);
+            (code.to_lowercase(), model)
+        })
+        .collect();
+    codes.sort_unstable_by(|a, b| b.0.len().cmp(&a.0.len()).then_with(|| a.0.cmp(&b.0)));
+    if let Some((_, model)) = codes.iter().find(|(code, _)| n.contains(code.as_str())) {
+        return Some(*model);
+    }
+
+    const HUMAN_NAMES: &[(&str, DeviceModel)] = &[
+        ("q20i", DeviceModel::SoundcoreA3004),
+        ("q20", DeviceModel::SoundcoreA3004),
+        ("q11i", DeviceModel::SoundcoreA3005),
+        ("life q35", DeviceModel::SoundcoreA3027),
+        ("q35", DeviceModel::SoundcoreA3027),
+        ("life q30", DeviceModel::SoundcoreA3028),
+        ("q30", DeviceModel::SoundcoreA3028),
+        ("life tune pro", DeviceModel::SoundcoreA3030),
+        ("life tune", DeviceModel::SoundcoreA3029),
+        ("vortex", DeviceModel::SoundcoreA3031),
+        ("life 2 neo", DeviceModel::SoundcoreA3033),
+        ("life neo", DeviceModel::SoundcoreA3033),
+        ("space one pro", DeviceModel::SoundcoreA3062),
+        ("space one", DeviceModel::SoundcoreA3035),
+        ("space q45", DeviceModel::SoundcoreA3040),
+        ("q45", DeviceModel::SoundcoreA3040),
+        ("space 2", DeviceModel::SoundcoreD1402),
+        ("space a40", DeviceModel::SoundcoreA3936),
+        ("a40", DeviceModel::SoundcoreA3936),
+        ("motion+", DeviceModel::SoundcoreA3116),
+        ("c30i", DeviceModel::SoundcoreA3330),
+        ("aeroclip", DeviceModel::SoundcoreA3388),
+        ("v20i", DeviceModel::SoundcoreA3876),
+        ("liberty 2 pro+", DeviceModel::SoundcoreA3930),
+        ("liberty 2 pro", DeviceModel::SoundcoreA3909),
+        ("life dot 2 nc", DeviceModel::SoundcoreA3931),
+        ("life dot 2", DeviceModel::SoundcoreA3926),
+        ("life note 3s", DeviceModel::SoundcoreA3945),
+        ("life note 3", DeviceModel::SoundcoreA3933),
+        ("life a2 nc", DeviceModel::SoundcoreA3935),
+        ("a2 nc", DeviceModel::SoundcoreA3935),
+        ("life p3", DeviceModel::SoundcoreA3939),
+        ("life p2 mini", DeviceModel::SoundcoreA3944),
+        ("liberty 4 nc", DeviceModel::SoundcoreA3947),
+        ("a20i", DeviceModel::SoundcoreA3948),
+        ("r50i nc", DeviceModel::SoundcoreA3959),
+        ("p30i", DeviceModel::SoundcoreA3959),
+        ("r50i", DeviceModel::SoundcoreA3949),
+        ("p20i", DeviceModel::SoundcoreA3949),
+        ("p25i", DeviceModel::SoundcoreA3949),
+        ("liberty air 2 pro", DeviceModel::SoundcoreA3951),
+        ("liberty 3 pro", DeviceModel::SoundcoreA3952),
+        ("liberty 4 pro", DeviceModel::SoundcoreA3954),
+        ("liberty 4 max", DeviceModel::SoundcoreA3954),
+        ("liberty 4", DeviceModel::SoundcoreA3953),
+        ("p40i", DeviceModel::SoundcoreA3955),
+        ("liberty 5 pro max", DeviceModel::SoundcoreD1204),
+        ("liberty 5 pro", DeviceModel::SoundcoreD1204),
+        ("liberty 5", DeviceModel::SoundcoreA3957),
+        ("sport x20", DeviceModel::SoundcoreA3968),
+        ("c50i", DeviceModel::SoundcoreD1101),
+        ("p31i", DeviceModel::SoundcoreD1202),
+        ("r60i nc", DeviceModel::SoundcoreD1202C),
+        ("r60i", DeviceModel::SoundcoreD1202),
+        ("sleep a30", DeviceModel::SoundcoreD1301),
+    ];
+
+    let mut patterns: Vec<(&str, DeviceModel)> = HUMAN_NAMES.to_vec();
+    patterns.sort_unstable_by(|a, b| b.0.len().cmp(&a.0.len()).then_with(|| a.0.cmp(b.0)));
+    patterns
+        .into_iter()
+        .find_map(|(pattern, model)| n.contains(pattern).then_some(model))
 }
 
 #[derive(Debug, Clone)]
@@ -155,6 +161,13 @@ pub enum Command {
     },
     /// Scan for connectable Bluetooth devices (to pick a MAC).
     Scan {
+        model: DeviceModel,
+    },
+    StartCapture,
+    StopCapture,
+    ClearCapture,
+    Pair {
+        mac: MacAddr6,
         model: DeviceModel,
     },
     Quit,
@@ -218,38 +231,118 @@ async fn run(
 
     let mut tasks = spawn_devices(&session, &state, &config);
 
-    while let Some(cmd) = rx.recv().await {
-        match cmd {
-            Command::UpdateConfig(new_config) => {
-                let (to_abort, to_spawn) = diff_tasks(&config.devices, &new_config.devices);
-                for mac in to_abort {
-                    if let Some(handle) = tasks.handles.remove(&mac) {
-                        handle.abort();
+    let mut capture_rx = soundcore_protocol::vendor::subscribe_capture();
+    let mut capture_closed = false;
+
+    loop {
+        tokio::select! {
+            biased;
+            maybe_cmd = rx.recv() => {
+                let Some(cmd) = maybe_cmd else { return };
+                match cmd {
+                    Command::UpdateConfig(new_config) => {
+                        let (to_abort, to_spawn) = diff_tasks(&config.devices, &new_config.devices);
+                        for mac in to_abort {
+                            if let Some(handle) = tasks.handles.remove(&mac) {
+                                handle.abort();
+                            }
+                            tasks.senders.remove(&mac);
+                            state.devices.lock().unwrap().remove(&mac);
+                        }
+                        for idx in to_spawn {
+                            spawn_device(&session, &state, &new_config.devices[idx], &mut tasks);
+                        }
+                        config = new_config;
                     }
-                    tasks.senders.remove(&mac);
-                    state.devices.lock().unwrap().remove(&mac);
+                    Command::SetSetting { mac, id, value } => {
+                        if let Some(tx) = tasks.senders.get(&mac) {
+                            let _ = tx.send(DeviceCommand::SetSetting { id, value });
+                        }
+                    }
+                    Command::Scan { model } => {
+                        let session = session.clone();
+                        let state = state.clone();
+                        tokio::spawn(async move { scan(&session, &state, model).await });
+                    }
+                    Command::StartCapture => {
+                        state.capture_frames.lock().unwrap().clear();
+                        *state.capture_started.lock().unwrap() = Some(std::time::Instant::now());
+                        *state.capture_active.lock().unwrap() = true;
+                    }
+                    Command::StopCapture => {
+                        *state.capture_active.lock().unwrap() = false;
+                        *state.capture_started.lock().unwrap() = None;
+                    }
+                    Command::ClearCapture => {
+                        state.capture_frames.lock().unwrap().clear();
+                    }
+                    Command::Pair { mac, model } => {
+                        match session.pair(mac, model).await {
+                            Ok(()) => set_device_state(&state, mac, |s| {
+                                s.message = format!("paired with {model}");
+                            }),
+                            Err(err) => set_device_state(&state, mac, |s| {
+                                s.message = format!("pair failed: {err}");
+                            }),
+                        }
+                    }
+                    Command::Quit => {
+                        tasks.abort();
+                        return;
+                    }
                 }
-                for idx in to_spawn {
-                    spawn_device(&session, &state, &new_config.devices[idx], &mut tasks);
+            }
+            frames = async {
+                loop {
+                    match capture_rx.recv().await {
+                        Ok(captured) => {
+                            let mut batch = vec![captured];
+                            while let Ok(more) = capture_rx.try_recv() {
+                                batch.push(more);
+                            }
+                            return Some(batch);
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => return None,
+                    }
                 }
-                config = new_config;
-            }
-            Command::SetSetting { mac, id, value } => {
-                if let Some(tx) = tasks.senders.get(&mac) {
-                    let _ = tx.send(DeviceCommand::SetSetting { id, value });
+            }, if !capture_closed => {
+                match frames {
+                    Some(batch) => {
+                        for captured in batch {
+                            push_capture(&state, captured);
+                        }
+                    }
+                    None => capture_closed = true,
                 }
-            }
-            Command::Scan { model } => {
-                let session = session.clone();
-                let state = state.clone();
-                tokio::spawn(async move { scan(&session, &state, model).await });
-            }
-            Command::Quit => {
-                tasks.abort();
-                return;
             }
         }
     }
+}
+
+fn push_capture(state: &SharedState, captured: soundcore_protocol::vendor::CapturedFrame) {
+    if !*state.capture_active.lock().unwrap() {
+        return;
+    }
+    let mut frames = state.capture_frames.lock().unwrap();
+    frames.push_back(soundcore_protocol::analysis::CapturedFrameDto {
+        direction: captured.direction.to_owned(),
+        timestamp_ms: captured.timestamp_ms,
+        hex: bytes_to_hex(&captured.bytes),
+    });
+    while frames.len() > CAPTURE_BUFFER_CAP {
+        frames.pop_front();
+    }
+}
+
+fn bytes_to_hex(bytes: &[u8]) -> String {
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for &byte in bytes {
+        out.push(DIGITS[(byte >> 4) as usize] as char);
+        out.push(DIGITS[(byte & 0x0f) as usize] as char);
+    }
+    out
 }
 
 /// True for real Soundcore hardware models. Anything else (notably the
@@ -308,7 +401,7 @@ fn diff_tasks(old: &[DeviceConfig], new: &[DeviceConfig]) -> (Vec<MacAddr6>, Vec
 }
 
 fn spawn_device(
-    session: &Arc<OpenSCQ30Session>,
+    session: &Arc<SoundcoreSession>,
     state: &Arc<SharedState>,
     dev: &DeviceConfig,
     tasks: &mut DeviceTasks,
@@ -343,7 +436,7 @@ fn spawn_device(
 }
 
 fn spawn_devices(
-    session: &Arc<OpenSCQ30Session>,
+    session: &Arc<SoundcoreSession>,
     state: &Arc<SharedState>,
     config: &Config,
 ) -> DeviceTasks {
@@ -413,7 +506,7 @@ async fn wait_for_commands(
 }
 
 async fn device_loop(
-    session: Arc<OpenSCQ30Session>,
+    session: Arc<SoundcoreSession>,
     state: Arc<SharedState>,
     dev: DeviceConfig,
     mut rx: mpsc::UnboundedReceiver<DeviceCommand>,
@@ -430,7 +523,7 @@ async fn device_loop(
 
     // OpenSCQ30 only ships Bluetooth backends for Windows and Linux. On any other OS
     // (e.g. macOS) connecting would panic, so degrade gracefully and park the task.
-    if openscq30_lib::default_backends().is_none() {
+    if soundcore_protocol::vendor::default_backends().is_none() {
         set_device_state(&state, mac, |s| {
             s.message =
                 "This OS has no Bluetooth backend (OpenSCQ30 supports Windows & Linux)".into();
@@ -440,13 +533,7 @@ async fn device_loop(
     }
 
     // Idempotent mac<->model registration.
-    let _ = session
-        .pair(PairedDevice {
-            mac_address: mac,
-            model,
-            is_demo: false,
-        })
-        .await;
+    let _ = session.pair(mac, model).await;
 
     let poll = Duration::from_secs(dev.poll_seconds.max(1));
     let apply_delay = Duration::from_secs(dev.apply_delay_seconds);
@@ -473,7 +560,8 @@ async fn device_loop(
 
         tracing::debug!("attempting connection to {mac} ({model})");
         match timeout(Duration::from_secs(10), session.connect(mac)).await {
-            Ok(Ok(device)) => {
+            Ok(Ok(connected)) => {
+                let device = connected.inner().clone();
                 tracing::debug!("connected to {mac} ({model})");
                 backoff = Duration::ZERO;
                 // Publish snapshot first so battery data is available when frontend detects connect
@@ -542,7 +630,10 @@ async fn handle_device_command(
             tracing::debug!("SetSetting {id} for {mac}");
             if let Err(err) = device.set_setting_values(vec![(id, value)]).await {
                 warn!("set failed: {err}");
-                if matches!(err, openscq30_lib::device::Error::ConnectionError { .. }) {
+                if matches!(
+                    err,
+                    soundcore_protocol::vendor::device::Error::ConnectionError { .. }
+                ) {
                     tracing::debug!(
                         "connection error during set, treating as disconnect for {mac}"
                     );
@@ -577,6 +668,8 @@ async fn connected_session(
     // connected-devices list (AQS cache query, no RFCOMM I/O).
     let mut presence_check = tokio::time::interval(Duration::from_secs(5));
     presence_check.tick().await; // consume first immediate tick
+    let mut capture_poll = tokio::time::interval(Duration::from_secs(2));
+    capture_poll.tick().await;
     tracing::debug!("entered connected_session for {mac}");
     loop {
         tokio::select! {
@@ -601,6 +694,11 @@ async fn connected_session(
                 if conn_changed.is_err() || *conn.borrow_and_update() == ConnectionStatus::Disconnected {
                     tracing::debug!("connection_status channel signaled disconnect for {mac}");
                     return false;
+                }
+            }
+            _ = capture_poll.tick() => {
+                if *state.capture_active.lock().unwrap() {
+                    let _ = device.request_state().await;
                 }
             }
             _ = presence_check.tick() => {
@@ -842,7 +940,11 @@ fn publish_snapshot(
         .into_iter()
         .map(|(cat, settings)| (cat, settings.into_iter().collect()))
         .collect();
-    set_device_state(state, mac, |s| s.snapshot = Some(snapshot));
+    let capabilities = soundcore_protocol::DeviceCapabilities::from_device(device);
+    set_device_state(state, mac, |s| {
+        s.snapshot = Some(snapshot);
+        s.capabilities = Some(capabilities);
+    });
 }
 
 /// One-shot actions (power off, ring, reset, export) that must never end up
@@ -969,7 +1071,7 @@ fn now_unix() -> u64 {
         .unwrap_or(0)
 }
 
-async fn scan(session: &OpenSCQ30Session, state: &SharedState, model: DeviceModel) {
+async fn scan(session: &SoundcoreSession, state: &SharedState, model: DeviceModel) {
     {
         let mut scanning = state.scanning.lock().unwrap();
         if *scanning {
@@ -978,7 +1080,7 @@ async fn scan(session: &OpenSCQ30Session, state: &SharedState, model: DeviceMode
         }
         *scanning = true;
     }
-    let results = match session.list_devices(model).await {
+    let results = match session.inner().list_devices(model).await {
         Ok(devices) => devices
             .into_iter()
             .map(|d| ScanResult {
@@ -1105,18 +1207,8 @@ fn one_of(setting: &Select, raw: &str) -> anyhow::Result<std::borrow::Cow<'stati
     })
 }
 
-async fn open_session() -> anyhow::Result<OpenSCQ30Session> {
-    let db_path = match std::env::var_os("OPENSCQ30_DATABASE_PATH") {
-        Some(path) => PathBuf::from(path),
-        None => dirs::config_dir()
-            .ok_or_else(|| anyhow!("failed to find config dir"))?
-            .join("openscq30")
-            .join("database.sqlite"),
-    };
-    if let Some(parent) = db_path.parent() {
-        std::fs::create_dir_all(parent).ok();
-    }
-    OpenSCQ30Session::new(db_path)
+async fn open_session() -> anyhow::Result<SoundcoreSession> {
+    SoundcoreSession::new()
         .await
         .map_err(|e| anyhow!("failed to open database: {e}"))
 }
@@ -1125,7 +1217,7 @@ async fn open_session() -> anyhow::Result<OpenSCQ30Session> {
 mod tests {
     use std::borrow::Cow;
 
-    use openscq30_lib::settings::{Equalizer, Range};
+    use soundcore_protocol::vendor::settings::{Equalizer, Range};
 
     use super::*;
 
@@ -1429,5 +1521,52 @@ mod tests {
             spawn.is_empty(),
             "entries with no fingerprint must never spawn"
         );
+    }
+
+    #[test]
+    fn infer_model_recognizes_liberty_family_and_raw_codes() {
+        let cases: Vec<(&str, Option<DeviceModel>)> = vec![
+            ("soundcore Liberty 4 Max", Some(DeviceModel::SoundcoreA3954)),
+            ("Soundcore Liberty 4", Some(DeviceModel::SoundcoreA3953)),
+            ("Soundcore Liberty 4 NC", Some(DeviceModel::SoundcoreA3947)),
+            ("Soundcore Liberty 4 Pro", Some(DeviceModel::SoundcoreA3954)),
+            ("Soundcore Liberty 5", Some(DeviceModel::SoundcoreA3957)),
+            ("soundcore R60i NC", Some(DeviceModel::SoundcoreD1202C)),
+            ("A3953 serial 123", Some(DeviceModel::SoundcoreA3953)),
+            ("D1202C", Some(DeviceModel::SoundcoreD1202C)),
+            ("unknown gadget", None),
+        ];
+        for (name, expected) in cases {
+            assert_eq!(infer_model(name), expected, "name {name:?}");
+        }
+    }
+
+    #[test]
+    fn infer_model_recognizes_every_raw_model_code() {
+        for model in DeviceModel::VARIANTS {
+            if *model == DeviceModel::SoundcoreDevelopment {
+                continue;
+            }
+            let display = model.to_string();
+            let code = display.strip_prefix("Soundcore").unwrap_or(&display);
+            let name = format!("Soundcore device {code}");
+            assert_eq!(infer_model(&name), Some(*model), "name {name:?}");
+        }
+    }
+
+    #[test]
+    fn infer_model_recognizes_added_human_names() {
+        let cases: Vec<(&str, DeviceModel)> = vec![
+            ("Soundcore Space 2", DeviceModel::SoundcoreD1402),
+            ("Soundcore AeroClip", DeviceModel::SoundcoreA3388),
+            ("Soundcore Sport X20", DeviceModel::SoundcoreA3968),
+            ("Soundcore Sleep A30", DeviceModel::SoundcoreD1301),
+            ("Soundcore P31i", DeviceModel::SoundcoreD1202),
+            ("soundcore Liberty 5 Pro Max", DeviceModel::SoundcoreD1204),
+            ("Soundcore Liberty 5 Pro", DeviceModel::SoundcoreD1204),
+        ];
+        for (name, expected) in cases {
+            assert_eq!(infer_model(name), Some(expected), "name {name:?}");
+        }
     }
 }
