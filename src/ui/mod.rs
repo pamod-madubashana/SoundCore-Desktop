@@ -64,6 +64,7 @@ pub struct RootView {
     pub(crate) spinner_tick: u8,
     /// Optimistic overrides so taps survive the 900ms poll.
     pub(crate) ambient_local: Option<(String, String)>,
+    pub(crate) ambient_local_at: Option<std::time::Instant>,
     pub(crate) sub_local: Option<(String, String, String)>,
     pub(crate) sub_local_at: Option<std::time::Instant>,
     pub(crate) toggle_local: HashMap<String, bool>,
@@ -313,6 +314,7 @@ impl RootView {
             protocol_share_notice: None,
             spinner_tick: 0,
             ambient_local: None,
+            ambient_local_at: None,
             sub_local: None,
             sub_local_at: None,
             toggle_local: HashMap::new(),
@@ -401,7 +403,11 @@ impl RootView {
         if model_changed {
             self.reload_eq_presets();
         }
-        // Drop ambient override once the poll reports the same value.
+        // Drop ambient override once the poll reports the same value or grace expires.
+        let ambient_timed_out = self
+            .ambient_local_at
+            .map(|at| at.elapsed() >= std::time::Duration::from_millis(2000))
+            .unwrap_or(false);
         if let Some((mac, val)) = self.ambient_local.clone() {
             let done = self
                 .settings_for(&mac)
@@ -409,8 +415,9 @@ impl RootView {
                 .and_then(|v| v.get("value"))
                 .and_then(|v| v.as_str())
                 == Some(val.as_str());
-            if done {
+            if done || ambient_timed_out {
                 self.ambient_local = None;
+                self.ambient_local_at = None;
             }
         }
         // Remember last built-in preset; clear SE pending once device agrees.
