@@ -700,6 +700,27 @@ fn parse_bands(raw: &str) -> Vec<i16> {
         .collect()
 }
 
+fn eq_export_json(presets: &[crate::EqPresetDto], digits: i32) -> String {
+    let scale = 10f64.powi(digits);
+    let items: Vec<serde_json::Value> = presets
+        .iter()
+        .map(|preset| {
+            let adjustments: Vec<f64> = preset
+                .bands
+                .split(',')
+                .filter_map(|value| value.trim().parse::<i16>().ok())
+                .map(|value| value as f64 / scale)
+                .collect();
+
+            serde_json::json!({
+                "name": preset.name,
+                "volumeAdjustments": adjustments,
+            })
+        })
+        .collect();
+    serde_json::to_string_pretty(&items).unwrap_or_else(|_| "[]".to_string())
+}
+
 fn eq_graph(
     root: &RootView,
     view: &Entity<RootView>,
@@ -794,32 +815,139 @@ fn eq_graph(
                 )
                 .child(
                     div()
-                        .id("eq-reset")
-                        .px_2()
-                        .py_1()
-                        .rounded_md()
-                        .text_size(px(11.))
-                        .text_color(theme::brand())
-                        .hover(|st| st.bg(theme::hover_subtle()))
-                        .cursor_pointer()
-                        .on_click({
-                            let view = view.clone();
-                            let mac = mac.clone();
-                            let count = draft.len();
-                            let reset = reset_value.to_string();
-                            move |_, _, cx| {
-                                view.update(cx, |root, cx| {
-                                    root.eq_draft = vec![reset_value; count];
-                                    root.eq_active_preset = None;
-                                    if !mac.is_empty() {
-                                        let raw = vec![reset.as_str(); count].join(",");
-                                        root.send_setting(&mac, "volumeAdjustments", &raw);
+                        .flex()
+                        .items_center()
+                        .gap_3()
+                        .child(
+                            div()
+                                .id("eq-import")
+                                .px_2()
+                                .py_1()
+                                .rounded_md()
+                                .text_size(px(11.))
+                                .text_color(theme::foreground())
+                                .hover(|st| st.bg(theme::hover_subtle()))
+                                .cursor_pointer()
+                                .on_click({
+                                    let view = view.clone();
+                                    let mac = mac.clone();
+                                    let model = model.clone();
+                                    move |_, _, cx| {
+                                        let Some(text) =
+                                            cx.read_from_clipboard().and_then(|item| item.text())
+                                        else {
+                                            return;
+                                        };
+                                        if text.trim().is_empty() {
+                                            return;
+                                        }
+                                        view.update(cx, |root, cx| {
+                                            root.send_setting(
+                                                &mac,
+                                                "importCustomEqualizerProfiles",
+                                                &text,
+                                            );
+                                            if let Ok(entries) =
+                                                serde_json::from_str::<Vec<serde_json::Value>>(
+                                                    &text,
+                                                )
+                                            {
+                                                let scale = 10f64.powi(digits);
+                                                for entry in entries {
+                                                    let name = entry
+                                                        .get("name")
+                                                        .and_then(|value| value.as_str())
+                                                        .unwrap_or("Imported")
+                                                        .to_string();
+                                                    let adjustments: Vec<i16> = entry
+                                                        .get("volumeAdjustments")
+                                                        .and_then(|value| value.as_array())
+                                                        .map(|values| {
+                                                            values
+                                                                .iter()
+                                                                .filter_map(|value| value.as_f64())
+                                                                .map(|value| {
+                                                                    (value * scale).round() as i16
+                                                                })
+                                                                .collect()
+                                                        })
+                                                        .unwrap_or_default();
+                                                    if adjustments.is_empty() {
+                                                        continue;
+                                                    }
+                                                    let bands = adjustments
+                                                        .iter()
+                                                        .map(|value| value.to_string())
+                                                        .collect::<Vec<_>>()
+                                                        .join(",");
+                                                    if let Ok(preset) = crate::save_eq_preset(
+                                                        crate::state(),
+                                                        name,
+                                                        bands,
+                                                        model.clone(),
+                                                    ) {
+                                                        root.eq_presets.push(preset);
+                                                    }
+                                                }
+                                            }
+                                            cx.notify();
+                                        });
                                     }
-                                    cx.notify();
-                                });
-                            }
-                        })
-                        .child("Reset"),
+                                })
+                                .child("Import"),
+                        )
+                        .child(
+                            div()
+                                .id("eq-export")
+                                .px_2()
+                                .py_1()
+                                .rounded_md()
+                                .text_size(px(11.))
+                                .text_color(theme::foreground())
+                                .hover(|st| st.bg(theme::hover_subtle()))
+                                .cursor_pointer()
+                                .on_click({
+                                    let view = view.clone();
+                                    move |_, _, cx| {
+                                        view.update(cx, |root, cx| {
+                                            let json = eq_export_json(&root.eq_presets, digits);
+                                            cx.write_to_clipboard(gpui::ClipboardItem::new_string(
+                                                json,
+                                            ));
+                                        });
+                                    }
+                                })
+                                .child("Export"),
+                        )
+                        .child(
+                            div()
+                                .id("eq-reset")
+                                .px_2()
+                                .py_1()
+                                .rounded_md()
+                                .text_size(px(11.))
+                                .text_color(theme::error())
+                                .hover(|st| st.bg(theme::hover_subtle()))
+                                .cursor_pointer()
+                                .on_click({
+                                    let view = view.clone();
+                                    let mac = mac.clone();
+                                    let count = draft.len();
+                                    let reset = reset_value.to_string();
+                                    move |_, _, cx| {
+                                        view.update(cx, |root, cx| {
+                                            root.eq_draft = vec![reset_value; count];
+                                            root.eq_active_preset = None;
+                                            if !mac.is_empty() {
+                                                let raw = vec![reset.as_str(); count].join(",");
+                                                root.send_setting(&mac, "volumeAdjustments", &raw);
+                                            }
+                                            cx.notify();
+                                        });
+                                    }
+                                })
+                                .child("Reset"),
+                        ),
                 ),
         )
         .child(
@@ -835,7 +963,7 @@ fn eq_graph(
                         .justify_between()
                         .pr_1()
                         .text_size(px(9.))
-                        .text_color(theme::muted())
+                        .text_color(theme::foreground())
                         .children(levels.iter().map(|v| eq_db(*v, digits))),
                 )
                 .child(
@@ -972,7 +1100,7 @@ fn eq_graph(
                                         .right(px(0.))
                                         .top(px(EQ_GRAPH_H + 2.))
                                         .text_size(px(9.))
-                                        .text_color(theme::muted())
+                                        .text_color(theme::foreground())
                                         .text_center()
                                         .child(hz.get(i).copied().map(eq_hz).unwrap_or_default()),
                                 )
