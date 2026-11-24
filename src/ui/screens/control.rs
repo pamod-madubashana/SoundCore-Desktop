@@ -1,7 +1,10 @@
 //! Control screen (connected device + header).
 
 use crate::ui::scale::px;
-use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, prelude::*};
+use gpui::{
+    AnimationExt as _, App, Context, Entity, IntoElement, ParentElement, SpringAnimation,
+    SpringConfig, Styled, Window, div, prelude::*,
+};
 
 use super::common::{
     chevron_right, controls_icon, download_icon, gear_icon, info_icon, sliders_icon,
@@ -657,6 +660,169 @@ fn update_block(progress: Option<&crate::UpdateProgress>, error: Option<&str>) -
     div()
 }
 
+fn mode_is(active: &str, expected: &str) -> bool {
+    let normalize = |v: &str| -> String {
+        v.chars()
+            .filter(|c| c.is_ascii_alphanumeric())
+            .flat_map(char::to_lowercase)
+            .collect()
+    };
+    normalize(active) == normalize(expected)
+}
+
+fn anc_level_range(s: &data::SettingsMap) -> Option<(i32, i32)> {
+    let value = s.get("manualNoiseCanceling")?;
+    let range = value
+        .get("setting")
+        .and_then(|v| v.get("range"))
+        .or_else(|| value.get("setting"))
+        .unwrap_or(value);
+    let start = range
+        .get("start")
+        .and_then(|v| v.as_i64().or_else(|| v.as_f64().map(|n| n.round() as i64)))
+        .unwrap_or(1) as i32;
+    let end = range
+        .get("end")
+        .and_then(|v| v.as_i64().or_else(|| v.as_f64().map(|n| n.round() as i64)))
+        .unwrap_or(5) as i32;
+    Some((start.min(end), start.max(end)))
+}
+
+fn anc_level(s: &data::SettingsMap, mac: &str, root: &RootView) -> Option<(i32, i32, i32)> {
+    let (lo, hi) = anc_level_range(s)?;
+    let value = s.get("manualNoiseCanceling")?;
+    let local = root
+        .sub_local
+        .as_ref()
+        .filter(|(m, id, _)| m == mac && id == "manualNoiseCanceling")
+        .and_then(|(_, _, v)| v.parse::<i32>().ok());
+    let polled = value
+        .get("value")
+        .and_then(|v| v.as_i64().or_else(|| v.as_f64().map(|n| n.round() as i64)))
+        .map(|n| n as i32);
+    Some((local.or(polled).unwrap_or(lo).clamp(lo, hi), lo, hi))
+}
+
+fn set_anc_level(view: &Entity<RootView>, mac: &str, level: i32, cx: &mut App) {
+    let value = level.to_string();
+    view.update(cx, |root, cx| {
+        let already = root
+            .sub_local
+            .as_ref()
+            .filter(|(m, id, _)| m == mac && id == "manualNoiseCanceling")
+            .map(|(_, _, v)| v == &value)
+            .unwrap_or(false);
+        if already {
+            return;
+        }
+        root.sub_local = Some((
+            mac.to_string(),
+            "manualNoiseCanceling".to_string(),
+            value.clone(),
+        ));
+        root.sub_local_at = Some(std::time::Instant::now());
+        root.send_setting(mac, "manualNoiseCanceling", &value);
+        cx.notify();
+    });
+}
+
+fn anc_level_bar(
+    view: &Entity<RootView>,
+    mac: &str,
+    s: &data::SettingsMap,
+    root: &RootView,
+) -> Option<gpui::Div> {
+    let (current, lo, hi) = anc_level(s, mac, root)?;
+    if hi <= lo {
+        return None;
+    }
+    let ratio = (current - lo) as f32 / (hi - lo) as f32;
+
+    Some(
+        div()
+            .mt(px(6.))
+            .h(px(20.))
+            .rounded_xl()
+            .bg(gpui::rgba(0x00000047))
+            .flex()
+            .items_center()
+            .px(px(10.))
+            .child(
+                div()
+                    .w_full()
+                    .h(px(6.))
+                    .rounded_full()
+                    .bg(gpui::rgba(0xffffff24))
+                    .relative()
+                    .child(
+                        div().absolute().inset_0().flex().items_center().child(
+                            div()
+                                .relative()
+                                .h(px(6.))
+                                .rounded_full()
+                                .bg(theme::brand())
+                                .with_spring(
+                                    gpui::SharedString::from("anc-level-fill"),
+                                    SpringAnimation::new(SpringConfig::new(280.0, 26.0, 1.0))
+                                        .to(ratio),
+                                    |this, value: f32| {
+                                        this.w(gpui::relative(value.clamp(0.0, 1.0)))
+                                    },
+                                )
+                                .child(
+                                    div()
+                                        .absolute()
+                                        .right(px(-5.))
+                                        .top(px(-5.))
+                                        .size(px(16.))
+                                        .rounded_full()
+                                        .bg(theme::brand_foreground())
+                                        .shadow(vec![gpui::BoxShadow {
+                                            color: gpui::rgb(0x6d6cff).into(),
+                                            offset: gpui::point(px(0.), px(1.)),
+                                            blur_radius: px(4.),
+                                            spread_radius: px(0.),
+                                            inset: false,
+                                        }]),
+                                ),
+                        ),
+                    )
+                    .child(
+                        div()
+                            .absolute()
+                            .left(px(-6.))
+                            .right(px(-6.))
+                            .top(px(-10.))
+                            .bottom(px(-10.))
+                            .flex()
+                            .children((lo..=hi).map(|level| {
+                                let view = view.clone();
+                                let mac = mac.to_string();
+                                div()
+                                    .id(gpui::SharedString::from(format!("anc-level-{level}")))
+                                    .flex_1()
+                                    .h_full()
+                                    .on_mouse_down(gpui::MouseButton::Left, {
+                                        let view = view.clone();
+                                        let mac = mac.clone();
+                                        move |_, _, cx| set_anc_level(&view, &mac, level, cx)
+                                    })
+                                    .on_mouse_move({
+                                        let view = view.clone();
+                                        let mac = mac.clone();
+                                        move |event, _, cx| {
+                                            if event.pressed_button == Some(gpui::MouseButton::Left)
+                                            {
+                                                set_anc_level(&view, &mac, level, cx);
+                                            }
+                                        }
+                                    })
+                            })),
+                    ),
+            ),
+    )
+}
+
 fn sound_mode(
     view: &Entity<RootView>,
     d: &crate::DeviceStateDto,
@@ -680,7 +846,18 @@ fn sound_mode(
         .map(|(_, v)| v.clone());
     let active = local.unwrap_or(polled);
 
-    let modes: Vec<(String, String)> = opts;
+    const ORDER: [&str; 3] = ["NoiseCanceling", "Normal", "Transparency"];
+    let mut modes: Vec<(String, String)> = Vec::with_capacity(opts.len());
+    for id in ORDER {
+        if let Some(entry) = opts.iter().find(|(oid, _)| oid.eq_ignore_ascii_case(id)) {
+            modes.push(entry.clone());
+        }
+    }
+    for entry in opts {
+        if !modes.iter().any(|(oid, _)| oid == &entry.0) {
+            modes.push(entry);
+        }
+    }
 
     let anc_count = modes.len();
     let anc_active_index = modes.iter().position(|(id, _)| id == &active).unwrap_or(0);
@@ -733,23 +910,8 @@ fn sound_mode(
                                 let id = id_for_click.clone();
                                 view.update(cx, |root, cx| {
                                     root.ambient_local = Some((mac.clone(), id.clone()));
+                                    root.ambient_local_at = Some(std::time::Instant::now());
                                     root.send_setting(&mac, "ambientSoundMode", &id);
-                                    let mac2 = mac.clone();
-                                    cx.spawn(async move |this, cx| {
-                                        cx.background_executor()
-                                            .timer(std::time::Duration::from_millis(2000))
-                                            .await;
-                                        this.update(&mut *cx, |view, cx| {
-                                            if view.ambient_local.as_ref().map(|(m, _)| *m == mac2)
-                                                == Some(true)
-                                            {
-                                                view.ambient_local = None;
-                                                cx.notify();
-                                            }
-                                        })
-                                        .ok();
-                                    })
-                                    .detach();
                                     cx.notify();
                                 });
                             })
@@ -760,35 +922,60 @@ fn sound_mode(
                 })),
         );
 
-    let lower = active.to_lowercase();
     let has_transparency = select_sub(s, "transparencyMode");
     let has_nc = select_sub(s, "noiseCancelingMode");
-    if (lower.contains("transparen") || (has_transparency.is_some() && has_nc.is_none()))
+    if mode_is(&active, "Transparency")
         && let Some(entries) = has_transparency
     {
-        row = row.child(sub_row(entries, s, "transparencyMode", view, d, root));
+        row = row.child(sub_row(entries, s, "transparencyMode", view, d, root, None));
     }
-    if (lower.contains("noise") || lower.contains("nc"))
-        && let Some(entries) = has_nc
-    {
-        row = row.child(sub_row(entries, s, "noiseCancelingMode", view, d, root));
-    }
-    let nc = s
-        .get("noiseCancelingMode")
-        .and_then(|v| v.get("value"))
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_lowercase();
-    let nc_local = root
-        .sub_local
-        .as_ref()
-        .filter(|(m, i, _)| m == &d.mac_address && i == "noiseCancelingMode")
-        .map(|(_, _, v)| v.to_lowercase());
-    let nc_eff = nc_local.as_deref().unwrap_or(&nc);
-    if (nc_eff.contains("multi") || nc_eff.contains("scene"))
-        && let Some(scene) = select_sub(s, "multiSceneNoiseCanceling")
-    {
-        row = row.child(sub_row(scene, s, "multiSceneNoiseCanceling", view, d, root));
+    if mode_is(&active, "NoiseCanceling") {
+        let nc = s
+            .get("noiseCancelingMode")
+            .and_then(|v| v.get("value"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let nc_local = root
+            .sub_local
+            .as_ref()
+            .filter(|(m, i, _)| m == &d.mac_address && i == "noiseCancelingMode")
+            .map(|(_, _, v)| v.clone());
+        let nc_eff = nc_local.unwrap_or(nc);
+        let level_label = if nc_eff.eq_ignore_ascii_case("Manual") {
+            anc_level(s, &d.mac_address, root)
+                .map(|(current, _, hi)| ("Manual".to_string(), format!("Manual ({current}/{hi})")))
+        } else {
+            None
+        };
+        if let Some(entries) = has_nc {
+            row = row.child(sub_row(
+                entries,
+                s,
+                "noiseCancelingMode",
+                view,
+                d,
+                root,
+                level_label,
+            ));
+        }
+        if nc_eff.eq_ignore_ascii_case("Manual") {
+            if let Some(bar) = anc_level_bar(view, &d.mac_address, s, root) {
+                row = row.child(bar);
+            }
+        } else if nc_eff.eq_ignore_ascii_case("MultiScene")
+            && let Some(scene) = select_sub(s, "multiSceneNoiseCanceling")
+        {
+            row = row.child(sub_row(
+                scene,
+                s,
+                "multiSceneNoiseCanceling",
+                view,
+                d,
+                root,
+                None,
+            ));
+        }
     }
     row
 }
@@ -809,6 +996,7 @@ fn sub_row(
     view: &Entity<RootView>,
     d: &crate::DeviceStateDto,
     root: &RootView,
+    label_override: Option<(String, String)>,
 ) -> impl IntoElement {
     let mac = d.mac_address.clone();
     let current = s
@@ -828,11 +1016,7 @@ fn sub_row(
         .iter()
         .position(|(eid, _)| eid == &active)
         .unwrap_or(0);
-    let pill_key: &'static str = if id == "transparencyMode" {
-        "sub-transparency"
-    } else {
-        "sub-nc"
-    };
+    let pill_key = gpui::SharedString::from(format!("sub-{id}"));
 
     div()
         .h(px(36.))
@@ -842,6 +1026,11 @@ fn sub_row(
         .relative()
         .child(morphing_pill(sub_active_index, sub_count, pill_key))
         .children(entries.into_iter().map(|(eid, label)| {
+            let label = label_override
+                .as_ref()
+                .filter(|(id, _)| id == &eid)
+                .map(|(_, text)| text.clone())
+                .unwrap_or(label);
             let on = eid == active;
             let seg_key = format!("seg-sub-{id}-{eid}");
             let view = view.clone();
