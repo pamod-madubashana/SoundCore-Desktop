@@ -43,6 +43,9 @@ pub fn render(
 
     let mut groups: Vec<gpui::Div> = Vec::new();
     for category in &d.categories {
+        if category.id == "deviceInformation" {
+            continue;
+        }
         let mut rows: Vec<gpui::Div> = Vec::new();
         for setting in &category.settings {
             if let Some(row) = setting_row(&view, &mac, &setting.id, s, &quick) {
@@ -152,7 +155,7 @@ fn setting_row(
     s: &data::SettingsMap,
     quick: &HashSet<String>,
 ) -> Option<gpui::Div> {
-    if EXCLUDED_IDS.contains(&id) {
+    if EXCLUDED_IDS.contains(&id) || data::is_button_config(id) {
         return None;
     }
     let value = s.get(id)?;

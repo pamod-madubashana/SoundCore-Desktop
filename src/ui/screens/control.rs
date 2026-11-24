@@ -3,7 +3,9 @@
 use crate::ui::scale::px;
 use gpui::{Context, Entity, IntoElement, ParentElement, Styled, Window, div, prelude::*};
 
-use super::common::{chevron_right, download_icon, gear_icon, info_icon, sliders_icon};
+use super::common::{
+    chevron_right, controls_icon, download_icon, gear_icon, info_icon, sliders_icon,
+};
 use crate::ui::animation::{morphing_pill, segment_text, toggle_switch};
 use crate::ui::{RootView, data, theme};
 
@@ -188,6 +190,68 @@ pub fn render(
                 )
                 .child(
                     div()
+                        .id("control-settings-row")
+                        .w_full()
+                        .rounded_2xl()
+                        .bg(theme::surface())
+                        .border_1()
+                        .border_color(theme::border_subtle())
+                        .px_3()
+                        .py(px(10.))
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .hover(|st| st.bg(theme::hover_subtle()))
+                        .cursor_pointer()
+                        .on_click({
+                            let view = view.clone();
+                            move |_, _, cx| {
+                                view.update(cx, |root, cx| {
+                                    root.show_control_settings = true;
+                                    root.show_device_settings = false;
+                                    root.show_sound_effects = false;
+                                    cx.notify();
+                                });
+                            }
+                        })
+                        .child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap(px(10.))
+                                .child(
+                                    div()
+                                        .size(px(32.))
+                                        .rounded_xl()
+                                        .bg(theme::brand_10())
+                                        .flex()
+                                        .items_center()
+                                        .justify_center()
+                                        .child(controls_icon(16., theme::brand())),
+                                )
+                                .child(
+                                    div()
+                                        .flex()
+                                        .flex_col()
+                                        .child(
+                                            div()
+                                                .text_size(px(14.))
+                                                .font_weight(gpui::FontWeight::BOLD)
+                                                .text_color(theme::foreground())
+                                                .child("Control Settings"),
+                                        )
+                                        .child(
+                                            div()
+                                                .text_size(px(12.))
+                                                .text_color(theme::muted())
+                                                .child("Button actions and gestures"),
+                                        ),
+                                ),
+                        )
+                        .child(chevron_right(16., theme::muted())),
+                )
+                .child(
+                    div()
                         .id("quick-toggles")
                         .flex_1()
                         .min_h_0()
@@ -254,6 +318,22 @@ fn header(
             .text_color(theme::brand())
             .child(super::devices::device_art_placeholder(name, theme::brand()))
     };
+
+    let view_for_info = view.clone();
+    let art = art
+        .id("device-image-button")
+        .cursor_pointer()
+        .hover(|st| st.opacity(0.85))
+        .on_click(move |_, _, cx| {
+            view_for_info.update(cx, |root, cx| {
+                root.show_device_info = true;
+                root.show_sound_effects = false;
+                root.show_device_settings = false;
+                root.show_control_settings = false;
+                root.button_dropdown = None;
+                cx.notify();
+            });
+        });
 
     let show_update_badge = update_info.is_some() && update_progress.is_none();
     let latest = update_info

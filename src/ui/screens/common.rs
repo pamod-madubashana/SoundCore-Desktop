@@ -53,6 +53,30 @@ pub(crate) fn chevron_left(size: f32, color: Hsla) -> impl IntoElement {
         .child("‹")
 }
 
+/// Chevron-down glyph for dropdown rows.
+pub(crate) fn chevron_down(size: f32, color: Hsla) -> impl IntoElement {
+    div()
+        .size(px(size))
+        .flex()
+        .items_center()
+        .justify_center()
+        .text_color(color)
+        .text_size(px(size * 1.2))
+        .child("⌄")
+}
+
+/// Chevron-up glyph for an open dropdown row.
+pub(crate) fn chevron_up(size: f32, color: Hsla) -> impl IntoElement {
+    div()
+        .size(px(size))
+        .flex()
+        .items_center()
+        .justify_center()
+        .text_color(color)
+        .text_size(px(size * 1.2))
+        .child("⌃")
+}
+
 /// Section icons extracted from the official Soundcore APK.
 pub(crate) fn eq_image_icon(kind: &str, size: f32) -> impl IntoElement {
     static SPATIAL: OnceLock<std::sync::Arc<gpui::Image>> = OnceLock::new();
@@ -170,6 +194,37 @@ pub(crate) fn eq_bars_icon(size: f32, color: Hsla) -> impl IntoElement {
         .child(knob(5.5, 5.5))
         .child(knob(12.0, 12.0))
         .child(knob(18.5, 18.5))
+}
+
+/// Mixer glyph for the Control Settings row.
+pub(crate) fn controls_icon(size: f32, color: Hsla) -> impl IntoElement {
+    let s = size / 24.0;
+    let track = |y: f32| {
+        div()
+            .absolute()
+            .left(px(3.0 * s))
+            .top(px(y * s))
+            .w(px(18.0 * s))
+            .h(px(2.0 * s))
+            .rounded_full()
+            .bg(color)
+    };
+    let knob = |x: f32, y: f32| {
+        div()
+            .absolute()
+            .left(px((x - 3.0) * s))
+            .top(px((y - 3.0) * s))
+            .size(px(6.0 * s))
+            .rounded_full()
+            .bg(color)
+    };
+    div()
+        .size(px(size))
+        .relative()
+        .child(track(7.0))
+        .child(knob(9.0, 8.0))
+        .child(track(16.0))
+        .child(knob(16.0, 17.0))
 }
 
 /// Circled-i glyph (About nav).
