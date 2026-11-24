@@ -81,6 +81,8 @@ pub struct RootView {
     pub(crate) eq_drag_band: Option<usize>,
     /// Preset selected by the user, updated optimistically on click.
     pub(crate) eq_active_preset: Option<i64>,
+    pub(crate) eq_hover_preset: Option<i64>,
+    pub(crate) eq_delete_confirm: Option<(i64, String)>,
     /// Screen-switch transition: current + outgoing screen keys and spring state.
     nav_screen: &'static str,
     nav_prev_screen: &'static str,
@@ -323,6 +325,8 @@ impl RootView {
             eq_draft: Vec::new(),
             eq_drag_band: None,
             eq_active_preset: None,
+            eq_hover_preset: None,
+            eq_delete_confirm: None,
             se_local: None,
             spatial_local: None,
             last_preset_id: None,
@@ -588,6 +592,98 @@ impl RootView {
                 })
                 .collect(),
         };
+        self.ensure_eq_preset();
+        self.sync_eq_selection();
+    }
+
+    fn ensure_eq_preset(&mut self) {
+        if !self.eq_presets.is_empty() {
+            return;
+        }
+        let settings = self
+            .active_device()
+            .map(data::settings_map)
+            .unwrap_or_default();
+        let values: Vec<i16> = settings
+            .get("volumeAdjustments")
+            .and_then(|value| value.get("value"))
+            .and_then(|value| value.as_array())
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|item| item.as_i64().map(|value| value as i16))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let bands = if values.is_empty() {
+            vec![0i16; 8]
+        } else {
+            values
+        };
+        let bands = bands
+            .iter()
+            .map(|value| value.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        let model = self
+            .active_device()
+            .map(|device| device.model.clone())
+            .unwrap_or_default();
+        match crate::save_eq_preset(state(), "Custom 1".to_string(), bands, model) {
+            Ok(preset) => {
+                self.eq_active_preset = Some(preset.id);
+                self.eq_presets.push(preset);
+            }
+            Err(err) => tracing::warn!("create default eq preset failed: {err}"),
+        }
+    }
+
+    fn sync_eq_selection(&mut self) {
+        if self.eq_presets.is_empty() {
+            self.eq_active_preset = None;
+            return;
+        }
+        if self
+            .eq_active_preset
+            .is_some_and(|id| self.eq_presets.iter().any(|preset| preset.id == id))
+        {
+            return;
+        }
+        let settings = self
+            .active_device()
+            .map(data::settings_map)
+            .unwrap_or_default();
+        let matched = data::match_custom_preset(&settings, &self.eq_presets);
+        self.eq_active_preset = matched
+            .and_then(|name| self.eq_presets.iter().find(|preset| preset.name == name))
+            .or_else(|| self.eq_presets.first())
+            .map(|preset| preset.id);
+    }
+
+    pub(crate) fn delete_eq_preset_confirmed(
+        &mut self,
+        id: i64,
+        name: &str,
+        mac: &str,
+        cx: &mut Context<Self>,
+    ) {
+        self.eq_drag_band = None;
+        if self.eq_presets.len() <= 1 {
+            self.eq_delete_confirm = None;
+            cx.notify();
+            return;
+        }
+        if !mac.is_empty() {
+            self.send_setting(mac, "customEqualizerProfile", &format!("-{name}"));
+        }
+        if let Err(err) = crate::delete_eq_preset(state(), id) {
+            tracing::warn!("delete eq preset failed: {err}");
+            return;
+        }
+        self.reload_eq_presets();
+        self.eq_hover_preset = None;
+        self.eq_delete_confirm = None;
+        cx.notify();
     }
 
     pub fn active_device(&self) -> Option<&DeviceStateDto> {
@@ -853,6 +949,11 @@ fn screen_depth(key: &str) -> u8 {
 
 impl Render for RootView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if self.eq_presets.is_empty() {
+            self.reload_eq_presets();
+        } else {
+            self.sync_eq_selection();
+        }
         // Spinner only ticks while Searching is visible.
         if self.devices.is_empty() {
             let tick = self.spinner_tick;
@@ -872,6 +973,12 @@ impl Render for RootView {
         }
 
         let connected_device = self.active_device().cloned();
+        let confirm_view = cx.entity();
+        let eq_delete_confirm = self.eq_delete_confirm.clone();
+        let confirm_mac = connected_device
+            .as_ref()
+            .map(|d| d.mac_address.clone())
+            .unwrap_or_default();
         self.unsupported_device = connected_device
             .as_ref()
             .filter(|d| d.categories.is_empty())
@@ -1051,5 +1158,126 @@ impl Render for RootView {
                     .overflow_hidden()
                     .children(layers),
             )
+            .when_some(eq_delete_confirm, |el, (preset_id, preset_name)| {
+                let backdrop_view = confirm_view.clone();
+                let dialog_view = confirm_view.clone();
+                let cancel_view = confirm_view.clone();
+                let confirm_view = confirm_view.clone();
+                let confirm_mac = confirm_mac.clone();
+                let name = preset_name.clone();
+                let message = format!("“{preset_name}” will be removed. This cannot be undone.");
+                el.child(
+                    div()
+                        .id("eq-delete-confirm-backdrop")
+                        .absolute()
+                        .top(px(0.))
+                        .left(px(0.))
+                        .right(px(0.))
+                        .bottom(px(0.))
+                        .bg(gpui::rgba(0x000000cc))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .on_click(move |_, _, cx| {
+                            backdrop_view.update(cx, |root, cx| {
+                                root.eq_drag_band = None;
+                                root.eq_delete_confirm = None;
+                                cx.notify();
+                            });
+                        })
+                        .child(
+                            div()
+                                .id("eq-delete-confirm-dialog")
+                                .w(px(272.))
+                                .flex()
+                                .flex_col()
+                                .gap_3()
+                                .rounded_2xl()
+                                .bg(theme::popup_bg())
+                                .border_1()
+                                .border_color(theme::border_medium())
+                                .px_4()
+                                .py_4()
+                                .on_mouse_up(gpui::MouseButton::Left, {
+                                    let view = dialog_view.clone();
+                                    move |_, _, cx| {
+                                        view.update(cx, |root, cx| {
+                                            root.eq_drag_band = None;
+                                            cx.notify();
+                                        });
+                                    }
+                                })
+                                .on_click(|_, _, cx| cx.stop_propagation())
+                                .child(
+                                    div()
+                                        .text_size(px(14.))
+                                        .font_weight(gpui::FontWeight::SEMIBOLD)
+                                        .text_color(theme::foreground())
+                                        .child("Delete preset?"),
+                                )
+                                .child(
+                                    div()
+                                        .text_size(px(11.))
+                                        .text_color(theme::muted())
+                                        .child(message),
+                                )
+                                .child(
+                                    div()
+                                        .w_full()
+                                        .mt(px(2.))
+                                        .flex()
+                                        .items_center()
+                                        .justify_end()
+                                        .gap_2()
+                                        .child(
+                                            div()
+                                                .id("eq-delete-cancel")
+                                                .px_3()
+                                                .py(px(7.))
+                                                .rounded_lg()
+                                                .bg(theme::surface())
+                                                .border_1()
+                                                .border_color(theme::border_subtle())
+                                                .text_size(px(11.))
+                                                .text_color(theme::foreground())
+                                                .cursor_pointer()
+                                                .hover(|style| style.bg(theme::hover_medium()))
+                                                .on_click(move |_, _, cx| {
+                                                    cancel_view.update(cx, |root, cx| {
+                                                        root.eq_drag_band = None;
+                                                        root.eq_delete_confirm = None;
+                                                        cx.notify();
+                                                    });
+                                                })
+                                                .child("No"),
+                                        )
+                                        .child(
+                                            div()
+                                                .id("eq-delete-confirm")
+                                                .px_3()
+                                                .py(px(7.))
+                                                .rounded_lg()
+                                                .bg(theme::error())
+                                                .text_size(px(11.))
+                                                .font_weight(gpui::FontWeight::SEMIBOLD)
+                                                .text_color(theme::brand_foreground())
+                                                .cursor_pointer()
+                                                .hover(|style| style.opacity(0.85))
+                                                .on_click(move |_, _, cx| {
+                                                    confirm_view.update(cx, |root, cx| {
+                                                        root.delete_eq_preset_confirmed(
+                                                            preset_id,
+                                                            &name,
+                                                            &confirm_mac,
+                                                            cx,
+                                                        );
+                                                    });
+                                                })
+                                                .child("Yes, Delete"),
+                                        ),
+                                ),
+                        ),
+                )
+            })
     }
 }
