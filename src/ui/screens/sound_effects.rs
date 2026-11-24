@@ -529,7 +529,11 @@ fn custom_card(
     expanded: bool,
     cx: &mut Context<RootView>,
 ) -> impl IntoElement {
-    let name = data::match_custom_preset(s, &root.eq_presets).unwrap_or_else(|| "Custom".into());
+    let name = root
+        .eq_active_preset
+        .and_then(|id| root.eq_presets.iter().find(|preset| preset.id == id))
+        .map(|preset| preset.name.clone())
+        .unwrap_or_else(|| "Custom".into());
     let body = eq_graph(root, view, d, s, cx);
     section_shell(
         view,
@@ -700,6 +704,42 @@ fn parse_bands(raw: &str) -> Vec<i16> {
         .collect()
 }
 
+fn eq_export_json(presets: &[crate::EqPresetDto], digits: i32) -> String {
+    let scale = 10f64.powi(digits);
+    let items: Vec<serde_json::Value> = presets
+        .iter()
+        .map(|preset| {
+            let adjustments: Vec<f64> = preset
+                .bands
+                .split(',')
+                .filter_map(|value| value.trim().parse::<i16>().ok())
+                .map(|value| value as f64 / scale)
+                .collect();
+
+            serde_json::json!({
+                "name": preset.name,
+                "volumeAdjustments": adjustments,
+            })
+        })
+        .collect();
+    serde_json::to_string_pretty(&items).unwrap_or_else(|_| "[]".to_string())
+}
+
+const MAX_EQ_PRESETS: usize = 5;
+
+fn next_eq_preset_name(presets: &[crate::EqPresetDto]) -> Option<String> {
+    (1..=MAX_EQ_PRESETS)
+        .map(|number| format!("Custom {number}"))
+        .find(|name| !presets.iter().any(|preset| preset.name == *name))
+}
+
+fn unique_eq_preset_name(preferred: &str, presets: &[crate::EqPresetDto]) -> Option<String> {
+    if !presets.iter().any(|preset| preset.name == preferred) {
+        return Some(preferred.to_string());
+    }
+    next_eq_preset_name(presets)
+}
+
 fn eq_graph(
     root: &RootView,
     view: &Entity<RootView>,
@@ -769,7 +809,12 @@ fn eq_graph(
         .map(|dev| dev.model.clone())
         .unwrap_or_default();
     let presets = root.eq_presets.clone();
-    let active_preset_id = root.eq_active_preset;
+    let can_add = presets.len() < MAX_EQ_PRESETS;
+    let can_delete = presets.len() > 1;
+    let active_preset_id = root
+        .eq_active_preset
+        .filter(|id| presets.iter().any(|preset| preset.id == *id))
+        .or_else(|| presets.first().map(|preset| preset.id));
     let drag_band = root.eq_drag_band;
 
     div()
@@ -794,32 +839,148 @@ fn eq_graph(
                 )
                 .child(
                     div()
-                        .id("eq-reset")
-                        .px_2()
-                        .py_1()
-                        .rounded_md()
-                        .text_size(px(11.))
-                        .text_color(theme::brand())
-                        .hover(|st| st.bg(theme::hover_subtle()))
-                        .cursor_pointer()
-                        .on_click({
-                            let view = view.clone();
-                            let mac = mac.clone();
-                            let count = draft.len();
-                            let reset = reset_value.to_string();
-                            move |_, _, cx| {
-                                view.update(cx, |root, cx| {
-                                    root.eq_draft = vec![reset_value; count];
-                                    root.eq_active_preset = None;
-                                    if !mac.is_empty() {
-                                        let raw = vec![reset.as_str(); count].join(",");
-                                        root.send_setting(&mac, "volumeAdjustments", &raw);
+                        .flex()
+                        .items_center()
+                        .gap_3()
+                        .child(
+                            div()
+                                .id("eq-import")
+                                .px_2()
+                                .py_1()
+                                .rounded_md()
+                                .text_size(px(11.))
+                                .text_color(theme::foreground())
+                                .hover(|st| st.bg(theme::hover_subtle()))
+                                .cursor_pointer()
+                                .on_click({
+                                    let view = view.clone();
+                                    let mac = mac.clone();
+                                    let model = model.clone();
+                                    move |_, _, cx| {
+                                        let Some(text) =
+                                            cx.read_from_clipboard().and_then(|item| item.text())
+                                        else {
+                                            return;
+                                        };
+                                        if text.trim().is_empty() {
+                                            return;
+                                        }
+                                        view.update(cx, |root, cx| {
+                                            root.send_setting(
+                                                &mac,
+                                                "importCustomEqualizerProfiles",
+                                                &text,
+                                            );
+                                            if let Ok(entries) =
+                                                serde_json::from_str::<Vec<serde_json::Value>>(
+                                                    &text,
+                                                )
+                                            {
+                                                let scale = 10f64.powi(digits);
+                                                for entry in entries {
+                                                    if root.eq_presets.len() >= MAX_EQ_PRESETS {
+                                                        break;
+                                                    }
+                                                    let preferred = entry
+                                                        .get("name")
+                                                        .and_then(|value| value.as_str())
+                                                        .unwrap_or("Imported")
+                                                        .to_string();
+                                                    let Some(name) = unique_eq_preset_name(
+                                                        &preferred,
+                                                        &root.eq_presets,
+                                                    ) else {
+                                                        break;
+                                                    };
+                                                    let adjustments: Vec<i16> = entry
+                                                        .get("volumeAdjustments")
+                                                        .and_then(|value| value.as_array())
+                                                        .map(|values| {
+                                                            values
+                                                                .iter()
+                                                                .filter_map(|value| value.as_f64())
+                                                                .map(|value| {
+                                                                    (value * scale).round() as i16
+                                                                })
+                                                                .collect()
+                                                        })
+                                                        .unwrap_or_default();
+                                                    if adjustments.is_empty() {
+                                                        continue;
+                                                    }
+                                                    let bands = adjustments
+                                                        .iter()
+                                                        .map(|value| value.to_string())
+                                                        .collect::<Vec<_>>()
+                                                        .join(",");
+                                                    if let Ok(preset) = crate::save_eq_preset(
+                                                        crate::state(),
+                                                        name,
+                                                        bands,
+                                                        model.clone(),
+                                                    ) {
+                                                        root.eq_presets.push(preset);
+                                                    }
+                                                }
+                                            }
+                                            cx.notify();
+                                        });
                                     }
-                                    cx.notify();
-                                });
-                            }
-                        })
-                        .child("Reset"),
+                                })
+                                .child("Import"),
+                        )
+                        .child(
+                            div()
+                                .id("eq-export")
+                                .px_2()
+                                .py_1()
+                                .rounded_md()
+                                .text_size(px(11.))
+                                .text_color(theme::foreground())
+                                .hover(|st| st.bg(theme::hover_subtle()))
+                                .cursor_pointer()
+                                .on_click({
+                                    let view = view.clone();
+                                    move |_, _, cx| {
+                                        view.update(cx, |root, cx| {
+                                            let json = eq_export_json(&root.eq_presets, digits);
+                                            cx.write_to_clipboard(gpui::ClipboardItem::new_string(
+                                                json,
+                                            ));
+                                        });
+                                    }
+                                })
+                                .child("Export"),
+                        )
+                        .child(
+                            div()
+                                .id("eq-reset")
+                                .px_2()
+                                .py_1()
+                                .rounded_md()
+                                .text_size(px(11.))
+                                .text_color(theme::error())
+                                .hover(|st| st.bg(theme::hover_subtle()))
+                                .cursor_pointer()
+                                .on_click({
+                                    let view = view.clone();
+                                    let mac = mac.clone();
+                                    let count = draft.len();
+                                    let reset = reset_value.to_string();
+                                    move |_, _, cx| {
+                                        view.update(cx, |root, cx| {
+                                            root.eq_draft = vec![reset_value; count];
+                                            root.eq_active_preset = None;
+                                            if !mac.is_empty() {
+                                                let raw = vec![reset.as_str(); count].join(",");
+                                                root.send_setting(&mac, "volumeAdjustments", &raw);
+                                            }
+                                            cx.notify();
+                                        });
+                                    }
+                                })
+                                .child("Reset"),
+                        ),
                 ),
         )
         .child(
@@ -835,7 +996,7 @@ fn eq_graph(
                         .justify_between()
                         .pr_1()
                         .text_size(px(9.))
-                        .text_color(theme::muted())
+                        .text_color(theme::foreground())
                         .children(levels.iter().map(|v| eq_db(*v, digits))),
                 )
                 .child(
@@ -972,7 +1133,7 @@ fn eq_graph(
                                         .right(px(0.))
                                         .top(px(EQ_GRAPH_H + 2.))
                                         .text_size(px(9.))
-                                        .text_color(theme::muted())
+                                        .text_color(theme::foreground())
                                         .text_center()
                                         .child(hz.get(i).copied().map(eq_hz).unwrap_or_default()),
                                 )
@@ -989,62 +1150,96 @@ fn eq_graph(
                 .items_center()
                 .gap_2()
                 .overflow_x_scroll()
-                .child(
-                    div()
-                        .id("eq-new-preset")
-                        .size(px(38.))
-                        .flex_shrink_0()
-                        .rounded_xl()
-                        .bg(theme::surface_elevated())
-                        .border_1()
-                        .border_color(theme::border_subtle())
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .text_size(px(18.))
-                        .text_color(theme::brand())
-                        .hover(|st| st.bg(theme::hover_subtle()))
-                        .cursor_pointer()
-                        .on_click({
-                            let view = view.clone();
-                            let bands = draft
-                                .iter()
-                                .map(|value| value.to_string())
-                                .collect::<Vec<_>>()
-                                .join(",");
-                            let model = model.clone();
-                            let name = format!("Custom {}", presets.len() + 1);
-                            move |_, _, cx| {
-                                view.update(cx, |root, cx| {
-                                    match crate::save_eq_preset(
-                                        crate::state(),
-                                        name.clone(),
-                                        bands.clone(),
-                                        model.clone(),
-                                    ) {
-                                        Ok(preset) => {
-                                            root.eq_active_preset = Some(preset.id);
-                                            root.eq_presets.push(preset);
+                .when(can_add, |el| {
+                    el.child(
+                        div()
+                            .id("eq-new-preset")
+                            .size(px(38.))
+                            .flex_shrink_0()
+                            .rounded_xl()
+                            .bg(theme::surface_elevated())
+                            .border_1()
+                            .border_color(theme::border_subtle())
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .text_size(px(18.))
+                            .text_color(theme::brand())
+                            .hover(|st| st.bg(theme::hover_subtle()))
+                            .cursor_pointer()
+                            .on_click({
+                                let view = view.clone();
+                                let bands = draft
+                                    .iter()
+                                    .map(|value| value.to_string())
+                                    .collect::<Vec<_>>()
+                                    .join(",");
+                                let model = model.clone();
+                                let name = next_eq_preset_name(&presets);
+                                move |_, _, cx| {
+                                    let Some(name) = name.clone() else {
+                                        return;
+                                    };
+                                    view.update(cx, |root, cx| {
+                                        if root.eq_presets.len() >= MAX_EQ_PRESETS {
+                                            return;
                                         }
-                                        Err(err) => tracing::warn!("save eq preset failed: {err}"),
-                                    }
-                                    cx.notify();
-                                });
-                            }
-                        })
-                        .child("+"),
-                )
+                                        root.eq_hover_preset = None;
+                                        match crate::save_eq_preset(
+                                            crate::state(),
+                                            name,
+                                            bands.clone(),
+                                            model.clone(),
+                                        ) {
+                                            Ok(preset) => {
+                                                root.eq_active_preset = Some(preset.id);
+                                                root.eq_presets.push(preset);
+                                            }
+                                            Err(err) => {
+                                                tracing::warn!("save eq preset failed: {err}")
+                                            }
+                                        }
+                                        cx.notify();
+                                    });
+                                }
+                            })
+                            .child("+"),
+                    )
+                })
                 .children(presets.iter().map(|preset| {
                     let view = view.clone();
+                    let remove_view = view.clone();
+                    let hover_view = view.clone();
+                    let exit_view = view.clone();
                     let mac = mac.clone();
                     let bands = preset.bands.clone();
                     let preset_id = preset.id;
+                    let remove_name = preset.name.clone();
+                    let preset_name = preset.name.clone();
                     let active = active_preset_id == Some(preset.id);
+                    let hovered = root.eq_hover_preset == Some(preset.id);
                     let spring_key = SharedString::from(format!("eq-preset-spring-{}", preset.id));
                     div()
                         .id(SharedString::from(format!("eq-preset-{}", preset.id)))
+                        .on_mouse_move(move |_, _, cx| {
+                            hover_view.update(cx, |root, cx| {
+                                if root.eq_hover_preset != Some(preset_id) {
+                                    root.eq_hover_preset = Some(preset_id);
+                                    cx.notify();
+                                }
+                            });
+                        })
+                        .on_mouse_exit(move |_, _, cx| {
+                            exit_view.update(cx, |root, cx| {
+                                if root.eq_hover_preset == Some(preset_id) {
+                                    root.eq_hover_preset = None;
+                                    cx.notify();
+                                }
+                            });
+                        })
+                        .relative()
                         .h(px(38.))
-                        .px_3()
+                        .w(px(104.))
                         .flex_shrink_0()
                         .rounded_xl()
                         .border_1()
@@ -1052,20 +1247,6 @@ fn eq_graph(
                         .items_center()
                         .text_size(px(12.))
                         .font_weight(gpui::FontWeight::MEDIUM)
-                        .cursor_pointer()
-                        .on_click(move |_, _, cx| {
-                            view.update(cx, |root, cx| {
-                                let next = parse_bands(&bands);
-                                if !next.is_empty() {
-                                    root.eq_draft = next;
-                                }
-                                root.eq_active_preset = Some(preset_id);
-                                if !mac.is_empty() {
-                                    root.send_setting(&mac, "volumeAdjustments", &bands);
-                                }
-                                cx.notify();
-                            });
-                        })
                         .with_spring(
                             spring_key,
                             SpringAnimation::new(CARD_SPRING).to(phase(active)),
@@ -1083,7 +1264,69 @@ fn eq_graph(
                                 }
                             },
                         )
-                        .child(preset.name.clone())
+                        .child(
+                            div()
+                                .id(SharedString::from(format!(
+                                    "eq-preset-select-{}",
+                                    preset.id
+                                )))
+                                .h_full()
+                                .flex_1()
+                                .min_w_0()
+                                .px_3()
+                                .pr(px(26.))
+                                .flex()
+                                .items_center()
+                                .text_ellipsis()
+                                .cursor_pointer()
+                                .on_click(move |_, _, cx| {
+                                    view.update(cx, |root, cx| {
+                                        let next = parse_bands(&bands);
+                                        if !next.is_empty() {
+                                            root.eq_draft = next;
+                                        }
+                                        root.eq_active_preset = Some(preset_id);
+                                        root.eq_hover_preset = None;
+                                        if !mac.is_empty() {
+                                            root.send_setting(&mac, "volumeAdjustments", &bands);
+                                        }
+                                        cx.notify();
+                                    });
+                                })
+                                .child(preset_name),
+                        )
+                        .when(can_delete, |el| {
+                            el.child(
+                                div()
+                                    .id(SharedString::from(format!(
+                                        "eq-preset-remove-{}",
+                                        preset.id
+                                    )))
+                                    .absolute()
+                                    .right(px(5.))
+                                    .top(px(9.))
+                                    .size(px(20.))
+                                    .rounded_md()
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .bg(theme::overlay_bg())
+                                    .opacity(if hovered { 1.0 } else { 0.0 })
+                                    .hover(|style| style.bg(theme::hover_medium()))
+                                    .cursor_pointer()
+                                    .on_click(move |_, _, cx| {
+                                        cx.stop_propagation();
+                                        let name = remove_name.clone();
+                                        remove_view.update(cx, |root, cx| {
+                                            root.eq_drag_band = None;
+                                            root.eq_hover_preset = None;
+                                            root.eq_delete_confirm = Some((preset_id, name));
+                                            cx.notify();
+                                        });
+                                    })
+                                    .child(close_icon(10., theme::brand_foreground())),
+                            )
+                        })
                 })),
         )
 }

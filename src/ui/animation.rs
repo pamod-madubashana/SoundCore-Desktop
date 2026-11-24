@@ -74,10 +74,11 @@ pub(crate) fn segment_text<E: IntoElement + Styled + 'static>(
 pub(crate) fn morphing_pill(
     active_index: usize,
     count: usize,
-    key: &'static str,
+    key: impl Into<SharedString>,
 ) -> impl IntoElement {
     const LEAD: SpringConfig = SpringConfig::new(320.0, 28.0, 1.0);
     const TRAIL: SpringConfig = SpringConfig::new(170.0, 22.0, 1.0);
+    let key = key.into();
     let target = active_index.min(count.saturating_sub(1)) as f32;
     let trailing_target = (count.saturating_sub(1)) as f32 - target;
     let lead_key = SharedString::from(format!("pill-lead-{key}"));

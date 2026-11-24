@@ -2,11 +2,13 @@ use std::collections::HashSet;
 
 use crate::ui::scale::px;
 use gpui::{
-    Context, Entity, IntoElement, ParentElement, SharedString, Styled, Window, div, prelude::*,
+    AnimationExt as _, Context, Entity, IntoElement, ParentElement, SharedString, SpringAnimation,
+    SpringConfig, Styled, Window, div, prelude::*,
 };
 use serde_json::Value;
 
-use super::common::chevron_left;
+use super::common::{chevron_down, chevron_left, chevron_up};
+use crate::ui::animation::toggle_switch;
 use crate::ui::{RootView, data, theme};
 
 const EXCLUDED_IDS: &[&str] = &[
@@ -14,12 +16,19 @@ const EXCLUDED_IDS: &[&str] = &[
     "transparencyMode",
     "noiseCancelingMode",
     "multiSceneNoiseCanceling",
+    "adaptiveNoiseCanceling",
+    "manualNoiseCanceling",
+    "windNoiseSuppression",
+    "windNoiseDetected",
+    "realTimeAdaptiveNoiseCanceling",
     "spatialAudio",
     "spatialAudioMode",
     "spatialAudioMusicMode",
     "volumeAdjustments",
     "presetEqualizerProfile",
     "customEqualizerProfile",
+    "exportCustomEqualizerProfiles",
+    "exportCustomEqualizerProfilesOutput",
     "batteryLevel",
     "batteryLevelLeft",
     "batteryLevelRight",
@@ -46,9 +55,10 @@ pub fn render(
         if category.id == "deviceInformation" {
             continue;
         }
-        let mut rows: Vec<gpui::Div> = Vec::new();
+        let mut rows: Vec<gpui::AnyElement> = Vec::new();
         for setting in &category.settings {
-            if let Some(row) = setting_row(&view, &mac, &setting.id, s, &quick) {
+            let open = root.device_dropdown.as_deref() == Some(setting.id.as_str());
+            if let Some(row) = setting_row(&view, &mac, &setting.id, s, &quick, root, open) {
                 rows.push(row);
             }
         }
@@ -142,6 +152,7 @@ fn back_button(view: &Entity<RootView>) -> gpui::Stateful<gpui::Div> {
         .on_click(move |_, _, cx| {
             view.update(cx, |root, cx| {
                 root.show_device_settings = false;
+                root.device_dropdown = None;
                 cx.notify();
             });
         })
@@ -154,9 +165,24 @@ fn setting_row(
     id: &str,
     s: &data::SettingsMap,
     quick: &HashSet<String>,
-) -> Option<gpui::Div> {
+    root: &RootView,
+    open: bool,
+) -> Option<gpui::AnyElement> {
     if EXCLUDED_IDS.contains(&id) || data::is_button_config(id) {
         return None;
+    }
+    if id == "dualConnectionsDevices" {
+        let polled = s
+            .get("dualConnections")
+            .and_then(|value| value.get("value"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let on = root
+            .toggle_local
+            .get("dualConnections")
+            .copied()
+            .unwrap_or(polled);
+        return Some(dual_connection_row(view, mac, "Dual Connections", on).into_any_element());
     }
     let value = s.get(id)?;
     let label = data::pretty_setting_id(id);
@@ -170,17 +196,19 @@ fn setting_row(
                 return None;
             }
             let on = value.get("value").and_then(Value::as_bool).unwrap_or(false);
-            Some(toggle_row(view, mac, id, &label, on))
+            Some(toggle_row(view, mac, id, &label, on).into_any_element())
         }
-        "i32Range" => Some(range_row(view, mac, id, &label, value)),
-        "select" | "optionalSelect" | "modifiableSelect" => {
-            select_row(view, mac, id, &label, s, ty == "optionalSelect")
+        "i32Range" => Some(range_row(view, mac, id, &label, value).into_any_element()),
+        "select" | "optionalSelect" | "modifiableSelect" => Some(
+            dropdown_row(view, mac, id, &label, s, open, ty == "optionalSelect").into_any_element(),
+        ),
+        "multiSelect" | "multiSelectWithRemove" => {
+            Some(multi_row(view, mac, id, &label, value, s).into_any_element())
         }
-        "multiSelect" | "multiSelectWithRemove" => Some(multi_row(view, mac, id, &label, value, s)),
-        "action" => Some(action_row(view, mac, id)),
-        "timeOfDay" => Some(time_row(view, mac, id, &label, value)),
-        "hueColorPicker" => Some(hue_row(view, mac, id, &label, value)),
-        "information" => Some(info_row(&label, value)),
+        "action" => Some(action_row(view, mac, id).into_any_element()),
+        "timeOfDay" => Some(time_row(view, mac, id, &label, value).into_any_element()),
+        "hueColorPicker" => Some(hue_row(view, mac, id, &label, value).into_any_element()),
+        "information" => Some(info_row(&label, value).into_any_element()),
         _ => None,
     }
 }
@@ -418,42 +446,206 @@ fn step_button(
         .child(glyph)
 }
 
-fn select_row(
+fn dropdown_row(
     view: &Entity<RootView>,
     mac: &str,
     id: &str,
     label: &str,
     s: &data::SettingsMap,
+    open: bool,
     optional: bool,
-) -> Option<gpui::Div> {
+) -> gpui::Stateful<gpui::Div> {
     let current = s
         .get(id)
-        .and_then(|v| v.get("value"))
+        .and_then(|value| value.get("value"))
         .and_then(Value::as_str)
         .unwrap_or_default()
         .to_string();
-    let mut pills: Vec<gpui::Stateful<gpui::Div>> = data::select_entries(s, id)
-        .into_iter()
-        .map(|(opt_id, opt_label)| {
-            let selected = opt_id == current;
-            pill(view, mac, id, &opt_id, opt_label, opt_id.clone(), selected)
+    let mut options = data::select_entries(s, id);
+    if optional && !options.iter().any(|(option_id, _)| option_id.is_empty()) {
+        options.push((String::new(), "None".into()));
+    }
+    let current_label = options
+        .iter()
+        .find(|(option_id, _)| option_id == &current)
+        .map(|(_, option_label)| option_label.clone())
+        .unwrap_or_else(|| {
+            if current.is_empty() {
+                "None".into()
+            } else {
+                current.clone()
+            }
+        });
+
+    let view_toggle = view.clone();
+    let id_toggle = id.to_string();
+    let row = div()
+        .id(SharedString::from(format!("ds-row-{id}")))
+        .w_full()
+        .flex()
+        .flex_col()
+        .rounded_xl()
+        .bg(theme::surface())
+        .border_1()
+        .border_color(theme::border_subtle())
+        .overflow_hidden()
+        .child(
+            div()
+                .id(SharedString::from(format!("ds-header-{id}")))
+                .w_full()
+                .flex()
+                .items_center()
+                .justify_between()
+                .gap(px(10.))
+                .px_3()
+                .py(px(11.))
+                .hover(|style| style.bg(theme::hover_subtle()))
+                .cursor_pointer()
+                .on_click(move |_, _, cx| {
+                    let view = view_toggle.clone();
+                    let id = id_toggle.clone();
+                    view.update(cx, move |root, cx| {
+                        root.device_dropdown =
+                            if root.device_dropdown.as_deref() == Some(id.as_str()) {
+                                None
+                            } else {
+                                Some(id.clone())
+                            };
+                        cx.notify();
+                    });
+                })
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .text_size(px(11.))
+                        .font_weight(gpui::FontWeight::MEDIUM)
+                        .text_color(theme::foreground())
+                        .child(label.to_string()),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap(px(6.))
+                        .child(
+                            div()
+                                .text_size(px(11.))
+                                .text_color(theme::muted())
+                                .child(current_label),
+                        )
+                        .child(if open {
+                            chevron_up(12., theme::muted()).into_any_element()
+                        } else {
+                            chevron_down(12., theme::muted()).into_any_element()
+                        }),
+                ),
+        );
+
+    let row_count = ((options.len() + 1) / 2).max(1) as f32;
+    let target = row_count * 32.0 + 12.0;
+    let drop_key = SharedString::from(format!("ds-drop-{id}"));
+    row.child(
+        div()
+            .w_full()
+            .overflow_hidden()
+            .child(
+                div()
+                    .w_full()
+                    .flex()
+                    .flex_wrap()
+                    .gap(px(6.))
+                    .border_t_1()
+                    .border_color(theme::border_subtle())
+                    .px_3()
+                    .py_2()
+                    .children(options.into_iter().map(|(option_id, option_label)| {
+                        dropdown_option(
+                            view,
+                            mac,
+                            id,
+                            &option_id,
+                            option_label,
+                            option_id == current,
+                        )
+                    })),
+            )
+            .with_spring(
+                drop_key,
+                SpringAnimation::new(SpringConfig::new(300.0, 28.0, 1.0)).to(if open {
+                    target
+                } else {
+                    0.0
+                }),
+                move |this, height| {
+                    let ratio = (height / target).clamp(0.0, 1.0);
+                    this.h(px(height)).opacity(ratio)
+                },
+            ),
+    )
+}
+
+fn dropdown_option(
+    view: &Entity<RootView>,
+    mac: &str,
+    id: &str,
+    option_id: &str,
+    label: String,
+    selected: bool,
+) -> gpui::Stateful<gpui::Div> {
+    let view = view.clone();
+    let mac = mac.to_string();
+    let setting_id = id.to_string();
+    let raw = option_id.to_string();
+    div()
+        .id(SharedString::from(format!("ds-option-{id}-{option_id}")))
+        .w(px(120.))
+        .px_3()
+        .py(px(7.))
+        .rounded_lg()
+        .text_size(px(11.))
+        .cursor_pointer()
+        .hover(|style| style.bg(theme::hover_subtle()))
+        .when(selected, |element| {
+            element.bg(theme::brand_10()).text_color(theme::brand())
         })
-        .collect();
-    if optional {
-        pills.push(pill(
-            view,
-            mac,
-            id,
-            "none",
-            "None".into(),
-            String::new(),
-            current.is_empty(),
-        ));
-    }
-    if pills.is_empty() {
-        return None;
-    }
-    Some(pills_row(label, pills))
+        .on_click(move |_, _, cx| {
+            let view = view.clone();
+            let mac = mac.clone();
+            let setting_id = setting_id.clone();
+            let raw = raw.clone();
+            view.update(cx, move |root, cx| {
+                root.send_setting(&mac, &setting_id, &raw);
+                root.device_dropdown = None;
+                cx.notify();
+            });
+        })
+        .child(label)
+}
+
+fn dual_connection_row(
+    view: &Entity<RootView>,
+    mac: &str,
+    label: &str,
+    on: bool,
+) -> gpui::Stateful<gpui::Div> {
+    let view = view.clone();
+    let mac = mac.to_string();
+    row_shell(label, toggle_switch(on, "ds-toggle-dual-connections"))
+        .id("ds-dual-connections-toggle")
+        .cursor_pointer()
+        .hover(|style| style.bg(theme::hover_subtle()))
+        .on_click(move |_, _, cx| {
+            let view = view.clone();
+            let mac = mac.clone();
+            view.update(cx, move |root, cx| {
+                let next = !on;
+                root.toggle_local
+                    .insert("dualConnections".to_string(), next);
+                root.send_setting(&mac, "dualConnections", if next { "true" } else { "false" });
+                cx.notify();
+            });
+        })
 }
 
 fn multi_row(
