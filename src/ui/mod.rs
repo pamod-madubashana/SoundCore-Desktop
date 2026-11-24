@@ -45,6 +45,7 @@ pub struct RootView {
     pub show_control_settings: bool,
     /// Setting id whose button-config dropdown is expanded.
     pub button_dropdown: Option<String>,
+    pub(crate) device_dropdown: Option<String>,
     /// App Settings screen (header gear button).
     pub show_settings: bool,
     /// About screen (header info button).
@@ -299,6 +300,7 @@ impl RootView {
             show_device_info: false,
             show_control_settings: false,
             button_dropdown: None,
+            device_dropdown: None,
             show_settings: false,
             show_about: false,
             show_protocol_lab: false,
