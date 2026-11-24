@@ -39,6 +39,12 @@ pub struct RootView {
     pub(crate) eq_presets: Vec<EqPresetDto>,
     pub show_sound_effects: bool,
     pub show_device_settings: bool,
+    /// Device Information screen (opened from the device image).
+    pub show_device_info: bool,
+    /// Control Settings screen (button actions / gestures).
+    pub show_control_settings: bool,
+    /// Setting id whose button-config dropdown is expanded.
+    pub button_dropdown: Option<String>,
     /// App Settings screen (header gear button).
     pub show_settings: bool,
     /// About screen (header info button).
@@ -289,6 +295,9 @@ impl RootView {
             eq_presets: Vec::new(),
             show_sound_effects: false,
             show_device_settings: false,
+            show_device_info: false,
+            show_control_settings: false,
+            button_dropdown: None,
             show_settings: false,
             show_about: false,
             show_protocol_lab: false,
@@ -809,6 +818,12 @@ impl RootView {
             "device-settings" => {
                 screens::device_settings::render(self, active?, window, cx).into_any_element()
             }
+            "device-info" => {
+                screens::device_info::render(self, active?, window, cx).into_any_element()
+            }
+            "control-settings" => {
+                screens::control_settings::render(self, active?, window, cx).into_any_element()
+            }
             "protocol-lab" => screens::protocol_lab::render(self, window, cx).into_any_element(),
             "settings" => screens::settings::render(self, window, cx).into_any_element(),
             "about" => screens::about::render(self, window, cx).into_any_element(),
@@ -820,7 +835,8 @@ impl RootView {
 /// Navigation hierarchy depth, used to decide push (deeper) vs pop (shallower).
 fn screen_depth(key: &str) -> u8 {
     match key {
-        "sound-effects" | "device-settings" | "settings" | "about" => 1,
+        "sound-effects" | "device-settings" | "control-settings" | "device-info" | "settings"
+        | "about" => 1,
         "protocol-lab" => 2,
         _ => 0,
     }
@@ -876,6 +892,21 @@ impl Render for RootView {
             && !show_about
             && !show_protocol_lab
             && !show_device;
+        let show_control = self.show_control_settings
+            && active.is_some()
+            && !show_settings
+            && !show_protocol_lab
+            && !show_about
+            && !show_device
+            && !show_se;
+        let show_info = self.show_device_info
+            && active.is_some()
+            && !show_settings
+            && !show_protocol_lab
+            && !show_about
+            && !show_device
+            && !show_se
+            && !show_control;
 
         let nav_key = if show_about {
             "about"
@@ -887,6 +918,10 @@ impl Render for RootView {
             "device-settings"
         } else if show_se {
             "sound-effects"
+        } else if show_control {
+            "control-settings"
+        } else if show_info {
+            "device-info"
         } else if active.is_some() {
             "control"
         } else if self.devices.is_empty() {

@@ -3,6 +3,8 @@
 pub mod about;
 pub mod common;
 pub mod control;
+pub mod control_settings;
+pub mod device_info;
 pub mod device_settings;
 pub mod devices;
 pub mod protocol_lab;

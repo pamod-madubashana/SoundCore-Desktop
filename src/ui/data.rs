@@ -519,6 +519,33 @@ pub fn quick_toggles(s: &SettingsMap) -> Vec<(String, bool)> {
     toggles
 }
 
+/// Button action / gesture setting ids, shown on the Control Settings screen.
+pub fn is_button_config(id: &str) -> bool {
+    const IDS: &[&str] = &[
+        "singlePress",
+        "doublePress",
+        "mfbLongPress",
+        "leftSinglePress",
+        "leftDoublePress",
+        "leftTriplePress",
+        "leftLongPress",
+        "leftSlideUp",
+        "leftSlideDown",
+        "rightSinglePress",
+        "rightDoublePress",
+        "rightTriplePress",
+        "rightLongPress",
+        "rightSlideUp",
+        "rightSlideDown",
+        "leftDoublePressDuringCall",
+        "rightDoublePressDuringCall",
+        "leftLongPressDuringCall",
+        "rightLongPressDuringCall",
+        "resetButtonsToDefault",
+    ];
+    IDS.contains(&id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
