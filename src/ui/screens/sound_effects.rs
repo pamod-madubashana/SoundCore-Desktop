@@ -27,7 +27,7 @@ pub fn render(
     cx: &mut Context<RootView>,
 ) -> gpui::Div {
     let view = cx.entity();
-    let s = data::settings_map(d);
+    let s = root.cached_settings(&d.mac_address);
 
     let active = root.se_active();
     let show_spatial = data::has_spatial(&s);
@@ -465,7 +465,11 @@ fn default_card(
                             view.update(cx, |root, _cx| {
                                 if root
                                     .active_device()
-                                    .map(|d| data::device_preset_id(&data::settings_map(d)))
+                                    .map(|d| {
+                                        data::device_preset_id(
+                                            &root.cached_settings(&d.mac_address),
+                                        )
+                                    })
                                     .flatten()
                                     .as_deref()
                                     != Some(id.as_str())

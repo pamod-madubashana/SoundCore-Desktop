@@ -231,25 +231,16 @@ pub fn render(
                                         .flex()
                                         .items_center()
                                         .justify_center()
-                                        .child(gear_icon(16., theme::brand())),
+                                        .child(info_icon(16., theme::brand())),
                                 )
                                 .child(
-                                    div()
-                                        .flex()
-                                        .flex_col()
-                                        .child(
-                                            div()
-                                                .text_size(px(14.))
-                                                .font_weight(gpui::FontWeight::BOLD)
-                                                .text_color(theme::foreground())
-                                                .child("Other settings"),
-                                        )
-                                        .child(
-                                            div()
-                                                .text_size(px(12.))
-                                                .text_color(theme::muted())
-                                                .child("All settings reported by this device"),
-                                        ),
+                                    div().flex().flex_col().child(
+                                        div()
+                                            .text_size(px(14.))
+                                            .font_weight(gpui::FontWeight::BOLD)
+                                            .text_color(theme::foreground())
+                                            .child("Other settings"),
+                                    ),
                                 ),
                         )
                         .child(chevron_right(16., theme::muted())),
@@ -288,7 +279,6 @@ fn header(
     root: &RootView,
 ) -> impl IntoElement {
     let image = root.load_device_image(d);
-    let connected = d.connected;
 
     let art = if let Some(img) = image {
         div()
@@ -385,8 +375,7 @@ fn header(
                                         .text_ellipsis()
                                         .whitespace_nowrap()
                                         .child(name.to_string()),
-                                )
-                                .child(status_dot(connected)),
+                                ),
                         )
                         .child(
                             div()
@@ -489,28 +478,6 @@ fn header(
                     el.child(update_block(update_progress, update_error))
                 })
         })
-}
-
-fn status_dot(connected: bool) -> impl IntoElement {
-    let color = if connected {
-        theme::success()
-    } else {
-        theme::toggle_off()
-    };
-    div()
-        .relative()
-        .size(px(8.))
-        .child(
-            div()
-                .absolute()
-                .left(px(-3.))
-                .top(px(-3.))
-                .size(px(14.))
-                .rounded_full()
-                .bg(theme::success_25())
-                .when(!connected, |el| el.opacity(0.0)),
-        )
-        .child(div().absolute().size(px(8.)).rounded_full().bg(color))
 }
 
 fn battery_pill(pct: i32, label: Option<&str>) -> impl IntoElement {

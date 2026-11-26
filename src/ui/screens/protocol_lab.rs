@@ -4,7 +4,7 @@ use gpui::{
     SpringAnimation, SpringConfig, Styled, Window, div, prelude::*,
 };
 use soundcore_protocol::analysis::{
-    CapturedFrameDto, ReportShare, SHARE_URL_MAX, analyze, build_share_bundle,
+    CapturedFrameDto, ReportShare, SHARE_URL_MAX, build_share_bundle,
 };
 
 use super::common::chevron_left;
@@ -46,7 +46,15 @@ pub fn render(
 
     let analysis = selected_frame
         .as_ref()
-        .and_then(|frame| analyze(&frame.hex, &report_model));
+        .and_then(|frame| root.frame_analysis(&frame.hex, &report_model));
+    let frame_tags: Vec<String> = frames
+        .iter()
+        .map(|frame| {
+            root.frame_analysis(&frame.hex, &report_model)
+                .map(|decoded| format!("{:02x}.{:02x}", decoded.group, decoded.command))
+                .unwrap_or_else(|| "--".to_string())
+        })
+        .collect();
 
     let mut device_rows: Vec<gpui::Stateful<gpui::Div>> = Vec::new();
     let connected: Vec<_> = root.devices.iter().filter(|d| d.connected).collect();
@@ -214,9 +222,7 @@ pub fn render(
             .iter()
             .enumerate()
             .map(|(i, frame)| {
-                let tag = analyze(&frame.hex, &report_model)
-                    .map(|decoded| format!("{:02x}.{:02x}", decoded.group, decoded.command))
-                    .unwrap_or_else(|| "--".to_string());
+                let tag = frame_tags[i].clone();
                 let is_selected = root.protocol_selected == Some(i);
                 let preview = if frame.hex.len() > 32 {
                     format!("{}…", &frame.hex[..32])

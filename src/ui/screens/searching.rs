@@ -11,7 +11,7 @@ pub fn render(
     _window: &mut Window,
     cx: &mut Context<RootView>,
 ) -> impl IntoElement {
-    let tick = root.spinner_tick;
+    let _ = root;
     let view = cx.entity();
 
     div()
@@ -22,7 +22,7 @@ pub fn render(
         .justify_center()
         .gap_3()
         .text_color(theme::muted())
-        .child(spinner(tick, theme::brand()))
+        .child(spinner(theme::brand()))
         .child(
             div()
                 .text_size(px(13.))

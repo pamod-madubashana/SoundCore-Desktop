@@ -1,8 +1,8 @@
 //! Shared chrome helpers — text/glyph icons (GPUI divs cannot rotate).
 
 use crate::ui::scale::px;
-use gpui::{Hsla, IntoElement, ParentElement, Styled, div};
-use std::sync::OnceLock;
+use gpui::{Animation, AnimationExt as _, Hsla, IntoElement, ParentElement, Styled, div};
+use std::{sync::OnceLock, time::Duration};
 
 /// Soundcore brand glyph (Lanczos-upscaled tray icon, smooth at display size).
 pub(crate) fn soundcore_glyph(size: f32) -> impl IntoElement {
@@ -123,30 +123,36 @@ pub(crate) fn sliders_icon(size: f32, color: Hsla) -> impl IntoElement {
         .child("≡")
 }
 
-/// 12-dot spinner; `tick` selects which dots are bright.
-pub(crate) fn spinner(tick: u8, color: Hsla) -> impl IntoElement {
-    let frame = tick % 12;
-    div().relative().size(px(28.)).children((0..12u8).map(|i| {
-        let angle = i as f32 * 30.0_f32;
-        let dist = 11.0_f32;
-        let rad = angle.to_radians();
-        let x = 14.0 + dist * rad.cos() - 3.0;
-        let y = 14.0 + dist * rad.sin() - 3.0;
-        let age = (frame + 12 - i) % 12;
-        let opacity = if age == 0 {
-            1.0
-        } else {
-            (1.0 - age as f32 / 12.0).max(0.15)
-        };
-        div()
-            .absolute()
-            .left(px(x))
-            .top(px(y))
-            .size(px(6.))
-            .rounded_full()
-            .bg(color)
-            .opacity(opacity)
-    }))
+/// 12-dot spinner driven by GPUI's frame scheduler, not `cx.notify()` timers.
+pub(crate) fn spinner(color: Hsla) -> impl IntoElement {
+    div().relative().size(px(28.)).with_animation(
+        "search-spinner",
+        Animation::new(Duration::from_millis(900)).repeat_synced(),
+        move |this, phase| {
+            let frame = (phase * 12.0) as u8 % 12;
+            this.children((0..12u8).map(|i| {
+                let angle = i as f32 * 30.0_f32;
+                let dist = 11.0_f32;
+                let rad = angle.to_radians();
+                let x = 14.0 + dist * rad.cos() - 3.0;
+                let y = 14.0 + dist * rad.sin() - 3.0;
+                let age = (frame + 12 - i) % 12;
+                let opacity = if age == 0 {
+                    1.0
+                } else {
+                    (1.0_f32 - age as f32 / 12.0).max(0.15_f32)
+                };
+                div()
+                    .absolute()
+                    .left(px(x))
+                    .top(px(y))
+                    .size(px(6.))
+                    .rounded_full()
+                    .bg(color)
+                    .opacity(opacity)
+            }))
+        },
+    )
 }
 
 /// Gear glyph (Settings nav). VS15 keeps U+2699 monochrome, not emoji.
