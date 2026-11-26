@@ -68,7 +68,7 @@ pub struct RootView {
     pub(crate) ambient_local_at: Option<std::time::Instant>,
     pub(crate) sub_local: Option<(String, String, String)>,
     pub(crate) sub_local_at: Option<std::time::Instant>,
-    pub(crate) toggle_local: HashMap<String, bool>,
+    pub(crate) toggle_local: HashMap<String, (bool, std::time::Instant)>,
     /// SE section pending override: (section, Instant), 2000ms grace.
     pub(crate) se_local: Option<(String, std::time::Instant)>,
     /// Spatial mode optimistic: (mac, mode, Instant), 500ms grace.
@@ -703,9 +703,29 @@ impl RootView {
             .unwrap_or_default()
     }
 
-    /// Effective toggle value (optimistic override wins for 500ms).
+    /// Effective toggle value while a device confirmation is pending.
     pub fn effective_toggle(&self, id: &str, polled: bool) -> bool {
-        self.toggle_local.get(id).copied().unwrap_or(polled)
+        self.toggle_local
+            .get(id)
+            .map(|(value, _)| *value)
+            .unwrap_or(polled)
+    }
+
+    pub(crate) fn begin_toggle_override(&mut self, id: impl Into<String>, value: bool) {
+        self.toggle_local
+            .insert(id.into(), (value, std::time::Instant::now()));
+    }
+
+    pub(crate) fn settle_toggle_overrides(&mut self, mac: &str) {
+        let settings = self.settings_for(mac);
+        self.toggle_local.retain(|id, (expected, started)| {
+            let polled = settings
+                .get(id)
+                .and_then(|value| value.get("value"))
+                .and_then(|value| value.as_bool())
+                .unwrap_or(!*expected);
+            polled != *expected && started.elapsed() < Duration::from_secs(5)
+        });
     }
 
     pub fn dismiss_update(&mut self, cx: &mut Context<Self>) {
@@ -990,6 +1010,9 @@ impl Render for RootView {
                 )
             });
         let active = connected_device.filter(|d| !d.categories.is_empty());
+        if let Some(device) = active.as_ref() {
+            self.settle_toggle_overrides(&device.mac_address);
+        }
         // Render-time exclusivity: About > Settings > Protocol Lab > Device Settings > Sound Effects.
         let show_about = self.show_about;
         if self.show_settings && !show_about {

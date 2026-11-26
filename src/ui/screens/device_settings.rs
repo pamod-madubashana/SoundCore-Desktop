@@ -177,11 +177,7 @@ fn setting_row(
             .and_then(|value| value.get("value"))
             .and_then(Value::as_bool)
             .unwrap_or(false);
-        let on = root
-            .toggle_local
-            .get("dualConnections")
-            .copied()
-            .unwrap_or(polled);
+        let on = root.effective_toggle("dualConnections", polled);
         return Some(dual_connection_row(view, mac, "Dual Connections", on).into_any_element());
     }
     let value = s.get(id)?;
@@ -639,9 +635,8 @@ fn dual_connection_row(
             let view = view.clone();
             let mac = mac.clone();
             view.update(cx, move |root, cx| {
-                let next = !on;
-                root.toggle_local
-                    .insert("dualConnections".to_string(), next);
+                let next = !root.effective_toggle("dualConnections", on);
+                root.begin_toggle_override("dualConnections", next);
                 root.send_setting(&mac, "dualConnections", if next { "true" } else { "false" });
                 cx.notify();
             });

@@ -28,7 +28,6 @@ pub fn render(
     let update_info = root.update_info.clone();
     let update_progress = root.update_progress.clone();
     let update_error = root.update_error.clone();
-    let version = root.version.clone();
 
     div()
         .size_full()
@@ -258,18 +257,20 @@ pub fn render(
                         .id("quick-toggles")
                         .flex_1()
                         .min_h_0()
+                        .rounded(px(crate::platform::shell::CORNER_RADIUS))
+                        .bg(theme::surface())
+                        .border_1()
+                        .border_color(theme::border_subtle())
                         .overflow_hidden()
-                        .child(quick_toggles(&view, &s, d, root)),
+                        .child(
+                            div()
+                                .id("quick-toggles-scroll")
+                                .h_full()
+                                .overflow_y_scroll()
+                                .restrict_scroll_to_axis()
+                                .child(quick_toggles(&view, &s, d, root)),
+                        ),
                 ),
-        )
-        .child(
-            div()
-                .pl(px(30.))
-                .pr_4()
-                .py_2()
-                .text_size(px(10.))
-                .text_color(theme::muted_dim())
-                .child(format!("v{version}")),
         )
 }
 
@@ -1085,61 +1086,53 @@ fn quick_toggles(
         return div();
     }
     let mac = d.mac_address.clone();
-    let optimistic = root.toggle_local.clone();
-    div()
-        .rounded_xl()
-        .bg(theme::surface())
-        .border_1()
-        .border_color(theme::border_subtle())
-        .children(toggles.into_iter().enumerate().map(|(i, (id, polled))| {
-            let on = optimistic.get(&id).copied().unwrap_or(polled);
-            let view = view.clone();
-            let mac = mac.clone();
-            let id2 = id.clone();
-            div()
-                .id(gpui::SharedString::from(format!("toggle-{id}")))
-                .w_full()
-                .flex()
-                .items_center()
-                .gap_3()
-                .px_3()
-                .py(px(9.))
-                .hover(|st| st.bg(theme::hover_subtle()))
-                .when(i > 0, |el| {
-                    el.border_t_1().border_color(theme::border_subtle())
-                })
-                .cursor_pointer()
-                .on_click(move |_, _window, cx| {
-                    let view = view.clone();
-                    let mac = mac.clone();
-                    let id = id2.clone();
-                    let next = !on;
-                    view.update(cx, |root, cx| {
-                        root.toggle_local.insert(id.clone(), next);
-                        root.send_setting(&mac, &id, if next { "true" } else { "false" });
-                        cx.spawn(async move |this, cx| {
-                            cx.background_executor()
-                                .timer(std::time::Duration::from_millis(500))
-                                .await;
-                            this.update(&mut *cx, |view, cx| {
-                                view.toggle_local.remove(&id);
-                                cx.notify();
-                            })
-                            .ok();
-                        })
-                        .detach();
-                        cx.notify();
-                    });
-                })
-                .child(
+    div().children(toggles.into_iter().enumerate().map(|(i, (id, polled))| {
+        let on = root.effective_toggle(&id, polled);
+        let view = view.clone();
+        let mac = mac.clone();
+        let id2 = id.clone();
+        div()
+            .id(gpui::SharedString::from(format!("toggle-{id}")))
+            .relative()
+            .w_full()
+            .flex()
+            .items_center()
+            .gap_3()
+            .px_3()
+            .py(px(9.))
+            .hover(|st| st.bg(theme::hover_subtle()))
+            .when(i > 0, |el| {
+                el.child(
                     div()
-                        .flex_1()
-                        .min_w_0()
-                        .text_size(px(13.))
-                        .font_weight(gpui::FontWeight::MEDIUM)
-                        .text_color(theme::foreground())
-                        .child(data::pretty_setting_id(&id)),
+                        .absolute()
+                        .left(px(12.))
+                        .right(px(12.))
+                        .top(px(0.))
+                        .h(px(1.))
+                        .bg(theme::border_subtle()),
                 )
-                .child(toggle_switch(on, format!("quick-{id}")))
-        }))
+            })
+            .cursor_pointer()
+            .on_click(move |_, _window, cx| {
+                let view = view.clone();
+                let mac = mac.clone();
+                let id = id2.clone();
+                view.update(cx, |root, cx| {
+                    let next = !root.effective_toggle(&id, polled);
+                    root.begin_toggle_override(id.clone(), next);
+                    root.send_setting(&mac, &id, if next { "true" } else { "false" });
+                    cx.notify();
+                });
+            })
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .text_size(px(13.))
+                    .font_weight(gpui::FontWeight::MEDIUM)
+                    .text_color(theme::foreground())
+                    .child(data::pretty_setting_id(&id)),
+            )
+            .child(toggle_switch(on, format!("quick-{id}")))
+    }))
 }
