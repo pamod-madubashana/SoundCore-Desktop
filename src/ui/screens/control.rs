@@ -475,17 +475,6 @@ fn header(
                                 }),
                         ),
                 )
-                .child(
-                    div()
-                        .text_size(px(10.5))
-                        .mt(px(2.))
-                        .text_color(theme::muted())
-                        .child(if connected {
-                            "Connected · Soundcore"
-                        } else {
-                            "Disconnected · Soundcore"
-                        }),
-                )
                 .when(!batteries.is_empty(), |el| {
                     // One row (target): L | R | Case — hug content, no wrap.
                     el.child(div().mt(px(8.)).flex().items_center().gap_1().children(
@@ -533,8 +522,8 @@ fn battery_pill(pct: i32, label: Option<&str>) -> impl IntoElement {
     };
     let is_case = label == Some("Case");
     div()
-        .h(px(18.))
-        .px_1()
+        .h(px(20.))
+        .px(px(6.))
         .rounded_full()
         .bg(theme::surface())
         .border_1()
@@ -545,7 +534,7 @@ fn battery_pill(pct: i32, label: Option<&str>) -> impl IntoElement {
         // Fixed label slot so bar + % align across pills.
         .child(
             div()
-                .w(if is_case { px(11.) } else { px(7.) })
+                .w(if is_case { px(12.) } else { px(8.) })
                 .flex_shrink_0()
                 .flex()
                 .items_center()
@@ -553,7 +542,7 @@ fn battery_pill(pct: i32, label: Option<&str>) -> impl IntoElement {
                 .when(!is_case, |el| {
                     el.children(label.map(|l| {
                         div()
-                            .text_size(px(9.5))
+                            .text_size(px(10.))
                             .font_weight(gpui::FontWeight::BOLD)
                             .text_color(theme::brand_secondary())
                             .child(l.to_string())
@@ -586,8 +575,8 @@ fn battery_pill(pct: i32, label: Option<&str>) -> impl IntoElement {
         )
         .child(
             div()
-                .w(px(16.))
-                .h(px(8.))
+                .w(px(18.))
+                .h(px(9.))
                 .rounded(px(2.))
                 .bg(theme::toggle_off())
                 .overflow_hidden()
@@ -602,7 +591,7 @@ fn battery_pill(pct: i32, label: Option<&str>) -> impl IntoElement {
         )
         .child(
             div()
-                .text_size(px(10.))
+                .text_size(px(10.5))
                 .font_weight(gpui::FontWeight::SEMIBOLD)
                 .text_color(theme::foreground())
                 .child(format!("{pct}%")),
