@@ -12,6 +12,8 @@ use super::common::{
 use crate::ui::animation::{morphing_pill, segment_text, toggle_switch};
 use crate::ui::{RootView, data, theme};
 
+const SOUND_MODE_SPRING: SpringConfig = SpringConfig::new(280.0, 28.0, 1.0);
+
 pub fn render(
     root: &mut RootView,
     d: &crate::DeviceStateDto,
@@ -131,67 +133,6 @@ pub fn render(
                 )
                 .child(
                     div()
-                        .id("device-settings-row")
-                        .w_full()
-                        .rounded_2xl()
-                        .bg(theme::surface())
-                        .border_1()
-                        .border_color(theme::border_subtle())
-                        .px_3()
-                        .py(px(10.))
-                        .flex()
-                        .items_center()
-                        .justify_between()
-                        .hover(|st| st.bg(theme::hover_subtle()))
-                        .cursor_pointer()
-                        .on_click({
-                            let view = view.clone();
-                            move |_, _window, cx| {
-                                view.update(cx, |root, cx| {
-                                    root.show_device_settings = true;
-                                    root.show_sound_effects = false;
-                                    cx.notify();
-                                });
-                            }
-                        })
-                        .child(
-                            div()
-                                .flex()
-                                .items_center()
-                                .gap(px(10.))
-                                .child(
-                                    div()
-                                        .size(px(32.))
-                                        .rounded_xl()
-                                        .bg(theme::brand_10())
-                                        .flex()
-                                        .items_center()
-                                        .justify_center()
-                                        .child(gear_icon(16., theme::brand())),
-                                )
-                                .child(
-                                    div()
-                                        .flex()
-                                        .flex_col()
-                                        .child(
-                                            div()
-                                                .text_size(px(14.))
-                                                .font_weight(gpui::FontWeight::BOLD)
-                                                .text_color(theme::foreground())
-                                                .child("Device Settings"),
-                                        )
-                                        .child(
-                                            div()
-                                                .text_size(px(12.))
-                                                .text_color(theme::muted())
-                                                .child("All settings reported by this device"),
-                                        ),
-                                ),
-                        )
-                        .child(chevron_right(16., theme::muted())),
-                )
-                .child(
-                    div()
                         .id("control-settings-row")
                         .w_full()
                         .rounded_2xl()
@@ -247,6 +188,67 @@ pub fn render(
                                                 .text_size(px(12.))
                                                 .text_color(theme::muted())
                                                 .child("Button actions and gestures"),
+                                        ),
+                                ),
+                        )
+                        .child(chevron_right(16., theme::muted())),
+                )
+                .child(
+                    div()
+                        .id("other-settings-row")
+                        .w_full()
+                        .rounded_2xl()
+                        .bg(theme::surface())
+                        .border_1()
+                        .border_color(theme::border_subtle())
+                        .px_3()
+                        .py(px(10.))
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .hover(|st| st.bg(theme::hover_subtle()))
+                        .cursor_pointer()
+                        .on_click({
+                            let view = view.clone();
+                            move |_, _window, cx| {
+                                view.update(cx, |root, cx| {
+                                    root.show_device_settings = true;
+                                    root.show_sound_effects = false;
+                                    cx.notify();
+                                });
+                            }
+                        })
+                        .child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap(px(10.))
+                                .child(
+                                    div()
+                                        .size(px(32.))
+                                        .rounded_xl()
+                                        .bg(theme::brand_10())
+                                        .flex()
+                                        .items_center()
+                                        .justify_center()
+                                        .child(gear_icon(16., theme::brand())),
+                                )
+                                .child(
+                                    div()
+                                        .flex()
+                                        .flex_col()
+                                        .child(
+                                            div()
+                                                .text_size(px(14.))
+                                                .font_weight(gpui::FontWeight::BOLD)
+                                                .text_color(theme::foreground())
+                                                .child("Other settings"),
+                                        )
+                                        .child(
+                                            div()
+                                                .text_size(px(12.))
+                                                .text_color(theme::muted())
+                                                .child("All settings reported by this device"),
                                         ),
                                 ),
                         )
@@ -852,7 +854,10 @@ fn sound_mode(
     let anc_count = modes.len();
     let anc_active_index = modes.iter().position(|(id, _)| id == &active).unwrap_or(0);
 
-    let mut row = div()
+    let mut details: Vec<gpui::AnyElement> = Vec::new();
+    let mut details_height = 0.0;
+
+    let row = div()
         .rounded_2xl()
         .bg(gpui::rgba(0xffffff0f))
         .border_1()
@@ -860,7 +865,6 @@ fn sound_mode(
         .p(px(10.))
         .flex()
         .flex_col()
-        .gap_2()
         .child(
             // ANC track — black 28%, compact height like the target.
             div()
@@ -917,7 +921,9 @@ fn sound_mode(
     if mode_is(&active, "Transparency")
         && let Some(entries) = has_transparency
     {
-        row = row.child(sub_row(entries, s, "transparencyMode", view, d, root, None));
+        details
+            .push(sub_row(entries, s, "transparencyMode", view, d, root, None).into_any_element());
+        details_height += 36.0;
     }
     if mode_is(&active, "NoiseCanceling") {
         let nc = s
@@ -939,35 +945,58 @@ fn sound_mode(
             None
         };
         if let Some(entries) = has_nc {
-            row = row.child(sub_row(
-                entries,
-                s,
-                "noiseCancelingMode",
-                view,
-                d,
-                root,
-                level_label,
-            ));
+            details.push(
+                sub_row(entries, s, "noiseCancelingMode", view, d, root, level_label)
+                    .into_any_element(),
+            );
+            details_height += 36.0;
         }
         if nc_eff.eq_ignore_ascii_case("Manual") {
             if let Some(bar) = anc_level_bar(view, &d.mac_address, s, root) {
-                row = row.child(bar);
+                details.push(bar.into_any_element());
+                details_height += 26.0;
             }
         } else if nc_eff.eq_ignore_ascii_case("MultiScene")
             && let Some(scene) = select_sub(s, "multiSceneNoiseCanceling")
         {
-            row = row.child(sub_row(
-                scene,
-                s,
-                "multiSceneNoiseCanceling",
-                view,
-                d,
-                root,
-                None,
-            ));
+            details.push(
+                sub_row(scene, s, "multiSceneNoiseCanceling", view, d, root, None)
+                    .into_any_element(),
+            );
+            details_height += 36.0;
         }
     }
-    row
+
+    if !details.is_empty() {
+        details_height += 8.0 + 8.0 * (details.len() - 1) as f32;
+    }
+    let details_key = gpui::SharedString::from(format!("sound-mode-details-{mac}"));
+    row.child(
+        div()
+            .w_full()
+            .overflow_hidden()
+            .with_spring(
+                details_key,
+                SpringAnimation::new(SOUND_MODE_SPRING).to(details_height),
+                move |this, h| {
+                    let ratio = if details_height > 0.0 {
+                        (h / details_height).clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
+                    this.h(px(h)).opacity(ratio)
+                },
+            )
+            .child(
+                div()
+                    .w_full()
+                    .flex()
+                    .flex_col()
+                    .gap_2()
+                    .pt_2()
+                    .children(details),
+            ),
+    )
 }
 
 fn select_sub(s: &data::SettingsMap, id: &str) -> Option<Vec<(String, String)>> {
@@ -1075,53 +1104,59 @@ fn quick_toggles(
         return div();
     }
     let mac = d.mac_address.clone();
-    div().children(toggles.into_iter().enumerate().map(|(i, (id, polled))| {
-        let on = root.effective_toggle(&id, polled);
-        let view = view.clone();
-        let mac = mac.clone();
-        let id2 = id.clone();
-        div()
-            .id(gpui::SharedString::from(format!("toggle-{id}")))
-            .relative()
-            .w_full()
-            .flex()
-            .items_center()
-            .gap_3()
-            .px_3()
-            .py(px(9.))
-            .hover(|st| st.bg(theme::hover_subtle()))
-            .when(i > 0, |el| {
-                el.child(
+    div()
+        .flex_1()
+        .flex()
+        .flex_col()
+        .children(toggles.into_iter().enumerate().map(|(i, (id, polled))| {
+            let on = root.effective_toggle(&id, polled);
+            let view = view.clone();
+            let mac = mac.clone();
+            let id2 = id.clone();
+            div()
+                .id(gpui::SharedString::from(format!("toggle-{id}")))
+                .relative()
+                .w_full()
+                .flex_1()
+                .min_h(px(34.))
+                .flex()
+                .items_center()
+                .gap_3()
+                .px_3()
+                .py(px(9.))
+                .hover(|st| st.bg(theme::hover_subtle()))
+                .when(i > 0, |el| {
+                    el.child(
+                        div()
+                            .absolute()
+                            .left(px(12.))
+                            .right(px(12.))
+                            .top(px(0.))
+                            .h(px(1.))
+                            .bg(theme::border_subtle()),
+                    )
+                })
+                .cursor_pointer()
+                .on_click(move |_, _window, cx| {
+                    let view = view.clone();
+                    let mac = mac.clone();
+                    let id = id2.clone();
+                    view.update(cx, |root, cx| {
+                        let next = !root.effective_toggle(&id, polled);
+                        root.begin_toggle_override(id.clone(), next);
+                        root.send_setting(&mac, &id, if next { "true" } else { "false" });
+                        cx.notify();
+                    });
+                })
+                .child(
                     div()
-                        .absolute()
-                        .left(px(12.))
-                        .right(px(12.))
-                        .top(px(0.))
-                        .h(px(1.))
-                        .bg(theme::border_subtle()),
+                        .flex_1()
+                        .min_w_0()
+                        .text_size(px(13.))
+                        .font_weight(gpui::FontWeight::MEDIUM)
+                        .text_color(theme::foreground())
+                        .child(data::pretty_setting_id(&id)),
                 )
-            })
-            .cursor_pointer()
-            .on_click(move |_, _window, cx| {
-                let view = view.clone();
-                let mac = mac.clone();
-                let id = id2.clone();
-                view.update(cx, |root, cx| {
-                    let next = !root.effective_toggle(&id, polled);
-                    root.begin_toggle_override(id.clone(), next);
-                    root.send_setting(&mac, &id, if next { "true" } else { "false" });
-                    cx.notify();
-                });
-            })
-            .child(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .text_size(px(13.))
-                    .font_weight(gpui::FontWeight::MEDIUM)
-                    .text_color(theme::foreground())
-                    .child(data::pretty_setting_id(&id)),
-            )
-            .child(toggle_switch(on, format!("quick-{id}")))
-    }))
+                .child(toggle_switch(on, format!("quick-{id}")))
+        }))
 }
