@@ -16,7 +16,8 @@ use std::time::Duration;
 
 use self::scale::px;
 use gpui::{
-    App, Context, IntoElement, ParentElement, Render, Styled, Task, Window, div, prelude::*,
+    Animation, AnimationExt as _, App, Context, IntoElement, ParentElement, Render, Styled, Task,
+    Window, div, prelude::*,
 };
 
 use crate::{
@@ -61,8 +62,6 @@ pub struct RootView {
     pub(crate) protocol_show_details: bool,
     pub(crate) protocol_share_error: Option<String>,
     pub(crate) protocol_share_notice: Option<String>,
-    /// 0..11 frame for the searching spinner
-    pub(crate) spinner_tick: u8,
     /// Optimistic overrides so taps survive the 900ms poll.
     pub(crate) ambient_local: Option<(String, String)>,
     pub(crate) ambient_local_at: Option<std::time::Instant>,
@@ -83,15 +82,15 @@ pub struct RootView {
     pub(crate) eq_active_preset: Option<i64>,
     pub(crate) eq_hover_preset: Option<i64>,
     pub(crate) eq_delete_confirm: Option<(i64, String)>,
-    /// Screen-switch transition: current + outgoing screen keys and spring state.
     nav_screen: &'static str,
     nav_prev_screen: &'static str,
-    nav_phase: f32,
-    nav_velocity: f32,
     nav_id: u64,
     /// +1 push (deeper screen), -1 pop (back), 0 lateral / initial mount.
     nav_direction: i8,
     device_entry_id: u64,
+    settings_cache: HashMap<String, data::SettingsMap>,
+    frame_analysis_cache:
+        HashMap<(String, String), Option<soundcore_protocol::analysis::FrameAnalysis>>,
     _states_task: Task<()>,
     _bt_task: Task<()>,
     _update_task: Task<()>,
@@ -217,9 +216,11 @@ impl RootView {
                     },
                 ));
                 this.update(&mut *cx, |view, cx| {
-                    view.bt_on = Some(bt);
-                    view.scanning = scan.scanning;
-                    cx.notify();
+                    if view.bt_on != Some(bt) || view.scanning != scan.scanning {
+                        view.bt_on = Some(bt);
+                        view.scanning = scan.scanning;
+                        cx.notify();
+                    }
                 })
                 .ok();
             }
@@ -316,7 +317,6 @@ impl RootView {
             protocol_show_details: false,
             protocol_share_error: None,
             protocol_share_notice: None,
-            spinner_tick: 0,
             ambient_local: None,
             ambient_local_at: None,
             sub_local: None,
@@ -332,11 +332,11 @@ impl RootView {
             last_preset_id: None,
             nav_screen: "",
             nav_prev_screen: "",
-            nav_phase: 1.0,
-            nav_velocity: 0.0,
             nav_id: 0,
             nav_direction: 0,
             device_entry_id: 0,
+            settings_cache: HashMap::new(),
+            frame_analysis_cache: HashMap::new(),
             _states_task: states_task,
             _bt_task: bt_task,
             _update_task: update_task,
@@ -406,7 +406,9 @@ impl RootView {
             .map(|d| d.model.clone())
             != next.iter().find(|d| d.connected).map(|d| d.model.clone());
         self.devices = next;
+        self.rebuild_settings_cache();
         if model_changed {
+            self.eq_draft.clear();
             self.reload_eq_presets();
         }
         // Drop ambient override once the poll reports the same value or grace expires.
@@ -427,18 +429,15 @@ impl RootView {
             }
         }
         // Remember last built-in preset; clear SE pending once device agrees.
-        if let Some(id) = self
-            .devices
-            .iter()
-            .find(|d| d.connected)
-            .and_then(|d| data::device_preset_id(&data::settings_map(d)))
-        {
-            self.last_preset_id = Some(id);
+        if let Some(mac) = self.active_device().map(|d| d.mac_address.as_str()) {
+            if let Some(id) = data::device_preset_id(&self.settings_for(mac)) {
+                self.last_preset_id = Some(id);
+            }
         }
         if let Some((section, at)) = self.se_local.clone() {
             let device_section = self
                 .active_device()
-                .map(|d| data::derive_active_section(&data::settings_map(d)))
+                .map(|d| data::derive_active_section(&self.settings_for(&d.mac_address)))
                 .unwrap_or_default();
             if device_section == section || at.elapsed() >= std::time::Duration::from_millis(2000) {
                 self.se_local = None;
@@ -466,7 +465,7 @@ impl RootView {
             }
         }
         self.active_device()
-            .map(|d| data::derive_active_section(&data::settings_map(d)).to_string())
+            .map(|d| data::derive_active_section(&self.settings_for(&d.mac_address)).to_string())
             .unwrap_or_default()
     }
 
@@ -502,49 +501,104 @@ impl RootView {
         self.eq_drag_band = None;
     }
 
+    fn eq_bands_for_apply(&self, mac: &str) -> Vec<String> {
+        let polled: Vec<String> = self
+            .settings_for(mac)
+            .get("volumeAdjustments")
+            .and_then(|v| v.get("value"))
+            .and_then(|v| v.as_array())
+            .map(|a| a.iter().map(|x| x.to_string()).collect())
+            .unwrap_or_default();
+
+        if !self.eq_draft.is_empty() && self.eq_draft.len() == polled.len() {
+            return self
+                .eq_draft
+                .iter()
+                .map(|value| value.to_string())
+                .collect();
+        }
+
+        if let Some(id) = self.eq_active_preset {
+            let preset_bands = self
+                .eq_presets
+                .iter()
+                .find(|preset| preset.id == id)
+                .map(|preset| preset.bands.as_str())
+                .unwrap_or_default();
+            let values: Vec<String> = preset_bands
+                .split(',')
+                .filter(|value| !value.is_empty())
+                .map(|value| value.trim().to_string())
+                .collect();
+            if !values.is_empty() && (polled.is_empty() || values.len() == polled.len()) {
+                return values;
+            }
+        }
+
+        polled
+    }
+
     /// Select an SE section (mirrors React `selectSection`).
     pub(crate) fn select_section(&mut self, section: &str, cx: &mut Context<Self>) {
         let active = self.se_active();
         if active == section {
-            if section == data::SECTION_CUSTOM {
+            if section == data::SECTION_CUSTOM && self.eq_draft.is_empty() {
                 self.sync_eq_draft();
-                cx.notify();
             }
+            cx.notify();
             return;
         }
         let Some(mac) = self.active_device().map(|d| d.mac_address.clone()) else {
             return;
         };
+        let spatial_on = {
+            let s = self.settings_for(&mac);
+            data::has_spatial(&s) && data::is_spatial_on(&s)
+        };
+
         if section == data::SECTION_SPATIAL {
+            self.begin_toggle_override("spatialAudio", true);
             self.send_setting(&mac, "spatialAudio", "true");
-        } else if section == data::SECTION_DEFAULT {
-            let s = self.settings_for(&mac);
-            let id = self.last_preset_id.clone().or_else(|| {
-                data::preset_options(&s)
-                    .into_iter()
-                    .next()
-                    .map(|(id, _)| id)
-            });
-            let Some(id) = id else { return };
-            self.send_setting(&mac, "presetEqualizerProfile", &id);
-        } else if section == data::SECTION_CUSTOM {
-            let s = self.settings_for(&mac);
-            let Some(vol) = s.get("volumeAdjustments") else {
-                return;
-            };
-            if vol.get("readOnly").and_then(|v| v.as_bool()) == Some(true) {
-                return;
+        } else {
+            if spatial_on {
+                self.begin_toggle_override("spatialAudio", false);
+                self.send_setting(&mac, "spatialAudio", "false");
             }
-            let bands: Vec<String> = vol
-                .get("value")
-                .and_then(|v| v.as_array())
-                .map(|a| a.iter().map(|x| x.to_string()).collect())
-                .unwrap_or_default();
-            if bands.is_empty() {
-                return;
+            if section == data::SECTION_DEFAULT {
+                let id = {
+                    let s = self.settings_for(&mac);
+                    self.last_preset_id.clone().or_else(|| {
+                        data::preset_options(&s)
+                            .into_iter()
+                            .next()
+                            .map(|(id, _)| id)
+                    })
+                };
+                let Some(id) = id else { return };
+                self.send_setting(&mac, "presetEqualizerProfile", &id);
+            } else if section == data::SECTION_CUSTOM {
+                let read_only = self
+                    .settings_for(&mac)
+                    .get("volumeAdjustments")
+                    .and_then(|v| v.get("readOnly"))
+                    .and_then(|v| v.as_bool())
+                    == Some(true);
+                if read_only {
+                    return;
+                }
+                let bands = self.eq_bands_for_apply(&mac);
+                if bands.is_empty() {
+                    return;
+                }
+                self.send_setting(&mac, "volumeAdjustments", &bands.join(","));
+                let values: Vec<i16> = bands
+                    .iter()
+                    .filter_map(|value| value.parse().ok())
+                    .collect();
+                if self.eq_draft.len() != values.len() || values.is_empty() {
+                    self.eq_draft = values;
+                }
             }
-            self.send_setting(&mac, "volumeAdjustments", &bands.join(","));
-            self.sync_eq_draft();
         }
         self.se_local = Some((section.to_string(), std::time::Instant::now()));
         cx.notify();
@@ -602,7 +656,7 @@ impl RootView {
         }
         let settings = self
             .active_device()
-            .map(data::settings_map)
+            .map(|d| self.settings_for(&d.mac_address))
             .unwrap_or_default();
         let values: Vec<i16> = settings
             .get("volumeAdjustments")
@@ -651,7 +705,7 @@ impl RootView {
         }
         let settings = self
             .active_device()
-            .map(data::settings_map)
+            .map(|d| self.settings_for(&d.mac_address))
             .unwrap_or_default();
         let matched = data::match_custom_preset(&settings, &self.eq_presets);
         self.eq_active_preset = matched
@@ -695,12 +749,33 @@ impl RootView {
         self.settings_for(mac)
     }
 
-    fn settings_for(&self, mac: &str) -> data::SettingsMap {
-        self.devices
+    fn rebuild_settings_cache(&mut self) {
+        self.settings_cache = self
+            .devices
             .iter()
-            .find(|d| d.mac_address == mac)
-            .map(data::settings_map)
-            .unwrap_or_default()
+            .map(|device| (device.mac_address.clone(), data::settings_map(device)))
+            .collect();
+    }
+
+    fn settings_for(&self, mac: &str) -> data::SettingsMap {
+        self.settings_cache.get(mac).cloned().unwrap_or_default()
+    }
+
+    pub(crate) fn frame_analysis(
+        &mut self,
+        hex: &str,
+        model: &str,
+    ) -> Option<soundcore_protocol::analysis::FrameAnalysis> {
+        let key = (hex.to_string(), model.to_string());
+        if let Some(cached) = self.frame_analysis_cache.get(&key) {
+            return cached.clone();
+        }
+        let result = soundcore_protocol::analysis::analyze(hex, model);
+        if self.frame_analysis_cache.len() > 512 {
+            self.frame_analysis_cache.clear();
+        }
+        self.frame_analysis_cache.insert(key, result.clone());
+        result
     }
 
     /// Effective toggle value while a device confirmation is pending.
@@ -806,7 +881,11 @@ impl RootView {
     }
 
     pub fn send_setting(&self, mac: &str, id: &str, raw: &str) {
-        let _ = crate::set_setting(state(), mac.to_string(), id.to_string(), raw.to_string());
+        if let Err(err) =
+            crate::set_setting(state(), mac.to_string(), id.to_string(), raw.to_string())
+        {
+            tracing::warn!("set_setting {id} for {mac} failed: {err}");
+        }
     }
 
     pub fn load_device_image(&self, d: &DeviceStateDto) -> Option<std::sync::Arc<gpui::Image>> {
@@ -862,16 +941,20 @@ fn downscale_png(bytes: Vec<u8>, max: u32) -> Vec<u8> {
     out
 }
 
+const NAV_DURATION: Duration = Duration::from_millis(320);
+const NAV_SETTLE: Duration = Duration::from_millis(360);
+
+fn ease_out_cubic(phase: f32) -> f32 {
+    1.0 - (1.0 - phase).powi(3)
+}
+
 impl RootView {
     /// Replay the saved-device entrance when the window becomes visible.
     pub fn begin_device_entrance(&mut self) {
         self.device_entry_id = self.device_entry_id.wrapping_add(1);
     }
 
-    /// Detect a screen change, classify it as push/pop/lateral and drive a
-    /// spring phase 0 -> 1. The outgoing screen is held until the spring settles.
     fn update_nav_animation(&mut self, key: &'static str, cx: &mut Context<Self>) {
-        const NAV_SPRING: gpui::SpringConfig = gpui::SpringConfig::new(280.0, 32.0, 1.0);
         if self.nav_screen == key {
             return;
         }
@@ -882,44 +965,20 @@ impl RootView {
         };
         self.nav_prev_screen = self.nav_screen;
         self.nav_screen = key;
-        self.nav_phase = 0.0;
-        self.nav_velocity = 0.0;
         self.nav_id = self.nav_id.wrapping_add(1);
         if key == "devices" {
             self.device_entry_id = self.device_entry_id.wrapping_add(1);
         }
         let nav_id = self.nav_id;
         cx.spawn(async move |this, cx| {
-            loop {
-                cx.background_executor()
-                    .timer(Duration::from_millis(16))
-                    .await;
-                let done = this
-                    .update(&mut *cx, |view, cx| {
-                        if view.nav_id != nav_id {
-                            return true;
-                        }
-                        let state = gpui::SpringState {
-                            position: view.nav_phase,
-                            velocity: view.nav_velocity,
-                        };
-                        let next = NAV_SPRING.step(state, 1.0, 1.0 / 60.0);
-                        view.nav_phase = next.position;
-                        view.nav_velocity = next.velocity;
-                        let done = NAV_SPRING.is_settled(next, 1.0, 0.001);
-                        if done {
-                            view.nav_phase = 1.0;
-                            view.nav_velocity = 0.0;
-                            view.nav_prev_screen = "";
-                        }
-                        cx.notify();
-                        done
-                    })
-                    .unwrap_or(true);
-                if done {
-                    break;
+            cx.background_executor().timer(NAV_SETTLE).await;
+            this.update(&mut *cx, |view, cx| {
+                if view.nav_id == nav_id {
+                    view.nav_prev_screen = "";
+                    cx.notify();
                 }
-            }
+            })
+            .ok();
         })
         .detach();
     }
@@ -973,23 +1032,6 @@ impl Render for RootView {
             self.reload_eq_presets();
         } else {
             self.sync_eq_selection();
-        }
-        // Spinner only ticks while Searching is visible.
-        if self.devices.is_empty() {
-            let tick = self.spinner_tick;
-            let spinner_task: Task<()> = cx.spawn(async move |this, cx| {
-                cx.background_executor()
-                    .timer(Duration::from_millis(80))
-                    .await;
-                this.update(&mut *cx, |view, cx| {
-                    if view.devices.is_empty() {
-                        view.spinner_tick = tick.wrapping_add(1);
-                        cx.notify();
-                    }
-                })
-                .ok();
-            });
-            spinner_task.detach();
         }
 
         let connected_device = self.active_device().cloned();
@@ -1069,7 +1111,7 @@ impl Render for RootView {
             "devices"
         };
         self.update_nav_animation(nav_key, cx);
-        let nav_phase = self.nav_phase.clamp(0.0, 1.0);
+        let nav_id = self.nav_id;
         let nav_dir = self.nav_direction;
         let current_key = self.nav_screen;
         let prev_key = self.nav_prev_screen;
@@ -1082,64 +1124,100 @@ impl Render for RootView {
             None
         };
 
-        // Only the screen content slides — the glass background stays put.
-        // Two complementary clipped windows keep the screens from overlapping.
         let mut layers: Vec<gpui::AnyElement> = Vec::new();
         if let Some(outgoing_el) = outgoing {
-            let (left, clip, inner_offset) = if nav_dir > 0 {
-                (0.0, (1.0 - nav_phase) * width, -nav_phase * width * 0.3)
-            } else {
-                (nav_phase * width, (1.0 - nav_phase) * width, 0.0)
-            };
+            let outer_animation = Animation::new(NAV_DURATION).with_easing(ease_out_cubic);
+            let inner_animation = Animation::new(NAV_DURATION).with_easing(ease_out_cubic);
             layers.push(
                 div()
-                    .id("nav-outgoing")
+                    .id(("nav-outgoing", nav_id))
                     .absolute()
                     .top(px(0.))
-                    .left(gpui::px(left))
-                    .w(gpui::px(clip + 1.0))
+                    .left(px(0.))
+                    .w_full()
                     .h_full()
                     .overflow_hidden()
+                    .with_animation(
+                        ("nav-outgoing-spring", nav_id),
+                        outer_animation,
+                        move |this, phase| {
+                            let p = phase.clamp(0.0, 1.0);
+                            let (left, clip) = if nav_dir > 0 {
+                                (0.0, (1.0 - p) * width)
+                            } else {
+                                (p * width, (1.0 - p) * width)
+                            };
+                            this.left(gpui::px(left)).w(gpui::px(clip + 1.0))
+                        },
+                    )
                     .child(
                         div()
                             .relative()
                             .w(gpui::px(width))
                             .h_full()
-                            .left(gpui::px(inner_offset))
+                            .with_animation(
+                                ("nav-outgoing-inner", nav_id),
+                                inner_animation,
+                                move |this, phase| {
+                                    let p = phase.clamp(0.0, 1.0);
+                                    let offset = if nav_dir > 0 { -p * width * 0.3 } else { 0.0 };
+                                    this.left(gpui::px(offset))
+                                },
+                            )
                             .child(outgoing_el),
                     )
                     .into_any_element(),
             );
         }
         if let Some(incoming_el) = incoming {
-            let (left, clip, inner_offset, opacity) = if nav_dir > 0 {
-                ((1.0 - nav_phase) * width, nav_phase * width, 0.0, 1.0)
-            } else if nav_dir < 0 {
-                (
-                    0.0,
-                    nav_phase * width,
-                    -(1.0 - nav_phase) * width * 0.3,
-                    1.0,
-                )
-            } else {
-                (0.0, width, (1.0 - nav_phase) * 12.0, nav_phase)
-            };
+            let outer_animation = Animation::new(NAV_DURATION).with_easing(ease_out_cubic);
+            let inner_animation = Animation::new(NAV_DURATION).with_easing(ease_out_cubic);
             layers.push(
                 div()
-                    .id("nav-incoming")
+                    .id(("nav-incoming", nav_id))
                     .absolute()
                     .top(px(0.))
-                    .left(gpui::px(left))
-                    .w(gpui::px(clip + 1.0))
+                    .left(px(0.))
+                    .w_full()
                     .h_full()
                     .overflow_hidden()
-                    .opacity(opacity)
+                    .with_animation(
+                        ("nav-incoming-spring", nav_id),
+                        outer_animation,
+                        move |this, phase| {
+                            let p = phase.clamp(0.0, 1.0);
+                            let (left, clip, opacity) = if nav_dir > 0 {
+                                ((1.0 - p) * width, p * width, 1.0)
+                            } else if nav_dir < 0 {
+                                (0.0, p * width, 1.0)
+                            } else {
+                                (0.0, width, p)
+                            };
+                            this.left(gpui::px(left))
+                                .w(gpui::px(clip + 1.0))
+                                .opacity(opacity)
+                        },
+                    )
                     .child(
                         div()
                             .relative()
                             .w(gpui::px(width))
                             .h_full()
-                            .left(gpui::px(inner_offset))
+                            .with_animation(
+                                ("nav-incoming-inner", nav_id),
+                                inner_animation,
+                                move |this, phase| {
+                                    let p = phase.clamp(0.0, 1.0);
+                                    let offset = if nav_dir > 0 {
+                                        0.0
+                                    } else if nav_dir < 0 {
+                                        -(1.0 - p) * width * 0.3
+                                    } else {
+                                        (1.0 - p) * 12.0
+                                    };
+                                    this.left(gpui::px(offset))
+                                },
+                            )
                             .child(incoming_el),
                     )
                     .into_any_element(),
