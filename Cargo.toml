@@ -1,6 +1,6 @@
 [package]
 name = "soundcore-desktop"
-version = "2.0.0"
+version = "2.1.0"
 edition = "2024"
 license = "GPL-3.0-or-later"
 description = "Cross-platform desktop tray app that mirrors Soundcore earbud settings (gaming mode, ANC, EQ) — fetch-only on connect, live single-setting controls from the tray. Windows & Linux."
