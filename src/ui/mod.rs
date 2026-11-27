@@ -449,11 +449,6 @@ impl RootView {
                 self.sub_local_at = None;
             }
         }
-        if let Some((_, _, at)) = self.spatial_local.clone() {
-            if at.elapsed() >= std::time::Duration::from_millis(500) {
-                self.spatial_local = None;
-            }
-        }
         cx.notify();
     }
 
@@ -469,10 +464,10 @@ impl RootView {
             .unwrap_or_default()
     }
 
-    /// Spatial mode with 500ms optimistic grace for this MAC.
+    /// Spatial mode stays on the optimistic choice until the device confirms it.
     pub(crate) fn spatial_mode(&self, mac: &str, polled: Option<String>) -> String {
-        if let Some((m, mode, at)) = &self.spatial_local {
-            if m == mac && at.elapsed() < std::time::Duration::from_millis(500) {
+        if let Some((m, mode, _)) = &self.spatial_local {
+            if m == mac {
                 return mode.clone();
             }
         }
@@ -803,6 +798,23 @@ impl RootView {
         });
     }
 
+    pub(crate) fn settle_spatial_override(&mut self, mac: &str) {
+        let Some((owner, mode, started)) = self.spatial_local.clone() else {
+            return;
+        };
+        if owner != mac {
+            return;
+        }
+        let settings = self.settings_for(mac);
+        let polled = settings
+            .get("spatialAudioMode")
+            .and_then(|value| value.get("value"))
+            .and_then(|value| value.as_str());
+        if polled == Some(mode.as_str()) || started.elapsed() >= Duration::from_secs(5) {
+            self.spatial_local = None;
+        }
+    }
+
     pub fn dismiss_update(&mut self, cx: &mut Context<Self>) {
         self.update_info = None;
         self.update_progress = None;
@@ -1054,6 +1066,7 @@ impl Render for RootView {
         let active = connected_device.filter(|d| !d.categories.is_empty());
         if let Some(device) = active.as_ref() {
             self.settle_toggle_overrides(&device.mac_address);
+            self.settle_spatial_override(&device.mac_address);
         }
         // Render-time exclusivity: About > Settings > Protocol Lab > Device Settings > Sound Effects.
         let show_about = self.show_about;
