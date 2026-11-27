@@ -91,11 +91,10 @@ impl Render for NotificationView {
                     .px_3()
                     .child(
                         div()
-                            .size(px(52.))
+                            .size(px(60.))
                             .flex_shrink_0()
                             .rounded_xl()
                             .overflow_hidden()
-                            .bg(theme::brand_10())
                             .flex()
                             .items_center()
                             .justify_center()
