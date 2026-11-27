@@ -36,6 +36,57 @@
   <img src="assets/screenshots/settings.png" width="200" alt="Settings">
 </div>
 
+## Supported Devices
+
+SoundCore-Desktop supports the following Soundcore models. The model ID is the value used in `config.toml` (`model = "..."`).
+
+| Device | Model ID |
+|--------|----------|
+| Soundcore Q20I | `SoundcoreA3004` |
+| Soundcore Q11i | `SoundcoreA3005` |
+| Soundcore Life Q35 | `SoundcoreA3027` |
+| Soundcore Q30 / Life Q30 | `SoundcoreA3028` |
+| Soundcore Life Tune | `SoundcoreA3029` |
+| Soundcore Life Tune Pro | `SoundcoreA3030` |
+| Soundcore Vortex | `SoundcoreA3031` |
+| Soundcore Life 2 Neo | `SoundcoreA3033` |
+| Soundcore Space One | `SoundcoreA3035` |
+| Soundcore Space Q45 | `SoundcoreA3040` |
+| Soundcore Space One Pro | `SoundcoreA3062` |
+| Soundcore Motion+ | `SoundcoreA3116` |
+| Soundcore C30i | `SoundcoreA3330` |
+| Soundcore AeroClip | `SoundcoreA3388` |
+| Soundcore V20i | `SoundcoreA3876` |
+| Soundcore Liberty 2 Pro | `SoundcoreA3909` |
+| Soundcore Life Dot 2S | `SoundcoreA3926` |
+| Soundcore Liberty 2 Pro+ | `SoundcoreA3930` |
+| Soundcore Life Dot 2 NC | `SoundcoreA3931` |
+| Soundcore Life Note 3 | `SoundcoreA3933` |
+| Soundcore Life A2 NC | `SoundcoreA3935` |
+| Soundcore Space A40 | `SoundcoreA3936` |
+| Soundcore Life P3 | `SoundcoreA3939` |
+| Soundcore Life P2 Mini | `SoundcoreA3944` |
+| Soundcore Life Note 3S | `SoundcoreA3945` |
+| Soundcore Liberty 4 NC | `SoundcoreA3947` |
+| Soundcore A20i | `SoundcoreA3948` |
+| Soundcore P20i / P25i / R50i | `SoundcoreA3949` |
+| Soundcore Liberty Air 2 Pro | `SoundcoreA3951` |
+| Soundcore Liberty 3 Pro | `SoundcoreA3952` |
+| Soundcore Liberty 4 | `SoundcoreA3953` |
+| Soundcore Liberty 4 Pro | `SoundcoreA3954` |
+| Soundcore P40i | `SoundcoreA3955` |
+| Soundcore Liberty 5 | `SoundcoreA3957` |
+| Soundcore P30i / R50i NC | `SoundcoreA3959` |
+| Soundcore Sport X20 | `SoundcoreA3968` |
+| Soundcore C50i | `SoundcoreD1101` |
+| Soundcore P31i | `SoundcoreD1202` |
+| Soundcore R60i NC | `SoundcoreD1202C` |
+| Soundcore Liberty 5 Pro Max | `SoundcoreD1204` |
+| Soundcore Sleep A30 | `SoundcoreD1301` |
+| Soundcore Space 2 | `SoundcoreD1402` |
+
+If your device is not listed, open **Protocol Lab** from Settings, capture its traffic, and send the generated report — that data is what is needed to add support.
+
 ## Tech Stack
 
 - UI: GPUI (Rust)
