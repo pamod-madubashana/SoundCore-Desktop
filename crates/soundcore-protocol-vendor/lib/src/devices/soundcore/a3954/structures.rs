@@ -135,8 +135,8 @@ impl ToPacketBody for SoundModes {
 sound_mode_enum!(
     pub enum AmbientSoundMode {
         NoiseCanceling = 0,
-        Transparency = 1,
         Normal = 2,
+        Transparency = 1,
         AirplaneMode = 3,
     }
 );
