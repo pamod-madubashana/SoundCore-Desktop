@@ -237,8 +237,8 @@ mod tests {
     pub enum AmbientSoundMode {
         #[default]
         NoiseCanceling = 0,
-        Transparency = 1,
         Normal = 2,
+        Transparency = 1,
     }
 
     #[repr(u8)]
