@@ -59,8 +59,8 @@ impl SoundModes {
 sound_mode_enum!(
     pub enum AmbientSoundMode {
         NoiseCanceling = 0,
-        Transparency = 1,
         Normal = 2,
+        Transparency = 1,
     }
 );
 
@@ -112,5 +112,26 @@ impl CustomNoiseCanceling {
             }),
         )
         .parse_complete(input)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AmbientSoundMode;
+    use strum::IntoEnumIterator;
+
+    #[test]
+    fn ambient_sound_mode_iteration_order_matches_ui_and_bytes_are_stable() {
+        assert_eq!(
+            AmbientSoundMode::iter().collect::<Vec<_>>(),
+            vec![
+                AmbientSoundMode::NoiseCanceling,
+                AmbientSoundMode::Normal,
+                AmbientSoundMode::Transparency,
+            ]
+        );
+        assert_eq!(AmbientSoundMode::NoiseCanceling.byte(), 0);
+        assert_eq!(AmbientSoundMode::Normal.byte(), 2);
+        assert_eq!(AmbientSoundMode::Transparency.byte(), 1);
     }
 }
